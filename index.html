@@ -1159,10 +1159,12 @@ const T = {
     ownerLabel: 'المسؤول',
     fieldDependsOn: 'يعتمد على (اختياري)',
     dependsOnNone: '— لا يوجد اعتماد —',
-    dependsOnHint: 'حدد المهمة التي يعتمد عليها إنجاز هذه المهمة',
+    dependsOnHint: 'اختر المهام التي يعتمد عليها إنجاز هذه المهمة (يمكن اختيار أكثر من مهمة)',
     blockedByLabel: 'يعتمد على',
     delayedDueToDependency: 'متأخرة بسبب اعتماد على: {0}',
     delayedDueToDependencyShort: 'متأخرة بسبب الاعتماد',
+    delayedDueToDependencyMulti: 'متأخرة بسبب اعتمادات غير مكتملة',
+    alertDependenciesOpen: 'لا يمكن إكمال هذه المهمة لأنها تعتمد على مهام غير مكتملة:',
     delayedOtherFactor: 'متأخرة (عامل آخر)',
     fieldTaskNote: 'ملاحظة / سبب التأخير (اختياري)',
     taskNotePh: 'مثال: بانتظار رد جهة خارجية',
@@ -1658,10 +1660,12 @@ const T = {
     ownerLabel: 'Owner',
     fieldDependsOn: 'Depends On (Optional)',
     dependsOnNone: '— No dependency —',
-    dependsOnHint: 'Select the task this task is waiting on',
+    dependsOnHint: 'Select tasks this task depends on (hold Ctrl/Cmd to select multiple)',
     blockedByLabel: 'Depends on',
     delayedDueToDependency: 'Delayed due to dependency: {0}',
     delayedDueToDependencyShort: 'Delayed due to dependency',
+    delayedDueToDependencyMulti: 'Delayed due to incomplete dependencies',
+    alertDependenciesOpen: 'Cannot complete this task because it depends on incomplete tasks:',
     delayedOtherFactor: 'Delayed (other factor)',
     fieldTaskNote: 'Note / delay reason (Optional)',
     taskNotePh: 'e.g., awaiting external party response',
@@ -2169,9 +2173,13 @@ function loadState() {
         if (a.type !== 'meeting') {
           if (a.ownerId === undefined) a.ownerId = '';
           if (a.ownerKind === undefined) a.ownerKind = '';   // 'internal' | 'partner'
-          if (a.dependsOn === undefined) a.dependsOn = '';    // another task id
           if (a.note === undefined) a.note = '';              // optional context / delay reason
           if (a.isMilestone === undefined) a.isMilestone = false;
+          // Migration: single dependsOn string → dependsOnIds array
+          if (!Array.isArray(a.dependsOnIds)) {
+            a.dependsOnIds = (a.dependsOn && typeof a.dependsOn === 'string' && a.dependsOn.trim()) ? [a.dependsOn.trim()] : [];
+          }
+          if ('dependsOn' in a) delete a.dependsOn;
         }
         // Migration: ensure meeting-specific fields exist
         if (a.type === 'meeting') {
@@ -2319,7 +2327,7 @@ function loadSampleData() {
   state.actions = [
     { id: 'a1', type: 'task', title: 'تسليم النسخة التجريبية الأولى', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'high', dueDate: daysAgo(15), completedDate: daysAgo(14), reason: '', createdAt: daysAgo(30), ownerKind:'partner', ownerId:'pm_p1a' },
     { id: 'a2', type: 'task', title: 'مراجعة وثيقة المتطلبات', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'medium', dueDate: daysAgo(8), completedDate: daysAgo(7), reason: '', createdAt: daysAgo(20), ownerKind:'partner', ownerId:'pm_p1a' },
-    { id: 'a3', type: 'task', title: 'تجهيز بيئة الاختبار', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: 'في انتظار اعتماد الميزانية من الإدارة', createdAt: daysAgo(15), ownerKind:'internal', ownerId:'tm2', dependsOn:'a8' },
+    { id: 'a3', type: 'task', title: 'تجهيز بيئة الاختبار', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: 'في انتظار اعتماد الميزانية من الإدارة', createdAt: daysAgo(15), ownerKind:'internal', ownerId:'tm2', dependsOnIds:['a8'] },
     { id: 'a4', type: 'task', title: 'تسليم تقرير التقدم الشهري', projectId: 'pr2', partnerId: 'p2', status: 'open', priority: 'medium', dueDate: daysAgo(10), completedDate: null, reason: 'تأخر استلام البيانات من العميل', createdAt: daysAgo(20), ownerKind:'partner', ownerId:'pm_p2a' },
     { id: 'a5', type: 'task', title: 'مراجعة الكود البرمجي', projectId: 'pr2', partnerId: 'p2', status: 'open', priority: 'high', dueDate: daysAgo(2), completedDate: null, reason: 'يحتاج اجتماع تنسيق', createdAt: daysAgo(10), ownerKind:'internal', ownerId:'tm3' },
     { id: 'a6', type: 'task', title: 'إعداد دليل المستخدم', projectId: 'pr3', partnerId: 'p3', status: 'completed', priority: 'low', dueDate: daysAgo(5), completedDate: daysAgo(4), reason: '', createdAt: daysAgo(15), ownerKind:'partner', ownerId:'pm_p3a' },
@@ -2336,9 +2344,9 @@ function loadSampleData() {
     { id: 'm4', type: 'meeting', title: 'اجتماع تنسيق مع العميل الرئيسي', projectId: 'pr2', partnerId: 'p2', status: 'missed', priority: 'high', dueDate: daysAgo(4), meetingTime: '13:00', completedDate: null, reason: 'لم يحضر ممثل العميل', createdAt: daysAgo(12), participants: 'أ. منى السبيعي، ممثل العميل', meetingNotes: '', meetingLink: '', linkedTaskId: 'a4' },
     { id: 'm5', type: 'meeting', title: 'استعراض نتائج التدقيق', projectId: 'pr5', partnerId: 'p4', status: 'scheduled', priority: 'medium', dueDate: todayDate(), meetingTime: '15:30', completedDate: null, reason: '', createdAt: daysAgo(7), participants: 'د. سارة العتيبي', meetingNotes: 'عرض النتائج الأولية للتدقيق', meetingLink: 'https://meet.google.com/sample-abc-xyz', linkedTaskId: 'a9' },
     { id: 'm6', type: 'meeting', title: 'اجتماع شهري - بيت الإبداع', projectId: 'pr3', partnerId: 'p3', status: 'scheduled', priority: 'medium', dueDate: daysAhead(5), meetingTime: '10:00', completedDate: null, reason: '', createdAt: daysAgo(2), participants: 'م. عبدالله الزهراني', meetingNotes: '', meetingLink: 'https://zoom.us/j/0000000000', linkedTaskId: '' },
-    { id: 'ms1', type: 'task', isMilestone: true, title: 'إطلاق النسخة التجريبية', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'high', dueDate: daysAgo(15), completedDate: daysAgo(14), reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOn:'', note:'', createdAt: daysAgo(60) },
-    { id: 'ms2', type: 'task', isMilestone: true, title: 'الإطلاق الرسمي للمنصة', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAhead(20), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOn:'a3', note:'', createdAt: daysAgo(60) },
-    { id: 'ms3', type: 'task', isMilestone: true, title: 'الحصول على ترخيص هيئة النقل', projectId: 'pr5', partnerId: 'p4', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p4a', dependsOn:'', note:'بانتظار رد الجهة', createdAt: daysAgo(40) }
+    { id: 'ms1', type: 'task', isMilestone: true, title: 'إطلاق النسخة التجريبية', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'high', dueDate: daysAgo(15), completedDate: daysAgo(14), reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOnIds:[], note:'', createdAt: daysAgo(60) },
+    { id: 'ms2', type: 'task', isMilestone: true, title: 'الإطلاق الرسمي للمنصة', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAhead(20), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOnIds:['a3'], note:'', createdAt: daysAgo(60) },
+    { id: 'ms3', type: 'task', isMilestone: true, title: 'الحصول على ترخيص هيئة النقل', projectId: 'pr5', partnerId: 'p4', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p4a', dependsOnIds:[], note:'بانتظار رد الجهة', createdAt: daysAgo(40) }
   ];
 
   saveState();
@@ -2426,10 +2434,15 @@ function getTaskDelayCause(task) {
   if (!isTask(task) || !isOpen(task) || getDelayDays(task) <= 0) {
     return { key: 'ok', label: t('onTrackLabel') };
   }
-  if (task.dependsOn) {
-    const dep = state.actions.find(a => a.id === task.dependsOn);
-    if (dep && !isCompleted(dep)) {
-      return { key: 'dep', label: t('delayedDueToDependencyShort'), depTask: dep };
+  // Check multiple dependencies
+  const depIds = Array.isArray(task.dependsOnIds) ? task.dependsOnIds : [];
+  if (depIds.length > 0) {
+    const unresolvedDeps = depIds
+      .map(id => state.actions.find(a => a.id === id))
+      .filter(dep => dep && !isCompleted(dep));
+    if (unresolvedDeps.length > 0) {
+      const titles = unresolvedDeps.map(d => d.title).join(', ');
+      return { key: 'dep', label: t('delayedDueToDependencyMulti') + ': ' + titles, depTasks: unresolvedDeps };
     }
   }
   return { key: 'other', label: task.note ? task.note : t('delayedOtherFactor') };
@@ -3115,7 +3128,7 @@ views.teamMemberDetail = (memberId) => {
                     const cause = getTaskDelayCause(a);
                     let causeHtml;
                     if (isCompleted(a)) causeHtml = `<span class="cause-chip ok">✓ ${t('filterCompleted')}</span>`;
-                    else if (cause.key === 'dep') causeHtml = `<span class="cause-chip dep">⛓ ${escapeHtml(t('delayedDueToDependency', cause.depTask.title))}</span>`;
+                    else if (cause.key === 'dep') causeHtml = `<span class="cause-chip dep">⛓ ${escapeHtml(cause.label)}</span>`;
                     else if (cause.key === 'other') causeHtml = `<span class="cause-chip other">${escapeHtml(cause.label)}</span>`;
                     else causeHtml = `<span class="cause-chip ok">${t('onTrackLabel')}</span>`;
                     return `<tr>
@@ -3415,7 +3428,7 @@ function renderActionCard(a) {
             <div class="ac-meta-item">${t('metaPartner')} ${escapeHtml(partner ? partner.name : '—')}</div>
             <div class="ac-meta-item">${t('metaDate')} ${meeting ? t('meetingDateLabel') : t('dueLabel')}: ${fmtDate(a.dueDate)}${meeting && a.meetingTime ? ' — ' + fmtTime(a.meetingTime) : ''}</div>
             ${!meeting && getOwnerName(a) ? `<div class="ac-meta-item">${t('ownerLabel')}: ${ownerTag(a)}${isInternalOwned(a) ? ` · <span style="color:var(--ink-faint)">${t('internalOwnedNote')}</span>` : ''}</div>` : ''}
-            ${!meeting && a.dependsOn ? `<div class="ac-meta-item">⛓ ${t('blockedByLabel')}: ${escapeHtml((state.actions.find(x=>x.id===a.dependsOn)||{}).title || '—')}</div>` : ''}
+            ${!meeting && Array.isArray(a.dependsOnIds) && a.dependsOnIds.length > 0 ? `<div class="ac-meta-item">⛓ ${t('blockedByLabel')}: ${a.dependsOnIds.map(did => { const dt = state.actions.find(x=>x.id===did); return `<span class="badge" style="font-size:10px;margin-inline:2px">${escapeHtml(dt ? dt.title : '—')}</span>`; }).join(' ')}</div>` : ''}
             ${meeting && a.participants ? `<div class="ac-meta-item">👥 ${escapeHtml(a.participants)}</div>` : ''}
             ${linkedTask ? `<div class="ac-meta-item">🔗 ${t('linkedToLabel')}: ${escapeHtml(linkedTask.title)}</div>` : ''}
             ${isOpen(a) && delay > 0 ? `<div class="ac-meta-item">${t('metaDelayClock')} ${t('delayLabel')}: ${delay} ${t('days')}</div>` : ''}
@@ -3429,7 +3442,7 @@ function renderActionCard(a) {
         </div>
       </div>
       ${meeting && a.meetingNotes ? `<div class="ac-reason">🗒 ${escapeHtml(a.meetingNotes)}</div>` : ''}
-      ${(() => { if (meeting) return ''; const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="ac-reason">⛓ ${escapeHtml(t('delayedDueToDependency', c.depTask.title))}</div>`; if (c.key === 'other' && a.note) return `<div class="ac-reason">📝 ${escapeHtml(a.note)}</div>`; return ''; })()}
+      ${(() => { if (meeting) return ''; const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="ac-reason">⛓ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="ac-reason">📝 ${escapeHtml(a.note)}</div>`; return ''; })()}
     </div>
   `;
 }
@@ -4245,7 +4258,8 @@ views.actions = () => {
                 <div class="name">${meeting ? '🗓 ' : ''}${escapeHtml(a.title)}</div>
                 ${meeting && a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
                 ${!meeting && getOwnerName(a) ? `<div class="sub">${ownerTag(a)}</div>` : ''}
-                ${!meeting ? (() => { const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="sub" style="color:var(--accent-warm)">⛓ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="sub">📝 ${escapeHtml(a.note)}</div>`; return ''; })() : ''}
+                ${!meeting && Array.isArray(a.dependsOnIds) && a.dependsOnIds.length > 0 ? `<div class="sub" style="color:var(--accent-warm)">⛓ ${a.dependsOnIds.map(did => { const dt = state.actions.find(x=>x.id===did); return escapeHtml(dt ? dt.title : '?'); }).join(', ')}</div>` : ''}
+                ${!meeting ? (() => { const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="sub" style="color:var(--crit)">⚠ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="sub">📝 ${escapeHtml(a.note)}</div>`; return ''; })() : ''}
               </td>
               <td>
                 <div style="font-size:12px">${escapeHtml(partner ? partner.name : '—')}</div>
@@ -5115,7 +5129,7 @@ function saveProject(id) {
           status: 'open', priority: 'medium',
           dueDate: m.date || data.targetDate || todayDate(),
           completedDate: null, reason: '', tracking: [],
-          ownerId: '', ownerKind: '', dependsOn: '', note: '',
+          ownerId: '', ownerKind: '', dependsOnIds: [], note: '',
           createdAt: todayDate()
         });
       });
@@ -5363,7 +5377,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row" id="depends-on-row">
       <label>${t('fieldDependsOn')}</label>
-      <select id="f-depends-on"></select>
+      <select id="f-depends-on" multiple size="4" style="min-height:80px"></select>
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('dependsOnHint')}</div>
     </div>
     <div class="form-row" id="task-note-row">
@@ -5423,24 +5437,27 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     sel.innerHTML = html;
   }
 
-  // Build the Depends-On dropdown: tasks in the same project, plus the current
-  // dependency even if it lives in another project (so it stays selectable).
+  // Build the Depends-On multi-select: tasks in the same project, plus any
+  // current dependencies that live in other projects (so they stay selectable).
   function refreshDependsOnOptions() {
     const sel = document.getElementById('f-depends-on');
     if (!sel) return;
     const pid = projectEl.value;
-    const cur = editing?.dependsOn || '';
+    const curIds = Array.isArray(editing?.dependsOnIds) ? editing.dependsOnIds : [];
     const tasks = state.actions.filter(a => isTask(a) && a.projectId === pid && (!editing || a.id !== editing.id));
-    // If the current dependency is on a task outside this project, keep it in the list
-    if (cur && !tasks.some(tk => tk.id === cur)) {
-      const ext = state.actions.find(a => a.id === cur && isTask(a));
-      if (ext) {
-        const pr = getProject(ext.projectId);
-        tasks.push({ id: ext.id, title: ext.title + (pr ? ' — ' + pr.name : '') });
+    // Include cross-project deps that aren't in the same-project list
+    curIds.forEach(did => {
+      if (!tasks.some(tk => tk.id === did)) {
+        const ext = state.actions.find(a => a.id === did && isTask(a));
+        if (ext) {
+          const pr = getProject(ext.projectId);
+          tasks.push({ id: ext.id, title: ext.title + (pr ? ' — ' + pr.name : '') });
+        }
       }
-    }
-    sel.innerHTML = `<option value="">${t('dependsOnNone')}</option>` +
-      tasks.map(tk => `<option value="${tk.id}" ${cur===tk.id?'selected':''}>${escapeHtml(tk.title)}</option>`).join('');
+    });
+    sel.innerHTML = tasks.map(tk =>
+      `<option value="${tk.id}" ${curIds.includes(tk.id)?'selected':''}>${escapeHtml(tk.title)}</option>`
+    ).join('');
   }
 
   // Populate the "Linked Deliverable" dropdown with the OPEN/ALL tasks of the selected project
@@ -5588,7 +5605,8 @@ function saveAction(id) {
     if (ownerRaw.startsWith('i:')) { data.ownerKind = 'internal'; data.ownerId = ownerRaw.slice(2); }
     else if (ownerRaw.startsWith('p:')) { data.ownerKind = 'partner'; data.ownerId = ownerRaw.slice(2); }
     else { data.ownerKind = ''; data.ownerId = ''; }
-    data.dependsOn = document.getElementById('f-depends-on')?.value || '';
+    const depSel = document.getElementById('f-depends-on');
+    data.dependsOnIds = depSel ? Array.from(depSel.selectedOptions).map(o => o.value).filter(Boolean) : [];
     data.note = (document.getElementById('f-task-note')?.value || '').trim();
   }
 
@@ -5687,6 +5705,18 @@ function completeAction(id) {
     // For meetings, show quick status picker
     showMeetingStatusPicker(id);
     return;
+  }
+  // Block completion if any dependency is still open
+  const depIds = Array.isArray(a.dependsOnIds) ? a.dependsOnIds : [];
+  if (depIds.length > 0) {
+    const openDeps = depIds
+      .map(did => state.actions.find(x => x.id === did))
+      .filter(d => d && !isCompleted(d));
+    if (openDeps.length > 0) {
+      const names = openDeps.map(d => d.title).join('\n• ');
+      alert(t('alertDependenciesOpen') + '\n\n• ' + names);
+      return;
+    }
   }
   a.status = 'completed';
   a.completedDate = todayDate();
@@ -5983,7 +6013,7 @@ function renderReportTasksTable(tasks) {
               const owner = getOwnerName(a);
               if (owner) parts.push((a.ownerKind === 'internal' ? '🧑‍💼 ' : '🤝 ') + escapeHtml(owner));
               const cause = getTaskDelayCause(a);
-              if (cause.key === 'dep') parts.push('⛓ ' + escapeHtml(t('delayedDueToDependency', cause.depTask.title)));
+              if (cause.key === 'dep') parts.push('⛓ ' + escapeHtml(cause.label));
               else if (a.note) parts.push(escapeHtml(a.note));
               return parts.length ? parts.join('<br>') : '—';
             })()}</td>
