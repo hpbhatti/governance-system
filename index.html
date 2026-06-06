@@ -1573,6 +1573,7 @@ const T = {
     incomeStars: '{0} من ٥',
     cardCommitment: 'تقييم الالتزام',
     importanceSubtitle: 'تقدير يدوي لقيمة الشريك للنظام',
+    partnerImportanceTooltip: 'تُحتسب تلقائياً: متوسط الأهمية الاستراتيجية لكل مشاريع هذا الشريك. وتأتي أهمية كل مشروع من نسبة الملكية، ودور الشريك، والقيمة المالية المرتبطة به.',
     commitmentSubtitle: 'يُحسب تلقائياً من إنجاز المهام',
     starsCount: '{0} نجوم',
     projectsCount: '{0} مشاريع',
@@ -2173,6 +2174,7 @@ const T = {
     incomeStars: '{0} of 5',
     cardCommitment: 'Commitment Score',
     importanceSubtitle: 'Manual estimate of partner value',
+    partnerImportanceTooltip: 'Calculated automatically: the average strategic importance of all this partner\'s projects. Each project\'s importance comes from your ownership stake, the partner\'s role, and the financial value involved.',
     commitmentSubtitle: 'Calculated automatically from task completion',
     starsCount: '{0} stars',
     projectsCount: '{0} projects',
@@ -3546,13 +3548,31 @@ function renderTrackingList() {
 // Translate a single string via the free MyMemory API
 async function translateText(text, from, to) {
   if (!text || !text.trim()) return text;
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data && data.responseData && data.responseData.translatedText) {
-    return data.responseData.translatedText;
-  }
-  throw new Error('Translation API returned no result');
+  // Primary: Google's free translate endpoint — far more accurate than community memories.
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        const out = data[0].map(seg => (seg && seg[0]) ? seg[0] : '').join('').trim();
+        if (out) return out;
+      }
+    }
+  } catch (e) { /* fall through to fallback */ }
+  // Fallback: MyMemory — but reject junk/low-quality community matches that cause bad results.
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rd = data && data.responseData;
+    if (rd && rd.translatedText &&
+        !/PLEASE SELECT|INVALID|QUERY LENGTH|MYMEMORY WARNING|NO QUERY/i.test(rd.translatedText)) {
+      const match = parseFloat(rd.match);
+      if (isNaN(match) || match >= 0.5) return rd.translatedText; // only confident matches
+    }
+  } catch (e) { /* ignore */ }
+  throw new Error('Translation unavailable');
 }
 
 // Collect every user-entered Arabic string from state that has no cached translation yet
@@ -3620,6 +3640,21 @@ async function translateAllUserContent(silent) {
 function detectContentLang(text) { return containsArabic(text) ? 'ar' : 'en'; }
 
 // Store an entered title/name into dual-language slots with manual-edit protection.
+// Store dual-language slots for an action's editable text fields (title + note/meetingNotes).
+function storeActionBilingual(a) {
+  if (a.title) setBilingualField(a, 'title', a.title);
+  const noteKey = a.type === 'meeting' ? 'meetingNotes' : 'note';
+  if (a[noteKey]) setBilingualField(a, noteKey, a[noteKey]);
+}
+// Best-effort background translation of an action's text fields into the other language.
+function autoTranslateAction(a) {
+  const jobs = [];
+  if (a.title) jobs.push(ensureBilingual(a, 'title', detectContentLang(a.title) === 'ar' ? 'en' : 'ar'));
+  const noteKey = a.type === 'meeting' ? 'meetingNotes' : 'note';
+  if (a[noteKey]) jobs.push(ensureBilingual(a, noteKey, detectContentLang(a[noteKey]) === 'ar' ? 'en' : 'ar'));
+  if (jobs.length) Promise.all(jobs).then(rs => { if (rs.some(Boolean)) saveState(); });
+}
+
 function setBilingualField(obj, baseKey, value) {
   // Slot strictly by the CURRENT UI language — what the user typed belongs to that language.
   const cap = currentLang === 'ar' ? 'Ar' : 'En';
@@ -3655,17 +3690,21 @@ async function ensureBilingual(obj, baseKey, targetLang) {
 // Detect the language of the legacy value, store it in the matching slot with manual flag FALSE,
 // leave the other slot empty. No auto-translation here.
 function migrateBilingualContent() {
-  (state.actions || []).forEach(a => {
-    if (a.title && !a.titleEn && !a.titleAr) {
-      const cap = detectContentLang(a.title) === 'ar' ? 'Ar' : 'En';
-      a['title' + cap] = a.title; a['titleManual' + cap] = false;
+  const mig = (obj, key) => {
+    const v = obj[key];
+    if (v && !obj[key + 'En'] && !obj[key + 'Ar']) {
+      const cap = detectContentLang(v) === 'ar' ? 'Ar' : 'En';
+      obj[key + cap] = v; obj[key + 'Manual' + cap] = false;
     }
+  };
+  (state.actions || []).forEach(a => {
+    mig(a, 'title');
+    if (a.type === 'meeting') mig(a, 'meetingNotes');
+    else mig(a, 'note');
   });
   (state.projects || []).forEach(p => {
-    if (p.name && !p.nameEn && !p.nameAr) {
-      const cap = detectContentLang(p.name) === 'ar' ? 'Ar' : 'En';
-      p['name' + cap] = p.name; p['nameManual' + cap] = false;
-    }
+    mig(p, 'name');
+    mig(p, 'description');
   });
 }
 
@@ -3676,15 +3715,22 @@ async function applyContentLanguage(lang) {
   const cap = lang === 'ar' ? 'Ar' : 'En';
   const otherCap = cap === 'Ar' ? 'En' : 'Ar';
   const missing = [];
-  // Show ONLY the current language's slot. If empty, show "—" (never fall back to the other
-  // language). If the other slot has text, queue a background translation to fill this one.
+  // Apply the active language to a single field on an object (display the current slot,
+  // "—" placeholder when empty, queue translation from the other slot — never fall back).
+  const applyField = (obj, key, opt) => {
+    if (obj[key + cap]) { obj[key] = obj[key + cap]; }
+    else if (obj[key + otherCap]) { obj[key] = opt ? '' : '—'; missing.push({ obj, key }); }
+    else if (opt) { obj[key] = ''; }
+  };
+  // Show ONLY the current language's slot for titles, notes, names and descriptions.
   (state.actions || []).forEach(a => {
-    if (a['title' + cap]) a.title = a['title' + cap];
-    else if (a['title' + otherCap]) { a.title = '—'; missing.push({ obj: a, key: 'title' }); }
+    applyField(a, 'title');
+    if (a.type === 'meeting') applyField(a, 'meetingNotes', true);
+    else applyField(a, 'note', true);
   });
   (state.projects || []).forEach(p => {
-    if (p['name' + cap]) p.name = p['name' + cap];
-    else if (p['name' + otherCap]) { p.name = '—'; missing.push({ obj: p, key: 'name' }); }
+    applyField(p, 'name');
+    applyField(p, 'description', true);
   });
   if (missing.length === 0 || isApplyingContentLang) return;
   isApplyingContentLang = true;
@@ -5428,8 +5474,7 @@ views.partnerDetail = (partnerId) => {
 
         <div class="scores-row">
           <div class="detail-card">
-            <h3>${t('cardImportance')}</h3>
-            <div class="score-card-sub">${t('importanceSubtitle')}</div>
+            <h3 title="${t('partnerImportanceTooltip')}" style="cursor:help">${t('cardImportance')} <span style="color:var(--ink-faint);font-size:12px;font-weight:400">ⓘ</span></h3>
             <div style="text-align:center;margin:10px 0">
               <div style="font-size:36px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--accent);margin-top:10px">${importance.score}</div>
               <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px">${t('outOf100')}</div>
@@ -6193,7 +6238,7 @@ function showProjectForm(projectId, defaultPartnerId) {
     </div>
     <div class="form-row">
       <label>${t('fieldDescription')}</label>
-      <textarea id="f-desc">${escapeHtml(editing?.description || '')}</textarea>
+      <textarea id="f-desc">${escapeHtml(editing ? (editing['description' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
     </div>
     <div class="form-row row-2">
       <div>
@@ -6332,13 +6377,21 @@ function saveProject(id) {
     const p = getProject(id);
     Object.assign(p, data); // preserves p.attachments
     setBilingualField(p, 'name', p.name);
-    ensureBilingual(p, 'name', detectContentLang(p.name) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
+    if (p.description) setBilingualField(p, 'description', p.description);
+    Promise.all([
+      ensureBilingual(p, 'name', detectContentLang(p.name) === 'ar' ? 'en' : 'ar'),
+      p.description ? ensureBilingual(p, 'description', detectContentLang(p.description) === 'ar' ? 'en' : 'ar') : Promise.resolve(false)
+    ]).then(rs => { if (rs.some(Boolean)) saveState(); });
   } else {
     const newId = uid();
     const newP = { id: newId, ...data, attachments: [] };
     setBilingualField(newP, 'name', newP.name);
+    if (newP.description) setBilingualField(newP, 'description', newP.description);
     state.projects.push(newP);
-    ensureBilingual(newP, 'name', detectContentLang(newP.name) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
+    Promise.all([
+      ensureBilingual(newP, 'name', detectContentLang(newP.name) === 'ar' ? 'en' : 'ar'),
+      newP.description ? ensureBilingual(newP, 'description', detectContentLang(newP.description) === 'ar' ? 'en' : 'ar') : Promise.resolve(false)
+    ]).then(rs => { if (rs.some(Boolean)) saveState(); });
     // Create optional milestone tasks defined in the project form
     (window._editingProjectMilestones || [])
       .filter(m => m.name && m.name.trim())
@@ -6604,7 +6657,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row hidden" id="meeting-notes-row">
       <label>${t('fieldMeetingNotesLabel')}</label>
-      <textarea id="f-meeting-notes" placeholder="${t('fieldMeetingNotesPh')}">${escapeHtml(editing?.meetingNotes || '')}</textarea>
+      <textarea id="f-meeting-notes" placeholder="${t('fieldMeetingNotesPh')}">${escapeHtml(editing ? (editing['meetingNotes' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
     </div>
     <div class="form-row hidden" id="meeting-link-row">
       <label>${t('fieldMeetingLink')}</label>
@@ -6633,7 +6686,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row" id="task-note-row">
       <label>${t('fieldTaskNote')}</label>
-      <textarea id="f-task-note" placeholder="${t('taskNotePh')}">${escapeHtml(editing?.note || '')}</textarea>
+      <textarea id="f-task-note" placeholder="${t('taskNotePh')}">${escapeHtml(editing ? (editing['note' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
     </div>
   `;
   const foot = `
@@ -6902,6 +6955,7 @@ function saveAction(id) {
           createdAt: todayDate()
         };
         state.actions.push(record);
+        storeActionBilingual(record);
         generated.push(record);
         currentDate = addRecurrence(currentDate, recurrence);
         count++;
@@ -6919,13 +6973,13 @@ function saveAction(id) {
   if (id) {
     const a = state.actions.find(x => x.id === id);
     Object.assign(a, data);
-    setBilingualField(a, 'title', a.title); // dual-language storage + manual flag
-    ensureBilingual(a, 'title', detectContentLang(a.title) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
+    storeActionBilingual(a);   // dual-language storage for title + note/meetingNotes
+    autoTranslateAction(a);    // fill the other language in the background
   } else {
     const newA = { id: uid(), ...data, createdAt: todayDate() };
-    setBilingualField(newA, 'title', newA.title);
+    storeActionBilingual(newA);
     state.actions.push(newA);
-    ensureBilingual(newA, 'title', detectContentLang(newA.title) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
+    autoTranslateAction(newA);
   }
   saveState();
   toast(t('toastSaved'));
@@ -8148,7 +8202,14 @@ function exportPDF() {
 }
 
 function exportData() {
-  const data = { partners: state.partners, projects: state.projects, actions: state.actions, exportedAt: new Date().toISOString() };
+  const data = {
+    partners: state.partners,
+    projects: state.projects,
+    actions: state.actions,
+    team: state.team || [],
+    reports: state.reports || [],
+    exportedAt: new Date().toISOString()
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -8168,9 +8229,17 @@ function importData(file) {
       state.partners = data.partners || [];
       state.projects = data.projects || [];
       state.actions = data.actions || [];
-      // Run migrations
+      // Restore internal team & reports when present (don't wipe existing if an older
+      // backup omitted them).
+      if (Array.isArray(data.team)) state.team = data.team;
+      else if (!Array.isArray(state.team)) state.team = [];
+      if (Array.isArray(data.reports)) state.reports = data.reports;
+      else if (!Array.isArray(state.reports)) state.reports = [];
+      // Run migrations on imported data
       state.actions.forEach(a => { if (!a.type) a.type = 'task'; });
       state.projects.forEach(p => { if (!Array.isArray(p.attachments)) p.attachments = []; });
+      if (typeof migrateProjectsToContributions === 'function') migrateProjectsToContributions();
+      if (typeof migrateBilingualContent === 'function') migrateBilingualContent();
       saveState();
       toast(t('toastDataImported'));
       render();
