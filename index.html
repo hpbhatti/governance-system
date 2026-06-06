@@ -7823,10 +7823,8 @@ function printPartnerReport(partnerId, existingEntry) {
     <h2>${t('reportSummary')}</h2>
     <div class="stats4">
       <div class="stat-cell">
-        <div class="v" style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
-          ${starsDisplay(importance.stars, 18)}
-          <span style="font-size:14px;color:var(--ink-muted);font-family:'Reem Kufi',serif">${importance.stars}/5</span>
-        </div>
+        <div class="v">${importance.score === null ? t('notRatedLabel') : importance.score + '/100'}</div>
+        ${importance.score === null ? '' : `<div style="max-width:130px;margin:7px auto 5px;height:6px;background:#e8e4da;border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;width:${importance.score}%;background:${importance.score >= 70 ? 'var(--green)' : importance.score >= 40 ? 'var(--amber)' : 'var(--red)'}"></div></div><div><span class="badge-mini ${importance.level === 'high' ? 'green' : importance.level === 'mid' ? 'amber' : 'red'}">${importance.label}</span></div>`}
         <div class="l">${t('cardImportance')}</div>
       </div>
       <div class="stat-cell"><div class="v">${commitmentScoreText(commitment)}${commitment.score===null?'':'/100'}</div><div class="l">${t('cardCommitment')}</div></div>
