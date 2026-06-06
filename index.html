@@ -1026,9 +1026,84 @@
   @media (max-width: 500px) {
     .checkbox-grid { grid-template-columns: 1fr; }
   }
+
+  /* ===================== MOBILE USABILITY ENHANCEMENTS ===================== */
+  /* All tables scroll horizontally instead of overflowing the viewport */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Hamburger button + slide-in drawer backdrop + back-to-top: hidden on desktop */
+  .hamburger-btn, .sidebar-backdrop, .back-to-top { display: none; }
+
+  /* Back-to-top floating button (shown via .show class on scroll) */
+  .back-to-top {
+    position: fixed; bottom: 20px; inset-inline-end: 20px; z-index: 1100;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--accent); color: #f5f3ee; border: none; cursor: pointer;
+    font-size: 22px; line-height: 1; box-shadow: var(--shadow);
+    align-items: center; justify-content: center;
+  }
+  .back-to-top.show { display: inline-flex; }
+  .back-to-top:hover { filter: brightness(1.1); }
+
+  @media (max-width: 980px) {
+    /* Hamburger visible on tablet/phone */
+    .hamburger-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      position: fixed; top: 12px; inset-inline-end: 12px; z-index: 1400;
+      width: 46px; height: 46px; border-radius: 9px;
+      background: var(--accent); color: #f5f3ee; border: none;
+      font-size: 24px; line-height: 1; cursor: pointer; box-shadow: var(--shadow);
+    }
+    /* Sidebar becomes an off-canvas drawer */
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; top: 0; inset-inline-start: 0;
+      height: 100vh; width: 286px; max-width: 86vw;
+      z-index: 1300; overflow-y: auto;
+      transform: translateX(-110%);
+      transition: transform 0.28s ease;
+      box-shadow: 0 0 40px rgba(0,0,0,0.35);
+    }
+    [dir="rtl"] .sidebar { transform: translateX(110%); }
+    body.sidebar-open .sidebar { transform: translateX(0) !important; }
+    .sidebar-backdrop {
+      position: fixed; inset: 0; z-index: 1250;
+      background: rgba(0,0,0,0.45);
+    }
+    body.sidebar-open .sidebar-backdrop { display: block; }
+    /* Leave room for the fixed hamburger */
+    .main { padding-top: 64px; }
+    /* Force tables wide enough that they scroll rather than crush columns */
+    .table-wrap table { min-width: 560px; }
+  }
+
+  @media (max-width: 600px) {
+    /* Touch targets: minimum 44px, comfortable padding */
+    .btn, .row-btn, .filter-chip, .sb-btn {
+      padding: 10px 16px !important; min-width: 44px; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .nav-item { padding: 12px 16px !important; min-height: 44px; }
+    .row-actions { gap: 8px; flex-wrap: wrap; }
+
+    /* Font sizes & spacing for small screens */
+    .page-title { font-size: 22px; }
+    .section-title { font-size: 16px; }
+    .stat-value { font-size: 28px; }
+    .ac-title { font-size: 13px; }
+    .main { padding: 16px !important; padding-top: 64px !important; }
+    .stats { grid-template-columns: 1fr; }
+
+    /* Action cards a touch roomier vertically */
+    .action-card { padding-top: 16px; padding-bottom: 16px; }
+  }
 </style>
 </head>
 <body>
+
+<!-- Mobile menu toggle (visible ≤980px) -->
+<button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
 <div class="app">
   <!-- Sidebar -->
@@ -1039,6 +1114,9 @@
     <!-- Views inserted here -->
   </main>
 </div>
+
+<!-- Back to top (visible after scrolling) -->
+<button class="back-to-top" id="backToTop" aria-label="Back to top" onclick="scrollToTop()">↑</button>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal">
@@ -3666,20 +3744,30 @@ function setBilingualField(obj, baseKey, value) {
   // editing one language must never overwrite or erase the other.
 }
 
-// Fill obj[baseKey + <targetLang>] by translating from the other slot — but ONLY when the
-// target slot is empty AND was not manually authored. Never overwrites real or manual content.
-async function ensureBilingual(obj, baseKey, targetLang) {
+// Heuristic: an auto-translation is "broken" if it contains characters from the WRONG script —
+// an Arabic slot containing Latin words, or an English slot containing Arabic letters. This catches
+// the garbage mixed-language results some translation services return (e.g. "...Startegy" in Arabic).
+function looksBroken(text, cap) {
+  if (!text) return false;
+  if (cap === 'Ar') return /[A-Za-z]{2,}/.test(text);   // Arabic slot containing a Latin word
+  return /[\u0600-\u06FF]/.test(text);                   // English slot containing Arabic letters
+}
+
+// Fill obj[baseKey + <targetLang>] by translating from the other slot. Writes when the target slot
+// is empty, OR (force=true) when the existing auto-translation is broken — but NEVER overwrites a
+// manually-authored slot, and never stores a result that is itself broken.
+async function ensureBilingual(obj, baseKey, targetLang, force) {
   const cap = targetLang === 'ar' ? 'Ar' : 'En';
   const otherCap = cap === 'Ar' ? 'En' : 'Ar';
-  if (obj[baseKey + cap]) return false;             // target non-empty → never overwrite
-  if (obj[baseKey + 'Manual' + cap]) return false;  // target manually authored → never overwrite
-  const source = obj[baseKey + otherCap];           // translate only from the other language slot
+  if (obj[baseKey + 'Manual' + cap]) return false;       // manual → never overwrite
+  if (!force && obj[baseKey + cap]) return false;        // non-empty & not forcing a fix
+  const source = obj[baseKey + otherCap];                // translate only from the other slot
   if (!source) return false;
   try {
     const translated = await translateText(source, targetLang === 'ar' ? 'en' : 'ar', targetLang);
-    if (translated && translated.trim()) {
-      obj[baseKey + cap] = translated.trim();
-      // manual flag stays false — this text was auto-translated, not user-authored
+    const tr = translated && translated.trim();
+    if (tr && !looksBroken(tr, cap)) {                   // only store a clean result
+      obj[baseKey + cap] = tr;
       return true;
     }
   } catch (e) { /* offline / failed → keep slots as they are, no crash */ }
@@ -3718,8 +3806,15 @@ async function applyContentLanguage(lang) {
   // Apply the active language to a single field on an object (display the current slot,
   // "—" placeholder when empty, queue translation from the other slot — never fall back).
   const applyField = (obj, key, opt) => {
-    if (obj[key + cap]) { obj[key] = obj[key + cap]; }
-    else if (obj[key + otherCap]) { obj[key] = opt ? '' : '—'; missing.push({ obj, key }); }
+    const cur = obj[key + cap];
+    // A non-manual slot whose text is broken (wrong-script garbage) should be re-translated.
+    const broken = cur && !obj[key + 'Manual' + cap] && looksBroken(cur, cap);
+    if (cur && !broken) { obj[key] = cur; }
+    else if (obj[key + otherCap]) {            // empty OR broken → (re)translate from the other slot
+      obj[key] = opt ? '' : '—';
+      missing.push({ obj, key, force: !!broken });
+    }
+    else if (cur) { obj[key] = cur; }          // broken but no source to fix it → show as-is
     else if (opt) { obj[key] = ''; }
   };
   // Show ONLY the current language's slot for titles, notes, names and descriptions.
@@ -3736,7 +3831,7 @@ async function applyContentLanguage(lang) {
   isApplyingContentLang = true;
   let changed = false;
   for (const m of missing) {
-    const ok = await ensureBilingual(m.obj, m.key, lang);
+    const ok = await ensureBilingual(m.obj, m.key, lang, m.force);
     if (ok) { m.obj[m.key] = m.obj[m.key + cap]; changed = true; }
     await new Promise(r => setTimeout(r, 120)); // be gentle with the free API
   }
@@ -8292,9 +8387,34 @@ migrateBilingualContent(); // backfill dual-language title/name slots
 loadConfig(); // apply any saved importance-configuration overrides
 renderSidebar();
 render();
+// Heal any broken/missing auto-translations for the current language on load (best-effort, online).
+applyContentLanguage(currentLang);
 // Schedule daily notification check (also runs immediately)
 sendDailyNotification(false);
 setInterval(() => sendDailyNotification(false), 60 * 60 * 1000); // re-check hourly while tab open
+
+/* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
+function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
+function closeSidebar() { document.body.classList.remove('sidebar-open'); }
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+// Close the drawer after tapping a nav item or sidebar button (mobile only)
+(function () {
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.addEventListener('click', function (e) {
+    if (window.innerWidth <= 980 && e.target.closest('.nav-item, .sb-btn')) {
+      setTimeout(closeSidebar, 60);
+    }
+  });
+  // Close drawer with Escape
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
+  // Show/hide back-to-top on scroll
+  const btt = document.getElementById('backToTop');
+  if (btt) {
+    const onScroll = () => btt.classList.toggle('show', (window.scrollY || document.documentElement.scrollTop) > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+})();
 </script>
 </body>
 </html>
