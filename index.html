@@ -68,6 +68,12 @@
     margin-bottom: 28px;
     border-bottom: 1px solid rgba(245, 243, 238, 0.12);
   }
+  .brand-logo {
+    display: block;
+    width: 128px;
+    height: auto;
+    margin: 0 auto 18px;
+  }
   .brand-mark {
     width: 44px; height: 44px;
     border: 1.5px solid var(--gold);
@@ -973,6 +979,53 @@
     .cal-cell { min-height: 70px; }
     .cal-chip { font-size: 10px; }
   }
+
+  /* Checkbox grid for multi-select groups (dependencies, partners, team) */
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 16px;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+  }
+  .checkbox-grid label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.4;
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+  .checkbox-grid label:hover {
+    background: rgba(26, 58, 82, 0.04);
+  }
+  .checkbox-grid input[type="checkbox"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .checkbox-grid .cb-sub {
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  .checkbox-grid-empty {
+    color: var(--ink-faint);
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+  @media (max-width: 500px) {
+    .checkbox-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -1006,6 +1059,104 @@
 const STORE_KEY = 'governance_data_v1';
 const LANG_KEY = 'governance_lang';
 const DELAY_THRESHOLD_DAYS = 3;
+
+/* ========== IMPORTANCE CONFIG (all weights/divisors are configurable here) ========== */
+const CONFIG_KEY = 'governance_config_v1';
+const IMPORTANCE_CONFIG = {
+  ownership: {
+    majorityOwn: 40,
+    jointVentureBase: 30,
+    noOwnership: 20
+  },
+  internalTier: {
+    strategic: 40,
+    operational: 25,
+    basic: 15
+  },
+  roleWeight: {
+    strategicPartner: 35,
+    investor: 25,
+    customer: 20,
+    vendor: 10
+  },
+  financial: {
+    monthlyRevenueDivisor: 10000,
+    revenuePercentDivisor: 4,
+    costDivisor: 100000,
+    maxRevenuePoints: 20,
+    maxCostPoints: 10,
+    monthlyRetainerMultiplier: 1.5,
+    defaultCertainty: 0.4,
+    defaultProjectDurationMonths: 4
+  },
+  customerValueTier: {
+    tier1Max: 100000,
+    tier2Max: 300000,
+    tier3Max: 500000,
+    tier1Mult: 0.25,
+    tier2Mult: 0.5,
+    tier3Mult: 0.75,
+    tier4Mult: 1.0
+  },
+  commitment: {
+    onTime: 100,
+    late1to3: 70,
+    late4to7: 50,
+    late8to10: 30,
+    lateOver10: 10,
+    overdueOpen: 20,
+    missed: 0,
+    highThreshold: 65,
+    midThreshold: 40
+  },
+  health: {
+    milestoneWeight: 0.6,
+    taskWeight: 0.4,
+    progressWeight: 0.5,
+    commitmentWeight: 0.5,
+    delayPenaltyPerTask: 5,
+    delayPenaltyCap: 20,
+    goodThreshold: 65,
+    warnThreshold: 40
+  }
+};
+// Pristine defaults snapshot (for "reset to defaults")
+const IMPORTANCE_DEFAULTS = JSON.parse(JSON.stringify(IMPORTANCE_CONFIG));
+
+// Deep-merge saved overrides into IMPORTANCE_CONFIG (mutates in place, keeping the const ref).
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    Object.keys(IMPORTANCE_CONFIG).forEach(section => {
+      if (saved[section] && typeof saved[section] === 'object') {
+        Object.keys(IMPORTANCE_CONFIG[section]).forEach(key => {
+          const v = saved[section][key];
+          if (typeof v === 'number' && !isNaN(v)) IMPORTANCE_CONFIG[section][key] = v;
+        });
+      }
+    });
+  } catch (e) { /* ignore corrupt config */ }
+}
+function saveConfig() {
+  try { localStorage.setItem(CONFIG_KEY, JSON.stringify(IMPORTANCE_CONFIG)); } catch (e) {}
+}
+function resetConfig() {
+  Object.keys(IMPORTANCE_DEFAULTS).forEach(section => {
+    Object.keys(IMPORTANCE_DEFAULTS[section]).forEach(key => {
+      IMPORTANCE_CONFIG[section][key] = IMPORTANCE_DEFAULTS[section][key];
+    });
+  });
+  saveConfig();
+}
+// Maps the role label stored on a contribution → the roleWeight config key
+const ROLE_WEIGHT_KEY = {
+  'Strategic Partner': 'strategicPartner',
+  'Investor': 'investor',
+  'Customer': 'customer',
+  'Vendor': 'vendor'
+};
 
 /* ========== TRANSLATIONS ========== */
 const T = {
@@ -1149,6 +1300,36 @@ const T = {
     groupNoneInPeriod: 'لا توجد بنود في هذه الفترة',
     groupSummaryLine: '{0} بند · {1} منجز · {2} مفتوح · {3} اجتماع',
     // Section rename
+    dailyAgenda: 'الأجندة اليومية',
+    dailyAgendaSub: 'المهام والاجتماعات المقبلة',
+    agendaTasksSection: '📋 المهام والمعالم',
+    agendaMeetingsSection: '🗓 الاجتماعات',
+    filterToday: 'اليوم',
+    filterThisWeek: 'هذا الأسبوع',
+    filterThisMonth: 'هذا الشهر',
+    filterDelayed: 'متأخرة',
+    agendaNoTasks: 'لا توجد مهام في هذه الفترة',
+    agendaNoMeetings: 'لا توجد اجتماعات في هذه الفترة',
+    backToDashboard: '← العودة للوحة التحكم',
+    taskStartDate: 'تاريخ البدء',
+    colStakeholder: 'الجهة',
+    avgDelayLabel: 'متوسط التأخير',
+    daysUnit: 'يوم',
+    stakeholderInternal: 'الفريق الداخلي',
+    stakeholderPartner: 'شريك: {0}',
+    stakeholderUnassigned: 'غير مُعيَّن',
+    internalReport: 'تقرير داخلي',
+    partnerFacingReport: 'تقرير للشريك',
+    linkName: 'اسم الرابط',
+    linkUrl: 'الرابط (URL)',
+    linkDescription: 'وصف (اختياري)',
+    addLink: '+ إضافة رابط',
+    openLink: 'فتح',
+    taskOwnerCol: 'المسؤول',
+    noAssignedTeam: 'لم يتم تعيين فريق لهذا المشروع',
+    noAssignableOwners: 'لا يوجد أعضاء معينون لهذا المشروع',
+    ownerKindInternal: 'الفريق الداخلي',
+    ownerKindPartner: 'فريق الشريك',
     reportSectionNav: 'التقارير',
     internalTeam: 'الفريق الداخلي',
     // Task owner & dependency
@@ -1308,6 +1489,69 @@ const T = {
     // New: importance questions
     sectionImportanceQuestions: 'أسئلة تقييم الأهمية',
     agreementSection: 'تفاصيل الاتفاق',
+    internalProjectLabel: 'مشروع داخلي (بدون شريك خارجي)',
+    engagementModelLabel: 'نموذج التعاقد',
+    ownershipTypeLabel: 'نوع الملكية',
+    internalProjectTag: 'مشروع داخلي',
+    navSettings: 'إعدادات التقييم',
+    settingsTitle: 'إعدادات معادلات التقييم',
+    settingsSubtitle: 'اضبط أوزان ومعاملات حساب الأهمية والالتزام وصحة التنفيذ. تُحفظ التغييرات محلياً وتُطبّق فوراً على كل الحسابات.',
+    cfgSaveBtn: 'حفظ الإعدادات',
+    cfgResetBtn: 'استعادة الافتراضي',
+    cfgSavedMsg: 'تم حفظ الإعدادات وإعادة احتساب كل النتائج',
+    cfgResetConfirm: 'استعادة كل الأوزان إلى قيمها الافتراضية؟',
+    cfg_ownership: 'مساهمة الملكية (أهمية المشروع)',
+    cfg_internalTier: 'مستويات المشاريع الداخلية',
+    cfg_roleWeight: 'أوزان أدوار الشركاء',
+    cfg_financial: 'النقاط المالية والمعاملات',
+    cfg_customerValueTier: 'شرائح قيمة العميل (معامل دور العميل)',
+    cfgHowTitle: 'كيف تعمل المعادلات؟',
+    cfg_commitment: 'التزام الشريك (نقاط حسب التأخير)',
+    cfg_health: 'صحة التنفيذ',
+    cfgNote: 'القيم أرقام فقط. عتبات النسب من 0 إلى 100. الأوزان مثل 0.6 و0.4 يجب أن يكون مجموعها 1.',
+    internalTierLabel: 'مستوى المشروع الداخلي',
+    tier_strategic: 'استراتيجي',
+    tier_operational: 'تشغيلي',
+    tier_basic: 'أساسي',
+    tier_strategic_desc: 'إيراد جديد / دخول سوق / ميزة تنافسية كبرى',
+    tier_operational_desc: 'تحسين الكفاءة الداخلية / خفض التكاليف / أتمتة',
+    tier_basic_desc: 'أداة داخلية صغيرة / مشروع تجريبي منخفض الأثر',
+    ft_monthlyRetainer: 'أتعاب شهرية',
+    monthlyAmountLabel: 'القيمة الشهرية (ر.س)',
+    ot_majorityOwn: 'ملكية غالبة (>50%)',
+    ot_jointVenture: 'مشروع مشترك (نسبة)',
+    ot_noOwnership: 'بدون ملكية (عمل لعميل)',
+    stakePercentLabel: 'نسبة الحصة (%)',
+    contributionsLabel: 'مساهمات الشركاء',
+    contributionsHint: 'لكل شريك مُختار: الدور والتدفق المالي.',
+    roleLabel: 'الدور',
+    role_strategic: 'شريك استراتيجي',
+    role_investor: 'مستثمر',
+    role_customer: 'عميل',
+    role_vendor: 'مورّد',
+    financialTypeLabel: 'النوع المالي',
+    ft_revenueFixed: 'إيراد (ثابت)',
+    ft_revenuePercent: 'إيراد (نسبة)',
+    ft_cost: 'تكلفة',
+    certaintyLabel: 'درجة التأكد',
+    amountSARLabel: 'القيمة (ر.س)',
+    percentOnlyLabel: 'النسبة (%)',
+    em_clientFixed: 'رسوم ثابتة من عميل',
+    em_jointVenture: 'مشروع مشترك (نسبة)',
+    em_outsourcingRetainer: 'إسناد / أتعاب شهرية',
+    em_ownStrategic: 'مشروع خاص — شريك استراتيجي',
+    em_ownVendor: 'مشروع خاص — مورّد',
+    em_internal: 'داخلي (بدون شريك)',
+    revenueCertaintyLabel: 'درجة تأكد الإيراد',
+    rc_proven: 'إيراد مؤكد (1.0)',
+    rc_pilot: 'تجريبي / إيراد مبكر (0.7)',
+    rc_speculative: 'احتمالي / قبل الإيراد (0.4)',
+    rc_idea: 'فكرة / مفهوم فقط (0.2)',
+    amountLabelFixed: 'القيمة (ر.س)',
+    amountLabelPercent: 'النسبة (%)',
+    importanceTooltip: 'الأهمية الاستراتيجية بناءً على نوع الشريك، نموذج التعاقد، القيمة المالية (ر.س)، وعمق العلاقة مع الشريك.',
+    healthTooltip: 'صحة التنفيذ: التقدم (مراحل/مهام) + التزام الشريك − خصم للتأخيرات المفتوحة. تُرجّح المراحل 60% والمهام 40% عند وجود الاثنين.',
+    focusTooltip: 'التركيز = الأهمية × (100 − الصحة) ÷ 100 — كلما زاد القيمة زادت الحاجة للاهتمام العاجل.',
     agreementSubtitle: 'كل مشروع له اتفاق مستقل قد يختلف عن باقي مشاريع الشريك',
     cardAgreement: 'الاتفاق',
     reportAgreement: 'الاتفاق',
@@ -1356,6 +1600,7 @@ const T = {
     reportTasksByStatus: 'المهام حسب الحالة',
     reportAttachmentsList: 'قائمة المرفقات',
     reportPartnerProjects: 'مشاريع الشريك',
+    colCompletedTotal: 'المنجزة / الإجمالي',
     reportPartnerTasks: 'مهام الشريك',
     reportNoData: 'لا توجد بيانات',
     reportProjectInfo: 'معلومات المشروع',
@@ -1385,6 +1630,11 @@ const T = {
     addPartnerBtn: 'إضافة الشريك', saveChanges: 'حفظ التعديلات',
     addProjectTitle: 'إضافة مشروع', editProjectTitle: 'تعديل مشروع',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
+    fieldPartnerHint: 'اختر شريكًا أو أكثر لهذا المشروع',
+    fieldProjectTeam: 'فريق العمل الداخلي',
+    fieldProjectTeamHint: 'اختر أعضاء الفريق المسؤولين عن هذا المشروع',
+    alertSelectPartner: 'الرجاء اختيار شريك واحد على الأقل',
+    noTeamMembers: 'لا يوجد أعضاء فريق بعد',
     fieldDescription: 'الوصف', fieldStartDate: 'تاريخ البدء', fieldTargetDate: 'الموعد المستهدف',
     devShort: 'تطوير', supShort: 'إشراف',
     addActionTitle: 'إضافة مهمة', editActionTitle: 'تعديل مهمة',
@@ -1650,6 +1900,36 @@ const T = {
     groupNoneInPeriod: 'No items in this period',
     groupSummaryLine: '{0} items · {1} done · {2} open · {3} meetings',
     // Section rename
+    dailyAgenda: 'Daily Agenda',
+    dailyAgendaSub: 'Upcoming tasks & meetings',
+    agendaTasksSection: '📋 Tasks & Milestones',
+    agendaMeetingsSection: '🗓 Meetings',
+    filterToday: 'Today',
+    filterThisWeek: 'This Week',
+    filterThisMonth: 'This Month',
+    filterDelayed: 'Delayed',
+    agendaNoTasks: 'No tasks in this period',
+    agendaNoMeetings: 'No meetings in this period',
+    backToDashboard: '← Back to Dashboard',
+    taskStartDate: 'Start Date',
+    colStakeholder: 'Stakeholder',
+    avgDelayLabel: 'Avg Delay',
+    daysUnit: 'days',
+    stakeholderInternal: 'Internal Team',
+    stakeholderPartner: 'Partner: {0}',
+    stakeholderUnassigned: 'Unassigned',
+    internalReport: 'Internal Report',
+    partnerFacingReport: 'Partner Report',
+    linkName: 'Link Name',
+    linkUrl: 'URL',
+    linkDescription: 'Description (optional)',
+    addLink: '+ Add Link',
+    openLink: 'Open',
+    taskOwnerCol: 'Owner',
+    noAssignedTeam: 'No team assigned to this project',
+    noAssignableOwners: 'No members assigned to this project',
+    ownerKindInternal: 'Internal Team',
+    ownerKindPartner: 'Partner Team',
     reportSectionNav: 'Reports',
     internalTeam: 'Internal Team',
     // Task owner & dependency
@@ -1809,6 +2089,69 @@ const T = {
     // New: importance questions
     sectionImportanceQuestions: 'Importance Assessment',
     agreementSection: 'Agreement Details',
+    internalProjectLabel: 'Internal project (no external partner)',
+    engagementModelLabel: 'Engagement Model',
+    ownershipTypeLabel: 'Ownership type',
+    internalProjectTag: 'Internal Project',
+    navSettings: 'Scoring Settings',
+    settingsTitle: 'Scoring Formula Settings',
+    settingsSubtitle: 'Adjust the weights and factors used to calculate importance, commitment, and execution health. Changes are saved locally and applied immediately to every calculation.',
+    cfgSaveBtn: 'Save Settings',
+    cfgResetBtn: 'Reset to Defaults',
+    cfgSavedMsg: 'Settings saved — all scores recalculated',
+    cfgResetConfirm: 'Reset all weights to their default values?',
+    cfg_ownership: 'Ownership contribution (project importance)',
+    cfg_internalTier: 'Internal project tiers',
+    cfg_roleWeight: 'Partner role weights',
+    cfg_financial: 'Financial points & divisors',
+    cfg_customerValueTier: 'Customer value tiers (Customer role multiplier)',
+    cfgHowTitle: 'How the scoring works',
+    cfg_commitment: 'Partner commitment (points by delay)',
+    cfg_health: 'Execution health',
+    cfgNote: 'Values are numbers only. Percentage thresholds are 0–100. Weights like 0.6 and 0.4 should sum to 1.',
+    internalTierLabel: 'Internal project tier',
+    tier_strategic: 'Strategic',
+    tier_operational: 'Operational',
+    tier_basic: 'Basic',
+    tier_strategic_desc: 'New revenue, new market, or major competitive advantage',
+    tier_operational_desc: 'Improves efficiency, reduces costs, automates workflows',
+    tier_basic_desc: 'Small internal tool, test project, low-impact utility',
+    ft_monthlyRetainer: 'Monthly Retainer',
+    monthlyAmountLabel: 'Monthly amount (SAR)',
+    ot_majorityOwn: 'Majority Own (>50%)',
+    ot_jointVenture: 'Joint Venture (percentage)',
+    ot_noOwnership: 'No Ownership (client work)',
+    stakePercentLabel: 'Stake percentage (%)',
+    contributionsLabel: 'Partner Contributions',
+    contributionsHint: 'For each selected partner: their role and financial flow.',
+    roleLabel: 'Role',
+    role_strategic: 'Strategic Partner',
+    role_investor: 'Investor',
+    role_customer: 'Customer',
+    role_vendor: 'Vendor',
+    financialTypeLabel: 'Financial type',
+    ft_revenueFixed: 'Revenue (fixed)',
+    ft_revenuePercent: 'Revenue (percentage)',
+    ft_cost: 'Cost',
+    certaintyLabel: 'Certainty',
+    amountSARLabel: 'Amount (SAR)',
+    percentOnlyLabel: 'Percentage (%)',
+    em_clientFixed: 'Client Fixed Fee',
+    em_jointVenture: 'Joint Venture (Percentage)',
+    em_outsourcingRetainer: 'Outsourcing Retainer',
+    em_ownStrategic: 'Own Project – Strategic Partner',
+    em_ownVendor: 'Own Project – Vendor',
+    em_internal: 'Internal (no partner)',
+    revenueCertaintyLabel: 'Revenue Certainty',
+    rc_proven: 'Proven revenue (1.0)',
+    rc_pilot: 'Pilot / early revenue (0.7)',
+    rc_speculative: 'Speculative / pre-revenue (0.4)',
+    rc_idea: 'Idea / concept only (0.2)',
+    amountLabelFixed: 'Amount (SAR)',
+    amountLabelPercent: 'Percentage (%)',
+    importanceTooltip: 'Strategic importance based on partner type, engagement model, financial value (SAR), and partner relationship depth.',
+    healthTooltip: 'Execution health: progress (milestones/tasks) + partner commitment − penalty for open delays. Milestones are weighted 60%, tasks 40% when both exist.',
+    focusTooltip: 'Focus = importance × (100 – health) / 100 – higher means more urgent attention needed.',
     agreementSubtitle: 'Each project has an independent agreement that may differ from other projects of the same partner',
     cardAgreement: 'Agreement',
     reportAgreement: 'Agreement',
@@ -1857,6 +2200,7 @@ const T = {
     reportTasksByStatus: 'Tasks by Status',
     reportAttachmentsList: 'Attachments',
     reportPartnerProjects: 'Partner Projects',
+    colCompletedTotal: 'Completed / Total',
     reportPartnerTasks: 'Partner Tasks',
     reportNoData: 'No data',
     reportProjectInfo: 'Project Information',
@@ -1886,6 +2230,11 @@ const T = {
     addPartnerBtn: 'Add Partner', saveChanges: 'Save Changes',
     addProjectTitle: 'Add Project', editProjectTitle: 'Edit Project',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
+    fieldPartnerHint: 'Select one or more partners for this project',
+    fieldProjectTeam: 'Assigned Internal Team',
+    fieldProjectTeamHint: 'Select team members who will work on this project',
+    alertSelectPartner: 'Please select at least one partner',
+    noTeamMembers: 'No internal team members yet',
     fieldDescription: 'Description', fieldStartDate: 'Start Date', fieldTargetDate: 'Target Date',
     devShort: 'dev', supShort: 'supervised',
     addActionTitle: 'Add Task', editActionTitle: 'Edit Task',
@@ -2028,20 +2377,13 @@ function setLang(lang) {
   currentLang = lang;
   try { localStorage.setItem(LANG_KEY, lang); } catch(e){}
   applyLangToDocument();
+  // Bidirectional: show task titles & project names in the active language,
+  // translating any that don't have a stored version yet (manual edits preserved).
+  if (lang !== previousLang) {
+    applyContentLanguage(lang);
+  }
   renderSidebar();
   render(state.detailParam);
-  // When switching to English, if untranslated Arabic content exists, ask user
-  if (lang === 'en' && previousLang !== 'en') {
-    const untranslated = collectUntranslatedStrings();
-    if (untranslated.length > 0) {
-      // Defer the prompt slightly so the UI updates first
-      setTimeout(() => {
-        if (confirm(t('translatePrompt'))) {
-          translateAllUserContent(false);
-        }
-      }, 200);
-    }
-  }
 }
 
 function applyLangToDocument() {
@@ -2050,10 +2392,12 @@ function applyLangToDocument() {
   document.title = t('appTitle');
 }
 
+const SCE_LOGO = 'data:image/png;base64,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';
 function renderSidebar() {
   const brandLetter = currentLang === 'ar' ? 'ح' : 'G';
   document.getElementById('sidebar').innerHTML = `
     <div class="brand">
+      <img class="brand-logo" src="${SCE_LOGO}" alt="SCE logo">
       <div class="brand-mark">${brandLetter}</div>
       <div class="brand-title">${t('appTitle')}</div>
       <div class="brand-sub">${t('appSubtitle')}</div>
@@ -2063,6 +2407,10 @@ function renderSidebar() {
       <button class="nav-item ${state.currentView==='dashboard'?'active':''}" data-view="dashboard">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         ${t('dashboard')}
+      </button>
+      <button class="nav-item ${state.currentView==='agenda'?'active':''}" data-view="agenda">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        ${t('dailyAgenda')}
       </button>
       <button class="nav-item ${state.currentView==='report'?'active':''}" data-view="report">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -2095,6 +2443,10 @@ function renderSidebar() {
       <button class="nav-item ${state.currentView==='meetings'?'active':''}" data-view="meetings">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         ${t('meetings')}
+      </button>
+      <button class="nav-item ${state.currentView==='settings'?'active':''}" data-view="settings">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        ${t('navSettings')}
       </button>
     </nav>
 
@@ -2175,6 +2527,19 @@ function loadState() {
           if (a.ownerKind === undefined) a.ownerKind = '';   // 'internal' | 'partner'
           if (a.note === undefined) a.note = '';              // optional context / delay reason
           if (a.isMilestone === undefined) a.isMilestone = false;
+          // NEW: task startDate migration
+          if (!a.startDate) {
+            const proj = state.projects.find(pr => pr.id === a.projectId);
+            if (proj && proj.startDate) {
+              a.startDate = proj.startDate;
+            } else if (a.dueDate) {
+              const d = new Date(a.dueDate + 'T00:00:00');
+              d.setDate(d.getDate() - 7);
+              a.startDate = d.toISOString().slice(0,10);
+            } else {
+              a.startDate = a.createdAt ? a.createdAt.slice(0,10) : todayDate();
+            }
+          }
           // Migration: single dependsOn string → dependsOnIds array
           if (!Array.isArray(a.dependsOnIds)) {
             a.dependsOnIds = (a.dependsOn && typeof a.dependsOn === 'string' && a.dependsOn.trim()) ? [a.dependsOn.trim()] : [];
@@ -2197,10 +2562,6 @@ function loadState() {
       state.projects.forEach(p => {
         if (!Array.isArray(p.attachments)) p.attachments = [];
       });
-      // Migration: ensure every partner has incomeRating field
-      state.partners.forEach(p => {
-        if (p.incomeRating === undefined || p.incomeRating === null) p.incomeRating = 3;
-      });
       // Migration: move legacy partnership data from partner → projects
       // Any partner that has partnership data copies it to its projects (if not already set),
       // then the partnership data is removed from the partner.
@@ -2221,13 +2582,29 @@ function loadState() {
           delete p.partnershipValue;
         }
       });
+      // Migration: multi-partner + team assignment on projects
+      state.projects.forEach(pr => {
+        if (!Array.isArray(pr.partnerIds)) {
+          pr.partnerIds = pr.partnerId ? [pr.partnerId] : [];
+        }
+        if (!Array.isArray(pr.teamMemberIds)) pr.teamMemberIds = [];
+      });
       // Migration: ensure every project has partnership fields
       state.projects.forEach(pr => {
         if (pr.partnershipModel === undefined) pr.partnershipModel = 'fixed';
         if (pr.partnershipAmount === undefined) pr.partnershipAmount = 0;
         if (pr.partnershipCurrency === undefined) pr.partnershipCurrency = pr.partnershipModel === 'percentage' ? '%' : 'SAR';
         if (pr.partnershipValue === undefined) pr.partnershipValue = '';
+        if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
+        if (!pr.engagementModel) {
+          pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
+        }
+        if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
+          pr.revenueCertainty = ['joint-venture', 'own-strategic', 'own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
+        }
       });
+      // Migration: convert old engagement model → ownershipType + partnerContributions
+      migrateProjectsToContributions();
       return true;
     }
   } catch (e) { console.error('Load error:', e); }
@@ -2315,13 +2692,13 @@ function loadSampleData() {
   ];
 
   state.projects = [
-    { id: 'pr1', name: 'منصة الخدمات الرقمية', partnerId: 'p1', description: 'تطوير منصة متكاملة للخدمات الإلكترونية', startDate: daysAgo(80), targetDate: daysAhead(30), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 35, partnershipCurrency: '%', partnershipValue: '35%' },
-    { id: 'pr2', name: 'تطبيق التحول الرقمي', partnerId: 'p2', description: 'إشراف على تنفيذ التطبيق للعميل الرئيسي', startDate: daysAgo(60), targetDate: daysAhead(15), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 80000, partnershipCurrency: 'SAR', partnershipValue: '80,000 ر.س' },
-    { id: 'pr3', name: 'منصة المحتوى التعليمي', partnerId: 'p3', description: 'تطوير منصة تعليمية تفاعلية', startDate: daysAgo(40), targetDate: daysAhead(45), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 25, partnershipCurrency: '%', partnershipValue: '25%' },
-    { id: 'pr4', name: 'نظام إدارة الموارد', partnerId: 'p1', description: 'نظام داخلي لإدارة الموارد البشرية', startDate: daysAgo(30), targetDate: daysAhead(60), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 45000, partnershipCurrency: 'SAR', partnershipValue: '45,000 ر.س' },
-    { id: 'pr5', name: 'تدقيق المشروع الحكومي', partnerId: 'p4', description: 'إشراف ومراجعة مشروع حكومي', startDate: daysAgo(20), targetDate: daysAhead(10), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 12000, partnershipCurrency: 'USD', partnershipValue: '$12,000' },
-    { id: 'pr6', name: 'منصة محاسبة داخلية', partnerId: 'p5', description: 'مشروع ملكية خاصة مع توزيع نسب للفريق المطور', startDate: daysAgo(70), targetDate: daysAhead(40), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' },
-    { id: 'pr7', name: 'أداة تحليلات SaaS', partnerId: 'p5', description: 'منتج داخلي تجاري — توزيع نسبي بين الفريق المؤسس', startDate: daysAgo(15), targetDate: daysAhead(90), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' }
+    { id: 'pr1', name: 'منصة الخدمات الرقمية', partnerId: 'p1', partnerIds: ['p1'], teamMemberIds: ['tm2'], description: 'تطوير منصة متكاملة للخدمات الإلكترونية', startDate: daysAgo(80), targetDate: daysAhead(30), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 35, partnershipCurrency: '%', partnershipValue: '35%' },
+    { id: 'pr2', name: 'تطبيق التحول الرقمي', partnerId: 'p2', partnerIds: ['p2'], teamMemberIds: ['tm3'], description: 'إشراف على تنفيذ التطبيق للعميل الرئيسي', startDate: daysAgo(60), targetDate: daysAhead(15), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 80000, partnershipCurrency: 'SAR', partnershipValue: '80,000 ر.س' },
+    { id: 'pr3', name: 'منصة المحتوى التعليمي', partnerId: 'p3', partnerIds: ['p3'], teamMemberIds: [], description: 'تطوير منصة تعليمية تفاعلية', startDate: daysAgo(40), targetDate: daysAhead(45), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 25, partnershipCurrency: '%', partnershipValue: '25%' },
+    { id: 'pr4', name: 'نظام إدارة الموارد', partnerId: 'p1', partnerIds: ['p1'], teamMemberIds: ['tm2'], description: 'نظام داخلي لإدارة الموارد البشرية', startDate: daysAgo(30), targetDate: daysAhead(60), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 45000, partnershipCurrency: 'SAR', partnershipValue: '45,000 ر.س' },
+    { id: 'pr5', name: 'تدقيق المشروع الحكومي', partnerId: 'p4', partnerIds: ['p4'], teamMemberIds: ['tm1'], description: 'إشراف ومراجعة مشروع حكومي', startDate: daysAgo(20), targetDate: daysAhead(10), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 12000, partnershipCurrency: 'USD', partnershipValue: '$12,000' },
+    { id: 'pr6', name: 'منصة محاسبة داخلية', partnerId: 'p5', partnerIds: ['p5'], teamMemberIds: [], description: 'مشروع ملكية خاصة مع توزيع نسب للفريق المطور', startDate: daysAgo(70), targetDate: daysAhead(40), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' },
+    { id: 'pr7', name: 'أداة تحليلات SaaS', partnerId: 'p5', partnerIds: ['p5'], teamMemberIds: [], description: 'منتج داخلي تجاري — توزيع نسبي بين الفريق المؤسس', startDate: daysAgo(15), targetDate: daysAhead(90), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' }
   ];
 
   state.actions = [
@@ -2372,15 +2749,39 @@ function daysBetween(a, b) {
   return Math.floor((db - da) / (1000 * 60 * 60 * 24));
 }
 
+// NEW: parse a YYYY-MM-DD string into a LOCAL date (avoids timezone day-shift)
+function parseDateLocal(s) {
+  if (!s) return null;
+  const parts = String(s).slice(0, 10).split('-');
+  if (parts.length !== 3) return new Date(s);
+  return new Date(+parts[0], (+parts[1]) - 1, +parts[2]);
+}
+
+// NEW: count Saudi BUSINESS days (Sun–Thu) strictly after date `a` up to and
+// including date `b`. Friday(5) and Saturday(6) are weekend and never counted.
+// Returns 0 when b <= a. Used everywhere for objective, consistent delay tracking.
+function businessDaysBetween(a, b) {
+  const da = parseDateLocal(a); const db = parseDateLocal(b);
+  if (!da || !db || db <= da) return 0;
+  let count = 0;
+  const cur = new Date(da);
+  while (cur < db) {
+    cur.setDate(cur.getDate() + 1);
+    const day = cur.getDay(); // 0=Sun ... 4=Thu work; 5=Fri,6=Sat weekend
+    if (day !== 5 && day !== 6) count++;
+  }
+  return count;
+}
+
 function getDelayDays(action) {
   if (isCompleted(action)) {
     if (!action.completedDate || !action.dueDate) return 0;
-    return Math.max(0, daysBetween(action.dueDate, action.completedDate));
+    return Math.max(0, businessDaysBetween(action.dueDate, action.completedDate));
   }
   // Postponed meetings reset the clock — no delay against the new date
   if (action.status === 'postponed') return 0;
   if (!action.dueDate) return 0;
-  return Math.max(0, daysBetween(action.dueDate, todayDate()));
+  return Math.max(0, businessDaysBetween(action.dueDate, todayDate()));
 }
 
 // Status helpers (work for both tasks and meetings)
@@ -2610,47 +3011,73 @@ function getRiskLevel(daysOverdue) {
 
 // Calculate partner importance score
 function getPartnerCommitment(partnerId) {
-  // Commitment reflects the PARTNER'S OWN work only.
-  // - Meetings are excluded (tracked separately).
-  // - Tasks owned by our internal team are excluded, so OUR delays never penalize the partner.
+  // Commitment = an OBJECTIVE measure of how reliably the partner delivers on
+  // tasks that have actually come DUE. Key principles:
+  //   - Meetings excluded (tracked separately).
+  //   - Internally-owned tasks excluded (our delays never penalize the partner).
+  //   - Upcoming tasks (open, not yet past due) are NOT yet evaluable — they never
+  //     count for or against the partner, so a brand-new upcoming task does not
+  //     produce an arbitrary mid score.
   const relevant = state.actions.filter(a =>
     a.partnerId === partnerId && isTask(a) && !isInternalOwned(a));
-
-  if (relevant.length === 0) {
-    return { score: null, level: 'na', label: t('notRatedLabel'),
-             completed: 0, open: 0, delayed: 0, missed: 0, avgDelay: 0, total: 0, completedOnTime: 0 };
-  }
 
   const completed = relevant.filter(isCompleted);
   const open = relevant.filter(isOpen);
   const missed = relevant.filter(isMissed);
   const completedOnTime = completed.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS);
-  const openDelayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+  const completedLate = completed.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+  const openDelayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS); // overdue & still open
 
-  const totalDelay = openDelayed.reduce((s, a) => s + getDelayDays(a), 0)
-                  + completed.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS).reduce((s, a) => s + getDelayDays(a), 0);
-  const totalDelayedItems = openDelayed.length + completed.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS).length;
-  const avgDelay = totalDelayedItems > 0 ? Math.round(totalDelay / totalDelayedItems) : 0;
+  // Average delay across items that are/were actually late
+  const lateItems = openDelayed.concat(completedLate);
+  const avgDelay = lateItems.length ? Math.round(lateItems.reduce((s,a)=>s+getDelayDays(a),0)/lateItems.length) : 0;
 
-  // Simpler, fairer scoring: a baseline for engagement + credit for completion and timeliness,
-  // minus capped penalties for misses / heavy delays. Real effort shows instead of collapsing to 0.
-  const total = relevant.length;
-  const completionRate = completed.length / total;   // 0..1
-  const onTimeRate = completedOnTime.length / total; // 0..1
-  const base = 50;
-  const positive = (completionRate * 30) + (onTimeRate * 20);     // up to +50
-  const penalty = Math.min(40, (missed.length * 8) + (openDelayed.length * 4));
-  let pct = Math.round(base + positive - penalty);
+  // Objective weighted average over evaluable tasks. Per-task points (delay = BUSINESS days):
+  //   on-time completion (≤0)        = 100
+  //   late completion 1–3 days       = 70
+  //   late completion 4–7 days       = 50
+  //   late completion 8–10 days      = 30
+  //   late completion > 10 days      = 10
+  //   overdue and still open         = 20
+  //   missed                         = 0
+  function taskCommitmentPoints(a) {
+    const C = IMPORTANCE_CONFIG.commitment;
+    if (isMissed(a)) return C.missed;
+    if (isCompleted(a)) {
+      const d = getDelayDays(a);
+      if (d <= 0) return C.onTime;
+      if (d <= 3) return C.late1to3;
+      if (d <= 7) return C.late4to7;
+      if (d <= 10) return C.late8to10;
+      return C.lateOver10;
+    }
+    if (isOpen(a)) {
+      return getDelayDays(a) > 0 ? C.overdueOpen : null; // overdue open; upcoming = not evaluable
+    }
+    return null;
+  }
+
+  const evaluable = relevant.map(taskCommitmentPoints).filter(pts => pts !== null);
+
+  if (evaluable.length === 0) {
+    // Nothing has come due yet → cannot fairly rate (e.g. only upcoming tasks).
+    return { score: null, level: 'na', label: t('notRatedLabel'),
+             completed: completed.length, completedOnTime: completedOnTime.length,
+             open: open.length, delayed: openDelayed.length, missed: missed.length,
+             avgDelay, total: relevant.length };
+  }
+
+  let pct = Math.round(evaluable.reduce((s, p) => s + p, 0) / evaluable.length);
   pct = Math.max(0, Math.min(100, pct));
 
   let level, label;
-  if (pct >= 65) { level = 'high'; label = t('importanceHigh'); }
-  else if (pct >= 40) { level = 'mid'; label = t('importanceMid'); }
+  if (pct >= IMPORTANCE_CONFIG.commitment.highThreshold) { level = 'high'; label = t('importanceHigh'); }
+  else if (pct >= IMPORTANCE_CONFIG.commitment.midThreshold) { level = 'mid'; label = t('importanceMid'); }
   else { level = 'low'; label = t('importanceLow'); }
 
   return {
     score: pct, rawScore: pct, level, label,
-    total, completed: completed.length,
+    total: relevant.length, completed: completed.length,
     completedOnTime: completedOnTime.length, open: open.length,
     delayed: openDelayed.length, missed: missed.length, avgDelay
   };
@@ -2667,15 +3094,16 @@ function commitmentBadgeClass(level) {
 function getPartnerImportance(partnerId) {
   const p = getPartner(partnerId);
   if (!p) return { stars: 0, score: 0, level: 'low', label: t('importanceLow'), projectCount: 0, hasPercentageProject: false };
-  const stars = Math.max(1, Math.min(5, p.incomeRating || 3));
   const partnerProjects = getPartnerProjects(partnerId);
   const projectCount = partnerProjects.length;
-  // Bonus: any project on a percentage agreement signals more strategic value
-  const hasPercentageProject = partnerProjects.some(pr => pr.partnershipModel === 'percentage');
-  const projectBonus = Math.min(projectCount, 5) * 4;
-  const partnershipBonus = hasPercentageProject ? 5 : 0;
-  let score = (stars * 16) + projectBonus + partnershipBonus;
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  // OBJECTIVE: a partner's importance = average strategic importance of their projects
+  let score = 0;
+  if (projectCount > 0) {
+    score = Math.round(partnerProjects.reduce((s, pr) => s + getProjectImportance(pr), 0) / projectCount);
+  }
+  score = Math.max(0, Math.min(100, score));
+  const stars = Math.max(0, Math.min(5, Math.round(score / 20)));
+  const hasPercentageProject = partnerProjects.some(pr => pr.partnershipModel === 'percentage' || pr.engagementModel === 'joint-venture');
   let level, label;
   if (score >= 70) { level = 'high'; label = t('importanceHigh'); }
   else if (score >= 40) { level = 'mid'; label = t('importanceMid'); }
@@ -2683,13 +3111,135 @@ function getPartnerImportance(partnerId) {
   return { stars, score, level, label, projectCount, hasPercentageProject };
 }
 
+// Convert legacy engagement-model projects into ownershipType + partnerContributions.
+function migrateProjectsToContributions() {
+  (state.projects || []).forEach(pr => {
+    if (pr.ownershipType && Array.isArray(pr.partnerContributions)) return; // already migrated
+    const em = pr.engagementModel || 'client-fixed';
+    const amount = parseFloat(pr.partnershipAmount) || 0;
+    const certainty = (typeof pr.revenueCertainty === 'number') ? pr.revenueCertainty : IMPORTANCE_CONFIG.financial.defaultCertainty;
+
+    let ownershipType = 'noOwnership', ownershipStake = 0, ownershipCertainty = 1.0, internalProject = false;
+    if (em === 'own-strategic' || em === 'own-vendor') ownershipType = 'majorityOwn';
+    else if (em === 'joint-venture') {
+      ownershipType = 'jointVenture';
+      ownershipStake = pr.partnershipModel === 'percentage' ? amount : 0;
+      ownershipCertainty = certainty;
+    } else if (em === 'internal') { ownershipType = 'majorityOwn'; internalProject = true; }
+    else ownershipType = 'noOwnership'; // client-fixed / outsourcing-retainer / other
+
+    const partnerIds = (Array.isArray(pr.partnerIds) && pr.partnerIds.length) ? pr.partnerIds : (pr.partnerId ? [pr.partnerId] : []);
+    const contribs = [];
+    if (!internalProject) {
+      partnerIds.forEach(pid => {
+        let role = 'Customer', financialType = 'Revenue (fixed)', entryCertainty = null;
+        if (em === 'joint-venture' || em === 'own-strategic') { role = 'Strategic Partner'; financialType = 'Revenue (percentage)'; entryCertainty = certainty; }
+        else if (em === 'client-fixed' || em === 'outsourcing-retainer') { role = 'Customer'; financialType = 'Revenue (fixed)'; }
+        else if (em === 'own-vendor') { role = 'Vendor'; financialType = 'Cost'; }
+        const entry = { partnerId: pid, role, financialType, amount };
+        if (financialType === 'Revenue (percentage)') entry.certainty = entryCertainty;
+        contribs.push(entry);
+      });
+    }
+    if (pr.ownershipType === undefined) pr.ownershipType = ownershipType;
+    if (pr.ownershipStake === undefined) pr.ownershipStake = ownershipStake;
+    if (pr.ownershipCertainty === undefined) pr.ownershipCertainty = ownershipCertainty;
+    if (pr.internalProject === undefined) pr.internalProject = internalProject;
+    if (pr.internalProject && !pr.internalTier) pr.internalTier = 'operational';
+    if (!Array.isArray(pr.partnerContributions)) pr.partnerContributions = contribs;
+  });
+}
+
+// Duration of a project in whole months (rounded up, min 1). Falls back to config default.
+function getDurationMonths(startDate, endDate) {
+  if (!startDate || !endDate) return IMPORTANCE_CONFIG.financial.defaultProjectDurationMonths;
+  const s = parseDateLocal(startDate), e = parseDateLocal(endDate);
+  if (!s || !e || e <= s) return IMPORTANCE_CONFIG.financial.defaultProjectDurationMonths;
+  const days = (e - s) / (1000 * 60 * 60 * 24);
+  return Math.max(1, Math.ceil(days / 30.4375));
+}
+
+// OBJECTIVE strategic importance of a single project (0–100), data-driven.
+function getProjectImportance(project) {
+  if (!project) return 0;
+  const CFG = IMPORTANCE_CONFIG;
+  let total = 0;
+
+  // 1) Ownership contribution
+  const ownershipType = project.ownershipType || 'noOwnership';
+  const noPartners = (!(project.partnerContributions || []).length) &&
+                     (!(project.partnerIds || []).length) && !project.partnerId;
+  if (ownershipType === 'majorityOwn') {
+    if (project.internalProject || noPartners) {
+      // Internal projects use a 3-tier business-impact score
+      const tier = project.internalTier || 'operational';
+      total += (CFG.internalTier[tier] !== undefined) ? CFG.internalTier[tier] : CFG.internalTier.operational;
+    } else {
+      total += CFG.ownership.majorityOwn;
+    }
+  } else if (ownershipType === 'jointVenture') {
+    const stake = (parseFloat(project.ownershipStake) || 0) / 100;
+    const certainty = (typeof project.ownershipCertainty === 'number') ? project.ownershipCertainty : CFG.financial.defaultCertainty;
+    total += CFG.ownership.jointVentureBase * stake * certainty;
+  } else { // noOwnership
+    total += CFG.ownership.noOwnership;
+  }
+
+  // 2) Partner contributions
+  const months = getDurationMonths(project.startDate, project.targetDate);
+  (project.partnerContributions || []).forEach(c => {
+    const roleKey = ROLE_WEIGHT_KEY[c.role];
+    const roleWeight = roleKey ? (CFG.roleWeight[roleKey] || 0) : 0;
+    const amount = parseFloat(c.amount) || 0;
+    const certainty = (typeof c.certainty === 'number') ? c.certainty : CFG.financial.defaultCertainty;
+    let points = 0;
+    if (c.financialType === 'Revenue (fixed)') {
+      const monthlyRevenue = amount / months;
+      points = Math.min(CFG.financial.maxRevenuePoints, monthlyRevenue / CFG.financial.monthlyRevenueDivisor);
+    } else if (c.financialType === 'Monthly Retainer') {
+      // Amount is already a per-month figure; multiplier recognises recurring, predictable income
+      const basePoints = amount / CFG.financial.monthlyRevenueDivisor;
+      points = Math.min(CFG.financial.maxRevenuePoints, basePoints * CFG.financial.monthlyRetainerMultiplier);
+    } else if (c.financialType === 'Revenue (percentage)') {
+      points = Math.min(CFG.financial.maxRevenuePoints, (amount * certainty) / CFG.financial.revenuePercentDivisor);
+    } else if (c.financialType === 'Cost') {
+      points = Math.min(CFG.financial.maxCostPoints, amount / CFG.financial.costDivisor);
+    }
+
+    // Customer role weight is scaled by contract value so small/zero deals contribute less.
+    // (Non-Customer roles keep their full weight; financial points are unchanged for all.)
+    let effectiveRoleWeight = roleWeight;
+    if (c.role === 'Customer' && (c.financialType === 'Revenue (fixed)' || c.financialType === 'Monthly Retainer')) {
+      const T = CFG.customerValueTier;
+      const basis = (c.financialType === 'Monthly Retainer') ? amount * 12 : amount; // annualise retainers
+      let mult;
+      if (basis < T.tier1Max) mult = T.tier1Mult;
+      else if (basis < T.tier2Max) mult = T.tier2Mult;
+      else if (basis < T.tier3Max) mult = T.tier3Mult;
+      else mult = T.tier4Mult;
+      effectiveRoleWeight = roleWeight * mult;
+    }
+    total += effectiveRoleWeight + points;
+  });
+
+  return Math.min(100, Math.round(total));
+}
+
 // Backward-compat alias for any leftover references
 const getPartnerScore = getPartnerCommitment;
 
 function getPartner(id) { return state.partners.find(p => p.id === id); }
 function getProject(id) { return state.projects.find(p => p.id === id); }
-function getPartnerProjects(partnerId) { return state.projects.filter(p => p.partnerId === partnerId); }
+function getProjectPartnerNames(project) {
+  if (!project) return '—';
+  const ids = Array.isArray(project.partnerIds) ? project.partnerIds : [project.partnerId];
+  return ids.map(pid => { const p = state.partners.find(x => x.id === pid); return p ? p.name : ''; }).filter(Boolean).join(', ') || '—';
+}
+function getPartnerProjects(partnerId) { return state.projects.filter(p => (Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId]).includes(partnerId)); }
 function getProjectActions(projectId) { return state.actions.filter(a => a.projectId === projectId); }
+// FIX #4: tasks-only filter (excludes meetings)
+function getProjectTasks(projectId) { return state.actions.filter(a => a.projectId === projectId && a.type !== 'meeting'); }
+function getProjectMeetings(projectId) { return state.actions.filter(a => a.projectId === projectId && a.type === 'meeting'); }
 function getPartnerActions(partnerId) { return state.actions.filter(a => a.partnerId === partnerId); }
 
 // --- Milestones & Project scoring ---
@@ -2715,8 +3265,8 @@ function getProjectScore(projectId) {
   const partnerImp = getPartnerImportance(project.partnerId);
   const commit = getPartnerCommitment(project.partnerId);
 
-  // Importance (0–100): strategic value = partner importance + agreement weight
-  const importance = Math.max(0, Math.min(100, partnerImp.score + agreementWeight(project)));
+  // Importance (0–100): objective strategic value of the project
+  const importance = getProjectImportance(project);
 
   // Milestones
   const milestones = getProjectMilestones(projectId);
@@ -2733,20 +3283,31 @@ function getProjectScore(projectId) {
   const allOpen = [...tasks, ...milestones].filter(isOpen);
   const delayedOpen = allOpen.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS).length;
 
-  // Progress component: prefer milestones if defined, else task progress, else neutral 50
-  const progress = milestoneProgress !== null ? milestoneProgress
-                 : (taskProgress !== null ? taskProgress : 50);
-  // Commitment component: 50 if partner not rated yet
-  const commitScore = commit.score === null ? 50 : commit.score;
+  // Weighted progress: milestones 60% + tasks 40% when both exist; otherwise whichever
+  // exists. When NEITHER tasks nor milestones exist, health is "not rated" (null).
+  let progress, health;
+  const H = IMPORTANCE_CONFIG.health;
+  const hasWork = (milestoneProgress !== null) || (taskProgress !== null);
+  if (!hasWork) {
+    health = null; // not rated — no defined work to assess
+  } else {
+    if (milestoneProgress !== null && taskProgress !== null) {
+      progress = Math.round(milestoneProgress * H.milestoneWeight + taskProgress * H.taskWeight);
+    } else if (milestoneProgress !== null) {
+      progress = milestoneProgress;
+    } else {
+      progress = taskProgress;
+    }
+    const commitScore = commit.score === null ? 50 : commit.score;
+    health = Math.round(H.progressWeight * progress + H.commitmentWeight * commitScore) - Math.min(H.delayPenaltyCap, delayedOpen * H.delayPenaltyPerTask);
+    health = Math.max(0, Math.min(100, health));
+  }
 
-  // Health (0–100): half progress + half commitment, minus a capped delay penalty
-  let health = Math.round(0.5 * progress + 0.5 * commitScore) - Math.min(20, delayedOpen * 5);
-  health = Math.max(0, Math.min(100, health));
-
-  // Focus (0–100): important AND at-risk → needs attention
-  const focus = Math.round(importance * (100 - health) / 100);
+  // Focus (0–100): important AND at-risk → needs attention. Unrated health → no focus value.
+  const focus = (health === null) ? null : Math.round(importance * (100 - health) / 100);
   let focusLevel;
-  if (focus >= 45) focusLevel = 'critical';
+  if (focus === null) focusLevel = 'na';
+  else if (focus >= 45) focusLevel = 'critical';
   else if (focus >= 28) focusLevel = 'high';
   else if (focus >= 14) focusLevel = 'watch';
   else focusLevel = 'ok';
@@ -2764,10 +3325,20 @@ function focusLevelLabel(level) {
   return level === 'critical' ? t('focusCritical')
        : level === 'high' ? t('focusHigh')
        : level === 'watch' ? t('focusWatch')
+       : level === 'na' ? t('notRatedLabel')
        : t('focusOk');
 }
 function focusBadgeClass(level) {
-  return level === 'critical' ? 'red' : level === 'high' ? 'amber' : level === 'watch' ? 'sup' : 'green';
+  return level === 'critical' ? 'red' : level === 'high' ? 'amber' : level === 'watch' ? 'sup' : level === 'na' ? 'neutral' : 'green';
+}
+
+// FIX #3: Reliable partner type label (used in reports + UI)
+function getPartnerTypeLabel(type, customType) {
+  if (type === 'development') return t('partnerDev');
+  if (type === 'supervision') return t('partnerSup');
+  if (type === 'ownership') return t('partnerOwnership');
+  if (type === 'vendor') return t('partnerVendor');
+  return customType || type || '—';
 }
 
 function partnerTypeBadge(type, customType) {
@@ -2811,6 +3382,24 @@ function starsDisplay(rating, size) {
   }
   html += '</span>';
   return html;
+}
+
+// Colour class for an importance score (0–100): green ≥70, amber 40–69, red <40.
+function impColorClass(score) {
+  if (score === null || score === undefined) return 'low';
+  return score >= 70 ? 'high' : score >= 40 ? 'mid' : 'low';
+}
+// Coloured horizontal importance bar + numeric score (mirrors the health bar style).
+// Treats null/undefined/0 as "not rated" (no bar).
+function importanceBar(score, width) {
+  if (score === null || score === undefined || score === 0) {
+    return `<span class="sub">${t('notRatedLabel')}</span>`;
+  }
+  const w = width || 80;
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <div class="imp-bar" style="width:${w}px"><div class="imp-fill ${impColorClass(score)}" style="width:${score}%"></div></div>
+    <span style="font-size:12px;color:var(--ink-muted)">${score}</span>
+  </div>`;
 }
 
 function starsInput(currentValue) {
@@ -3024,6 +3613,91 @@ async function translateAllUserContent(silent) {
   render();
 }
 
+// ===== Bidirectional content language (task titles & project names) =====
+// Goal: a name entered in one language auto-appears translated when the UI is
+// toggled to the other language, while any language a user has TYPED themselves
+// is treated as manual and never overwritten by auto-translation.
+function detectContentLang(text) { return containsArabic(text) ? 'ar' : 'en'; }
+
+// Store an entered title/name into dual-language slots with manual-edit protection.
+function setBilingualField(obj, baseKey, value) {
+  // Slot strictly by the CURRENT UI language — what the user typed belongs to that language.
+  const cap = currentLang === 'ar' ? 'Ar' : 'En';
+  const v = value || '';
+  obj[baseKey + cap] = v;                  // store in the current language slot
+  obj[baseKey + 'Manual' + cap] = true;    // current language is now user-authored
+  obj[baseKey] = v;                        // canonical mirror = current-language text (for legacy display paths)
+  // The OTHER language slot and its manual flag are left completely untouched —
+  // editing one language must never overwrite or erase the other.
+}
+
+// Fill obj[baseKey + <targetLang>] by translating from the other slot — but ONLY when the
+// target slot is empty AND was not manually authored. Never overwrites real or manual content.
+async function ensureBilingual(obj, baseKey, targetLang) {
+  const cap = targetLang === 'ar' ? 'Ar' : 'En';
+  const otherCap = cap === 'Ar' ? 'En' : 'Ar';
+  if (obj[baseKey + cap]) return false;             // target non-empty → never overwrite
+  if (obj[baseKey + 'Manual' + cap]) return false;  // target manually authored → never overwrite
+  const source = obj[baseKey + otherCap];           // translate only from the other language slot
+  if (!source) return false;
+  try {
+    const translated = await translateText(source, targetLang === 'ar' ? 'en' : 'ar', targetLang);
+    if (translated && translated.trim()) {
+      obj[baseKey + cap] = translated.trim();
+      // manual flag stays false — this text was auto-translated, not user-authored
+      return true;
+    }
+  } catch (e) { /* offline / failed → keep slots as they are, no crash */ }
+  return false;
+}
+
+// Backfill bilingual slots for existing data (first run / legacy records).
+// Detect the language of the legacy value, store it in the matching slot with manual flag FALSE,
+// leave the other slot empty. No auto-translation here.
+function migrateBilingualContent() {
+  (state.actions || []).forEach(a => {
+    if (a.title && !a.titleEn && !a.titleAr) {
+      const cap = detectContentLang(a.title) === 'ar' ? 'Ar' : 'En';
+      a['title' + cap] = a.title; a['titleManual' + cap] = false;
+    }
+  });
+  (state.projects || []).forEach(p => {
+    if (p.name && !p.nameEn && !p.nameAr) {
+      const cap = detectContentLang(p.name) === 'ar' ? 'Ar' : 'En';
+      p['name' + cap] = p.name; p['nameManual' + cap] = false;
+    }
+  });
+}
+
+// On language switch: show every task title & project name in the active language,
+// translating any missing ones in the background (best-effort) then re-rendering.
+let isApplyingContentLang = false;
+async function applyContentLanguage(lang) {
+  const cap = lang === 'ar' ? 'Ar' : 'En';
+  const otherCap = cap === 'Ar' ? 'En' : 'Ar';
+  const missing = [];
+  // Show ONLY the current language's slot. If empty, show "—" (never fall back to the other
+  // language). If the other slot has text, queue a background translation to fill this one.
+  (state.actions || []).forEach(a => {
+    if (a['title' + cap]) a.title = a['title' + cap];
+    else if (a['title' + otherCap]) { a.title = '—'; missing.push({ obj: a, key: 'title' }); }
+  });
+  (state.projects || []).forEach(p => {
+    if (p['name' + cap]) p.name = p['name' + cap];
+    else if (p['name' + otherCap]) { p.name = '—'; missing.push({ obj: p, key: 'name' }); }
+  });
+  if (missing.length === 0 || isApplyingContentLang) return;
+  isApplyingContentLang = true;
+  let changed = false;
+  for (const m of missing) {
+    const ok = await ensureBilingual(m.obj, m.key, lang);
+    if (ok) { m.obj[m.key] = m.obj[m.key + cap]; changed = true; }
+    await new Promise(r => setTimeout(r, 120)); // be gentle with the free API
+  }
+  isApplyingContentLang = false;
+  if (changed) { saveState(); render(state.detailParam); }
+}
+
 /* ========== TOAST ========== */
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -3097,6 +3771,7 @@ views.teamMemberDetail = (memberId) => {
   tasks.forEach(a => { (byProject[a.projectId] = byProject[a.projectId] || []).push(a); });
 
   return `
+    ${backToDashBtn()}
     <button class="btn ghost sm" style="margin-bottom:16px" onclick="navigate('team')">← ${t('internalTeam')}</button>
     <div class="page-head">
       <div>
@@ -3277,32 +3952,34 @@ views.dashboard = () => {
         ${(() => {
           const scored = state.projects.map(p => ({ p, s: getProjectScore(p.id) })).filter(x => x.s);
           if (scored.length === 0) return `<div class="empty">${t('noPriorityProjects')}</div>`;
-          scored.sort((a, b) => b.s.focus - a.s.focus || b.s.importance - a.s.importance);
+          scored.sort((a, b) => ((b.s.focus===null?-1:b.s.focus) - (a.s.focus===null?-1:a.s.focus)) || b.s.importance - a.s.importance);
           return `<table>
             <thead><tr><th>${t('colProject')}</th><th>${t('colImportance')}</th><th>${t('colHealth')}</th><th>${t('colMilestones')}</th><th>${t('colFocus')}</th></tr></thead>
             <tbody>
               ${scored.map(({p, s}) => {
                 const partner = getPartner(p.partnerId);
-                const healthColor = s.health >= 65 ? 'high' : s.health >= 40 ? 'mid' : 'low';
+                const healthColor = s.health === null ? 'low' : s.health >= IMPORTANCE_CONFIG.health.goodThreshold ? 'high' : s.health >= IMPORTANCE_CONFIG.health.warnThreshold ? 'mid' : 'low';
                 return `<tr style="cursor:pointer" onclick="viewProject('${p.id}')">
                   <td>
                     <div class="name">${escapeHtml(p.name)}</div>
-                    <div class="sub">${escapeHtml(partner ? partner.name : '—')} · ${partnershipBadge(p.partnershipModel, p.partnershipCustomType)}</div>
+                    <div class="sub">${p.internalProject ? `<span class="partnership-badge">🏢 ${t('internalProjectTag')}</span>` : escapeHtml(partner ? partner.name : '—') + ' · ' + partnershipBadge(p.partnershipModel, p.partnershipCustomType)}</div>
                   </td>
                   <td>
-                    <div style="display:flex;align-items:center;gap:8px">
-                      <div class="imp-bar" style="width:70px"><div class="imp-fill high" style="width:${s.importance}%"></div></div>
+                    <div style="display:flex;align-items:center;gap:8px" title="${t('importanceTooltip')}">
+                      <div class="imp-bar" style="width:70px"><div class="imp-fill ${impColorClass(s.importance)}" style="width:${s.importance}%"></div></div>
                       <span style="font-size:12px;color:var(--ink-muted)">${s.importance}</span>
                     </div>
                   </td>
                   <td>
-                    <div style="display:flex;align-items:center;gap:8px">
+                    ${s.health === null
+                      ? `<span class="sub" title="${t('healthTooltip')}">${t('notRatedLabel')}</span>`
+                      : `<div style="display:flex;align-items:center;gap:8px" title="${t('healthTooltip')}">
                       <div class="imp-bar" style="width:70px"><div class="imp-fill ${healthColor}" style="width:${s.health}%"></div></div>
                       <span style="font-size:12px;color:var(--ink-muted)">${s.health}</span>
-                    </div>
+                    </div>`}
                   </td>
                   <td>${s.milestonesTotal ? `<span class="badge ${s.milestonesReached===s.milestonesTotal?'green':'sup'}">🎯 ${s.milestonesReached}/${s.milestonesTotal}</span>` : '<span class="sub">—</span>'}</td>
-                  <td><span class="badge ${focusBadgeClass(s.focusLevel)}">${focusLevelLabel(s.focusLevel)} · ${s.focus}</span></td>
+                  <td>${s.focus === null ? `<span class="sub">${t('notRatedLabel')}</span>` : `<span class="badge ${focusBadgeClass(s.focusLevel)}" title="${t('focusTooltip')}">${focusLevelLabel(s.focusLevel)} · ${s.focus}</span>`}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -3314,7 +3991,7 @@ views.dashboard = () => {
     <div class="section">
       <div class="section-head">
         <div class="section-title">${t('sectionTopDelayed')}<span class="accent-line"></span></div>
-        <button class="btn ghost sm" onclick="navigate('report')">${t('viewFullReport')}</button>
+        <button class="btn ghost sm" onclick="goToTasksFiltered('delayed')">${t('viewFullReport')}</button>
       </div>
       ${recentDelayed.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noDelayed')}</div></div>` :
         recentDelayed.map(a => renderActionCard(a)).join('')}
@@ -3337,10 +4014,7 @@ views.dashboard = () => {
                     <div class="sub">${partnerTypeBadge(p.type, p.customType)}</div>
                   </td>
                   <td>
-                    <div style="display:flex;align-items:center;gap:6px">
-                      ${starsDisplay(importance.stars, 14)}
-                      <span style="font-size:11px;color:var(--ink-muted)">${importance.stars}/5</span>
-                    </div>
+                    ${importanceBar(importance.score, 70)}
                   </td>
                   <td>${importance.projectCount}</td>
                 </tr>
@@ -3738,6 +4412,94 @@ function renderReportComprehensive(open, completed) {
 }
 
 // Reports archive view: lists all issued report entries with filter and re-print
+
+// ========== DAILY AGENDA VIEW ==========
+views.agenda = () => {
+  const taskFilter = state.filters.agendaTaskFilter || 'today';
+  const meetFilter = state.filters.agendaMeetFilter || 'today';
+
+  function getWeekRange() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const sun = new Date(now);
+    sun.setDate(now.getDate() - day);
+    const thu = new Date(sun);
+    thu.setDate(sun.getDate() + 4);
+    return {
+      start: sun.toISOString().slice(0,10),
+      end: thu.toISOString().slice(0,10)
+    };
+  }
+
+  function getMonthRange() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0,10);
+    return { start, end };
+  }
+
+  function filterByPeriod(items, filter) {
+    const today = todayDate();
+    if (filter === 'today') return items.filter(a => a.dueDate === today);
+    if (filter === 'week') {
+      const { start, end } = getWeekRange();
+      return items.filter(a => a.dueDate >= start && a.dueDate <= end);
+    }
+    if (filter === 'month') {
+      const { start, end } = getMonthRange();
+      return items.filter(a => a.dueDate >= start && a.dueDate <= end);
+    }
+    if (filter === 'delayed') return items.filter(a => isOpen(a) && getDelayDays(a) > 0);
+    return items;
+  }
+
+  const allTasks = state.actions.filter(a => a.type !== 'meeting');
+  const allMeetings = state.actions.filter(a => a.type === 'meeting');
+
+  const filteredTasks = filterByPeriod(allTasks, taskFilter).sort((a,b) => (a.dueDate||'').localeCompare(b.dueDate||''));
+  const filteredMeetings = filterByPeriod(allMeetings, meetFilter).sort((a,b) => (a.dueDate||'').localeCompare(b.dueDate||''));
+
+  function filterChips(current, stateKey) {
+    const filters = ['today', 'week', 'month', 'delayed'];
+    const labels = { today: t('filterToday'), week: t('filterThisWeek'), month: t('filterThisMonth'), delayed: t('filterDelayed') };
+    return filters.map(f =>
+      `<button class="filter-chip ${current===f?'active':''}" onclick="setFilter('${stateKey}','${f}')">${labels[f]}</button>`
+    ).join('');
+  }
+
+  return `
+    ${backToDashBtn()}
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">${t('dailyAgenda')}</h1>
+        <div class="page-sub">${t('dailyAgendaSub')}</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:32px">
+      <h2 style="font-size:18px;margin-bottom:12px;color:var(--accent)">${t('agendaTasksSection')}</h2>
+      <div class="filters" style="margin-bottom:16px">
+        ${filterChips(taskFilter, 'agendaTaskFilter')}
+      </div>
+      ${filteredTasks.length === 0
+        ? `<div class="empty" style="padding:24px"><div class="empty-icon">✅</div>${t('agendaNoTasks')}</div>`
+        : `<div class="card-list">${filteredTasks.map(a => renderActionCard(a)).join('')}</div>`
+      }
+    </div>
+
+    <div>
+      <h2 style="font-size:18px;margin-bottom:12px;color:var(--accent)">${t('agendaMeetingsSection')}</h2>
+      <div class="filters" style="margin-bottom:16px">
+        ${filterChips(meetFilter, 'agendaMeetFilter')}
+      </div>
+      ${filteredMeetings.length === 0
+        ? `<div class="empty" style="padding:24px"><div class="empty-icon">📅</div>${t('agendaNoMeetings')}</div>`
+        : `<div class="card-list">${filteredMeetings.map(a => renderActionCard(a)).join('')}</div>`
+      }
+    </div>
+  `;
+};
+
 views.reports = () => {
   const reports = state.reports || [];
   const filter = state.filters.reportArchiveType || 'all';
@@ -3816,17 +4578,36 @@ views.reports = () => {
 views.partners = () => {
   const filter = state.filters.partnerType || 'all';
   const search = (state.filters.partnerSearch || '').toLowerCase();
+  // Distinct custom categories in use, so each appears as its own filter chip
+  const STD = ['development','supervision','ownership','vendor'];
+  const customTypes = [...new Set((state.partners || [])
+    .map(pp => pp.type)
+    .filter(ty => ty && ty !== 'other' && !STD.includes(ty)))];
   let list = state.partners;
   if (filter !== 'all') list = list.filter(p => p.type === filter);
   if (search) list = list.filter(p => p.name.toLowerCase().includes(search) || (p.contact||'').toLowerCase().includes(search));
 
+  const sortKey = state.filters.partnerSortKey === 'commitment' ? 'commitment' : 'importance';
+  const sortDir = state.filters.partnerSortDir === 'asc' ? 'asc' : 'desc';
   const enriched = list.map(p => ({
     p,
     importance: getPartnerImportance(p.id),
     commitment: getPartnerCommitment(p.id)
-  })).sort((a, b) => b.importance.score - a.importance.score);
+  })).sort((a, b) => {
+    // null/not-rated scores always sort to the bottom
+    const av = (sortKey === 'commitment' ? a.commitment.score : a.importance.score);
+    const bv = (sortKey === 'commitment' ? b.commitment.score : b.importance.score);
+    const aNull = (av === null || av === undefined), bNull = (bv === null || bv === undefined);
+    if (aNull && bNull) return 0;
+    if (aNull) return 1;
+    if (bNull) return -1;
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+  const impArrow = sortKey === 'importance' ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  const commitArrow = sortKey === 'commitment' ? (sortDir === 'asc' ? '▲' : '▼') : '';
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <h1 class="page-title">${t('partners')}</h1>
@@ -3841,6 +4622,7 @@ views.partners = () => {
       <button class="filter-chip ${filter==='supervision'?'active':''}" onclick="setFilter('partnerType','supervision')">${t('partnerSup')}</button>
       <button class="filter-chip ${filter==='ownership'?'active':''}" onclick="setFilter('partnerType','ownership')">${t('partnerOwnership')}</button>
       <button class="filter-chip ${filter==='vendor'?'active':''}" onclick="setFilter('partnerType','vendor')">${t('partnerVendor')}</button>
+      ${customTypes.map(ct => `<button class="filter-chip ${filter===ct?'active':''}" onclick="setFilter('partnerType','${escapeHtml(ct)}')">${escapeHtml(ct)}</button>`).join('')}
       <input type="text" class="search-input" placeholder="${t('partnersSearchPlaceholder')}" value="${escapeHtml(search)}" oninput="setFilter('partnerSearch', this.value)">
     </div>
 
@@ -3851,10 +4633,10 @@ views.partners = () => {
           <tr>
             <th>${t('colPartner')}</th>
             <th>${t('colType')}</th>
-            <th>${t('colImportance')}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setPartnerSort('importance')" title="${t('colImportance')}">${t('colImportance')} ${impArrow}</th>
             <th>${t('colProjects')}</th>
             <th>${t('colActions')}</th>
-            <th>${t('colCommitment')}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setPartnerSort('commitment')" title="${t('colCommitment')}">${t('colCommitment')} ${commitArrow}</th>
             <th></th>
           </tr>
         </thead>
@@ -3868,10 +4650,7 @@ views.partners = () => {
               </td>
               <td>${partnerTypeBadge(p.type, p.customType)}</td>
               <td>
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  ${starsDisplay(importance.stars, 16)}
-                  <span style="font-size:11px;color:var(--ink-muted);background:#faf8f3;padding:1px 7px;border-radius:8px;border:1px solid var(--line)">${importance.stars}/5</span>
-                </div>
+                ${importanceBar(importance.score, 90)}
               </td>
               <td>${importance.projectCount}</td>
               <td>${commitment.completed}/${commitment.total} <span style="color:var(--ink-faint);font-size:11px">${t('colDelayedCount', commitment.delayed)}</span></td>
@@ -3901,10 +4680,12 @@ views.projects = () => {
   const filter = state.filters.projectPartner || 'all';
   const search = (state.filters.projectSearch || '').toLowerCase();
   let list = state.projects;
-  if (filter !== 'all') list = list.filter(p => p.partnerId === filter);
+  if (filter === '__internal__') list = list.filter(p => p.internalProject);
+  else if (filter !== 'all') list = list.filter(p => (Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId]).includes(filter));
   if (search) list = list.filter(p => p.name.toLowerCase().includes(search));
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <h1 class="page-title">${t('projects')}</h1>
@@ -3915,6 +4696,7 @@ views.projects = () => {
 
     <div class="filters">
       <button class="filter-chip ${filter==='all'?'active':''}" onclick="setFilter('projectPartner','all')">${t('allPartners')}</button>
+      <button class="filter-chip ${filter==='__internal__'?'active':''}" onclick="setFilter('projectPartner','__internal__')">🏢 ${t('internalProjectTag')}</button>
       ${state.partners.map(p => `<button class="filter-chip ${filter===p.id?'active':''}" onclick="setFilter('projectPartner','${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
       <input type="text" class="search-input" placeholder="${t('projectsSearchPlaceholder')}" value="${escapeHtml(search)}" oninput="setFilter('projectSearch', this.value)">
     </div>
@@ -3936,7 +4718,7 @@ views.projects = () => {
         </thead>
         <tbody>
           ${list.map(p => {
-            const partner = getPartner(p.partnerId);
+            const allPartnerIds = Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId];
             const acts = getProjectActions(p.id);
             const completedActs = acts.filter(isCompleted).length;
             const attachCount = (p.attachments || []).length;
@@ -3947,11 +4729,14 @@ views.projects = () => {
                 <div class="sub">${escapeHtml(p.description || '')}</div>
               </td>
               <td>
-                ${partner ? `<div class="name" style="cursor:pointer" onclick="viewPartner('${partner.id}')">${escapeHtml(partner.name)}</div>${partnerTypeBadge(partner.type, partner.customType)}` : '—'}
+                ${p.internalProject
+                  ? `<span class="partnership-badge">🏢 ${t('internalProjectTag')}</span>`
+                  : allPartnerIds.map(pid => { const pt = getPartner(pid); return pt ? `<div class="name" style="cursor:pointer;margin-bottom:2px" onclick="viewPartner('${pt.id}')">${escapeHtml(pt.name)}</div>${partnerTypeBadge(pt.type, pt.customType)}` : ''; }).join('')}
               </td>
               <td>
-                ${partnershipBadge(p.partnershipModel, p.partnershipCustomType)}
-                <div class="sub" style="margin-top:3px;font-weight:500;color:var(--ink)">${escapeHtml(p.partnershipValue || '—')}</div>
+                ${p.internalProject
+                  ? `<div class="sub">${t('tier_' + (p.internalTier||'operational'))}</div>`
+                  : partnershipBadge(p.partnershipModel, p.partnershipCustomType) + `<div class="sub" style="margin-top:3px;font-weight:500;color:var(--ink)">${escapeHtml(p.partnershipValue || '—')}</div>`}
               </td>
               <td>${fmtDate(p.startDate)}</td>
               <td>${fmtDate(p.targetDate)}</td>
@@ -3987,14 +4772,17 @@ views.projectDetail = (projectId) => {
   const score = getProjectScore(projectId);
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <button class="btn ghost sm" onclick="navigate('projects')" style="margin-bottom:10px">${t('backToProjects')}</button>
         <h1 class="page-title">${escapeHtml(p.name)}</h1>
         <div class="page-sub">
-          ${partner ? `<span style="cursor:pointer;color:var(--accent)" onclick="viewPartner('${partner.id}')">${escapeHtml(partner.name)}</span> · ${partnerTypeBadge(partner.type, partner.customType)}` : '—'}
+          ${p.internalProject
+            ? `<span class="partnership-badge">🏢 ${t('internalProjectTag')}</span> · <strong style="color:var(--accent-warm)">${t('tier_' + (p.internalTier||'operational'))}</strong>`
+            : `${partner ? `<span style="cursor:pointer;color:var(--accent)" onclick="viewPartner('${partner.id}')">${escapeHtml(partner.name)}</span> · ${partnerTypeBadge(partner.type, partner.customType)}` : '—'}
           · ${partnershipBadge(p.partnershipModel, p.partnershipCustomType)}
-          ${p.partnershipValue ? ` · <strong style="color:var(--accent-warm)">${escapeHtml(p.partnershipValue)}</strong>` : ''}
+          ${p.partnershipValue ? ` · <strong style="color:var(--accent-warm)">${escapeHtml(p.partnershipValue)}</strong>` : ''}`}
           ${p.description ? ` · ${escapeHtml(p.description)}` : ''}
         </div>
       </div>
@@ -4004,20 +4792,20 @@ views.projectDetail = (projectId) => {
     </div>
 
     <div class="stats">
-      <div class="stat">
+      <div class="stat" title="${t('importanceTooltip')}">
         <div class="stat-label">${t('importanceAxisLabel')}</div>
         <div class="stat-value">${score.importance}</div>
-        <div class="stat-meta">${'★'.repeat(score.stars)}</div>
+        <div class="stat-meta" style="margin-top:6px"><div class="imp-bar" style="width:100%"><div class="imp-fill ${impColorClass(score.importance)}" style="width:${score.importance}%"></div></div></div>
       </div>
-      <div class="stat ${score.health>=65?'good':score.health>=40?'warn':'danger'}">
+      <div class="stat ${score.health===null?'':score.health>=IMPORTANCE_CONFIG.health.goodThreshold?'good':score.health>=IMPORTANCE_CONFIG.health.warnThreshold?'warn':'danger'}" title="${t('healthTooltip')}">
         <div class="stat-label">${t('healthAxisLabel')}</div>
-        <div class="stat-value">${score.health}</div>
-        <div class="stat-meta">${t('milestonesReachedLabel')}: ${score.milestonesReached}/${score.milestonesTotal}</div>
+        <div class="stat-value">${score.health===null ? '—' : score.health}</div>
+        <div class="stat-meta">${score.health===null ? t('notRatedLabel') : t('milestonesReachedLabel') + ': ' + score.milestonesReached + '/' + score.milestonesTotal}</div>
       </div>
-      <div class="stat">
+      <div class="stat" title="${t('focusTooltip')}">
         <div class="stat-label">${t('colFocus')}</div>
-        <div class="stat-value" style="font-size:20px"><span class="badge ${focusBadgeClass(score.focusLevel)}">${focusLevelLabel(score.focusLevel)}</span></div>
-        <div class="stat-meta">${t('colFocus')}: ${score.focus}/100</div>
+        <div class="stat-value" style="font-size:20px">${score.focus===null ? `<span class="badge neutral">${t('notRatedLabel')}</span>` : `<span class="badge ${focusBadgeClass(score.focusLevel)}">${focusLevelLabel(score.focusLevel)}</span>`}</div>
+        <div class="stat-meta">${score.focus===null ? '—' : t('colFocus') + ': ' + score.focus + '/100'}</div>
       </div>
       <div class="stat good">
         <div class="stat-label">${t('statCompletedActions')}</div>
@@ -4049,17 +4837,38 @@ views.projectDetail = (projectId) => {
     <div class="section">
       <div class="section-head">
         <div class="section-title">${t('sectionAttachments')}<span class="accent-line"></span></div>
-        <input type="file" id="attach-input" style="display:none" multiple onchange="handleAttachUpload('${p.id}', this.files)">
-        <button class="btn" onclick="document.getElementById('attach-input').click()">${t('uploadAttachment')}</button>
+        <button class="btn" onclick="showAddLinkForm('${p.id}')">${t('addLink')}</button>
       </div>
-      <div class="upload-zone" id="upload-zone-${p.id}" onclick="document.getElementById('attach-input').click()">
-        <div class="upload-ico">📎</div>
-        <div class="upload-text">${t('uploadHint1')}</div>
-        <div class="upload-hint">${t('uploadHint2')}</div>
+      <div id="link-form-${p.id}" style="display:none;margin-bottom:12px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--bg-card)">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+          <input id="link-name-${p.id}" placeholder="${t('linkName')}" style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:13px">
+          <input id="link-url-${p.id}" placeholder="https://..." style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:13px">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="link-desc-${p.id}" placeholder="${t('linkDescription')}" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:13px">
+          <button class="btn sm" onclick="saveLink('${p.id}')">💾</button>
+          <button class="btn ghost sm" onclick="document.getElementById('link-form-${p.id}').style.display='none'">✕</button>
+        </div>
       </div>
       ${attachments.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noAttachments')}</div></div>` : `
         <div class="attach-list">
           ${attachments.map(att => {
+            // NEW: Handle link attachments
+            if (att.isLink) {
+              return `
+              <div class="attach-item">
+                <div class="attach-icon" style="font-size:20px">🔗</div>
+                <div class="attach-info">
+                  <div class="attach-name">${escapeHtml(att.name)}</div>
+                  <div class="attach-meta">${t('uploadedOn', fmtDate(att.addedAt || att.uploadedAt))}</div>
+                  ${att.description ? `<div class="attach-desc">${escapeHtml(att.description)}</div>` : ''}
+                </div>
+                <div class="attach-actions">
+                  <button class="row-btn" onclick="window.open('${att.url}','_blank')">${t('openLink')}</button>
+                  <button class="row-btn danger" onclick="deleteAttachment('${p.id}','${att.id}')">${t('delete')}</button>
+                </div>
+              </div>`;
+            }
             const ico = getFileIcon(att.type, att.name);
             return `
               <div class="attach-item">
@@ -4104,7 +4913,7 @@ views.projectDetail = (projectId) => {
                 const d = getDelayDays(a);
                 return `<tr>
                   <td><div class="name">${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</div></td>
-                  <td>${fmtDate(a.dueDate)}</td>
+                  <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
                   <td>${fmtDate(a.completedDate)}</td>
                   <td>${d > 0 ? `<span class="badge ${d>DELAY_THRESHOLD_DAYS?'amber':'neutral'}">${t('daysShort', d)}</span>` : `<span class="badge green">${t('onTime')}</span>`}</td>
                 </tr>`;
@@ -4188,6 +4997,7 @@ views.actions = () => {
   else if (period === 'month') periodLabel = ` · ${new Date(actionDate).toLocaleDateString(t('locale'), { year: 'numeric', month: 'long' })}`;
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <h1 class="page-title">${t('actionsNav')}</h1>
@@ -4262,12 +5072,12 @@ views.actions = () => {
                 ${!meeting ? (() => { const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="sub" style="color:var(--crit)">⚠ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="sub">📝 ${escapeHtml(a.note)}</div>`; return ''; })() : ''}
               </td>
               <td>
-                <div style="font-size:12px">${escapeHtml(partner ? partner.name : '—')}</div>
+                <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
                 <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
               </td>
               <td>${statusBadge(a.status)}</td>
               <td>${priorityBadge(a.priority)}</td>
-              <td>${fmtDate(a.dueDate)}</td>
+              <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
               <td>${delay > 0 && !isCompleted(a) ? t('daysShort', delay) : (isCompleted(a) && delay > 0 ? `<span style="color:var(--ink-faint)">+${delay}</span>` : '—')}</td>
               <td>${risk ? `<span class="badge ${risk.cls}">${risk.label}</span>` : (isMissed(a) ? `<span class="badge dark">${t('statusMissed')}</span>` : '—')}</td>
               <td>
@@ -4319,6 +5129,7 @@ views.meetings = () => {
     .slice(0, 3);
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <h1 class="page-title">${t('meetings')}</h1>
@@ -4406,7 +5217,7 @@ views.meetings = () => {
                 ${priorityBadge(a.priority)}
               </td>
               <td>
-                <div style="font-size:12px">${escapeHtml(partner ? partner.name : '—')}</div>
+                <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
                 <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
               </td>
               <td>${fmtDate(a.dueDate)}${isUpcoming && !isToday ? `<div class="sub">${t('inDays', daysBetween(today, a.dueDate))}</div>` : ''}</td>
@@ -4585,6 +5396,7 @@ views.partnerDetail = (partnerId) => {
   const completed = actions.filter(a => isTask(a) && isCompleted(a));
 
   return `
+    ${backToDashBtn()}
     <div class="page-head">
       <div>
         <button class="btn ghost sm" onclick="navigate('partners')" style="margin-bottom:10px">${t('backToPartners')}</button>
@@ -4592,7 +5404,8 @@ views.partnerDetail = (partnerId) => {
         <div class="page-sub">${partnerTypeBadge(p.type, p.customType)} · ${escapeHtml(p.contact || '')}</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn ghost" onclick="printPartnerReport('${p.id}')">${t('exportPartnerReport')}</button>
+        <button class="btn ghost" onclick="printPartnerReport('${p.id}')">${t('internalReport')}</button>
+        <button class="btn ghost" onclick="printPartnerFacingReport('${p.id}')">${t('partnerFacingReport')}</button>
         <button class="btn ghost" onclick="showPartnerForm('${p.id}')">${t('edit')}</button>
       </div>
     </div>
@@ -4618,12 +5431,9 @@ views.partnerDetail = (partnerId) => {
             <h3>${t('cardImportance')}</h3>
             <div class="score-card-sub">${t('importanceSubtitle')}</div>
             <div style="text-align:center;margin:10px 0">
-              <div class="stars-with-count">
-                ${starsDisplay(importance.stars, 24)}
-                <span class="stars-count-label">${importance.stars} / 5</span>
-              </div>
               <div style="font-size:36px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--accent);margin-top:10px">${importance.score}</div>
-              <div style="font-size:11px;color:var(--ink-faint)">${t('outOf100')}</div>
+              <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px">${t('outOf100')}</div>
+              <div style="max-width:220px;margin:0 auto"><div class="imp-bar" style="width:100%"><div class="imp-fill ${impColorClass(importance.score)}" style="width:${importance.score}%"></div></div></div>
               <div style="margin-top:8px"><span class="badge ${importance.level==='high'?'green':importance.level==='mid'?'amber':'red'}" style="font-size:11px;padding:4px 12px">${importance.label}</span></div>
             </div>
             <div class="kv"><span class="kv-label">${t('colProjects')}</span><span class="kv-value">${importance.projectCount}</span></div>
@@ -4698,7 +5508,7 @@ views.partnerDetail = (partnerId) => {
                   const d = getDelayDays(a);
                   return `<tr>
                     <td><div class="name">${escapeHtml(a.title)}</div></td>
-                    <td>${fmtDate(a.dueDate)}</td>
+                    <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
                     <td>${fmtDate(a.completedDate)}</td>
                     <td>${d > 0 ? `<span class="badge ${d>DELAY_THRESHOLD_DAYS?'amber':'neutral'}">${t('daysShort', d)}</span>` : `<span class="badge green">${t('onTime')}</span>`}</td>
                   </tr>`;
@@ -4713,19 +5523,234 @@ views.partnerDetail = (partnerId) => {
 };
 
 /* ========== NAVIGATION ========== */
+// NEW: Back-to-dashboard button HTML (for views reached from dashboard)
+function backToDashBtn() {
+  return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="navigate(\'dashboard\')" style="font-size:12px;padding:4px 12px">'+t('backToDashboard')+'</button></div>';
+}
+
 function navigate(view, param) {
   state.currentView = view;
   renderSidebar();
   render(param);
 }
 
-// Dashboard drill-down: jump to the Tasks view pre-filtered (delayed / critical / etc.)
+// Dashboard drill-down: jump to the right view pre-filtered.
 window.goToTasksFiltered = function(filter) {
-  state.filters.actionStatus = filter;
-  state.filters.actionProject = 'all';
-  state.filters.actionPeriod = 'all';
-  state.filters.includeMeetings = false; // tasks only
-  navigate('actions');
+  if (filter === 'critical') {
+    // Critical Cases → Tasks tab with the "Critical (+14d)" filter applied
+    state.filters.actionStatus = 'critical';
+    state.filters.actionPeriod = 'all';
+    navigate('actions');
+    return;
+  }
+  // Delayed (and others) → Daily Agenda with the delayed filter
+  state.filters.agendaTaskFilter = 'delayed';
+  state.filters.agendaMeetFilter = 'delayed';
+  navigate('agenda');
+};
+
+// Daily Reminder "View all" → Daily Agenda with TODAY filter for tasks & meetings
+window.goToAgendaToday = function() {
+  state.filters.agendaTaskFilter = 'today';
+  state.filters.agendaMeetFilter = 'today';
+  navigate('agenda');
+};
+
+/* ========== SCORING SETTINGS (configurable weights UI) ========== */
+// Bilingual labels + input step for every configurable field.
+const CFG_META = {
+  ownership: {
+    majorityOwn:      { ar: 'ملكية غالبة (>50%)', en: 'Majority Own (>50%)', step: 1 },
+    jointVentureBase: { ar: 'أساس المشروع المشترك', en: 'Joint Venture base', step: 1 },
+    noOwnership:      { ar: 'بدون ملكية (عمل لعميل)', en: 'No Ownership (client work)', step: 1 }
+  },
+  internalTier: {
+    strategic:   { ar: 'استراتيجي', en: 'Strategic', step: 1 },
+    operational: { ar: 'تشغيلي', en: 'Operational', step: 1 },
+    basic:       { ar: 'أساسي', en: 'Basic', step: 1 }
+  },
+  roleWeight: {
+    strategicPartner: { ar: 'شريك استراتيجي', en: 'Strategic Partner', step: 1 },
+    investor:         { ar: 'مستثمر', en: 'Investor', step: 1 },
+    customer:         { ar: 'عميل', en: 'Customer', step: 1 },
+    vendor:           { ar: 'مورّد', en: 'Vendor', step: 1 }
+  },
+  financial: {
+    monthlyRevenueDivisor:       { ar: 'مقسوم الإيراد الشهري', en: 'Monthly revenue divisor', step: 1000 },
+    revenuePercentDivisor:       { ar: 'مقسوم نسبة الإيراد', en: 'Revenue % divisor', step: 1 },
+    costDivisor:                 { ar: 'مقسوم التكلفة', en: 'Cost divisor', step: 1000 },
+    maxRevenuePoints:            { ar: 'حد نقاط الإيراد', en: 'Max revenue points', step: 1 },
+    maxCostPoints:               { ar: 'حد نقاط التكلفة', en: 'Max cost points', step: 1 },
+    monthlyRetainerMultiplier:   { ar: 'معامل الأتعاب الشهرية', en: 'Monthly retainer multiplier', step: 0.1 },
+    defaultCertainty:            { ar: 'درجة التأكد الافتراضية', en: 'Default certainty', step: 0.1 },
+    defaultProjectDurationMonths:{ ar: 'مدة المشروع الافتراضية (شهور)', en: 'Default duration (months)', step: 1 }
+  },
+  customerValueTier: {
+    tier1Max:  { ar: 'حد الشريحة 1 (ر.س)', en: 'Tier 1 max (SAR)', step: 10000 },
+    tier2Max:  { ar: 'حد الشريحة 2 (ر.س)', en: 'Tier 2 max (SAR)', step: 10000 },
+    tier3Max:  { ar: 'حد الشريحة 3 (ر.س)', en: 'Tier 3 max (SAR)', step: 10000 },
+    tier1Mult: { ar: 'معامل الشريحة 1 (الأصغر)', en: 'Tier 1 multiplier (smallest)', step: 0.05 },
+    tier2Mult: { ar: 'معامل الشريحة 2', en: 'Tier 2 multiplier', step: 0.05 },
+    tier3Mult: { ar: 'معامل الشريحة 3', en: 'Tier 3 multiplier', step: 0.05 },
+    tier4Mult: { ar: 'معامل الشريحة 4 (الأكبر)', en: 'Tier 4 multiplier (largest)', step: 0.05 }
+  },
+  commitment: {
+    onTime:        { ar: 'في الموعد', en: 'On time', step: 1 },
+    late1to3:      { ar: 'تأخير 1–3 أيام', en: 'Late 1–3 days', step: 1 },
+    late4to7:      { ar: 'تأخير 4–7 أيام', en: 'Late 4–7 days', step: 1 },
+    late8to10:     { ar: 'تأخير 8–10 أيام', en: 'Late 8–10 days', step: 1 },
+    lateOver10:    { ar: 'تأخير أكثر من 10', en: 'Late > 10 days', step: 1 },
+    overdueOpen:   { ar: 'متأخرة ومفتوحة', en: 'Overdue & open', step: 1 },
+    missed:        { ar: 'فائتة', en: 'Missed', step: 1 },
+    highThreshold: { ar: 'عتبة عالٍ', en: 'High threshold', step: 1 },
+    midThreshold:  { ar: 'عتبة متوسط', en: 'Mid threshold', step: 1 }
+  },
+  health: {
+    milestoneWeight:    { ar: 'وزن المراحل', en: 'Milestone weight', step: 0.1 },
+    taskWeight:         { ar: 'وزن المهام', en: 'Task weight', step: 0.1 },
+    progressWeight:     { ar: 'وزن التقدم', en: 'Progress weight', step: 0.1 },
+    commitmentWeight:   { ar: 'وزن الالتزام', en: 'Commitment weight', step: 0.1 },
+    delayPenaltyPerTask:{ ar: 'خصم لكل مهمة متأخرة', en: 'Penalty per delayed task', step: 1 },
+    delayPenaltyCap:    { ar: 'حد الخصم', en: 'Penalty cap', step: 1 },
+    goodThreshold:      { ar: 'عتبة جيد', en: 'Good threshold', step: 1 },
+    warnThreshold:      { ar: 'عتبة تحذير', en: 'Warn threshold', step: 1 }
+  }
+};
+
+// Plain-language explanation of each scoring formula (shown in the Settings page).
+const CFG_EXPLAIN = {
+  overview: {
+    en: `Every <b>project</b> gets a <b>Strategic Importance</b> score from 0–100, built from two parts that are added together:<br>
+      <b>1) Ownership contribution</b> — how much of the project we own.<br>
+      <b>2) Partner contributions</b> — for each partner on the project: their <b>role weight</b> plus <b>financial points</b> from the money involved.<br>
+      The total is capped at 100. A <b>partner's</b> importance is simply the <b>average</b> importance of the projects they're on.<br><br>
+      <b>Execution Health</b> (0–100) measures delivery: it blends <b>progress</b> (milestones &amp; tasks) with <b>partner commitment</b>, then subtracts a penalty for overdue work. <b>Partner Commitment</b> scores how reliably a partner delivers tasks that have come due. <b>Focus</b> = Importance × (100 − Health) ÷ 100, so important + struggling projects rise to the top.`,
+    ar: `كل <b>مشروع</b> يحصل على درجة <b>أهمية استراتيجية</b> من 0–100 مكوّنة من جزأين يُجمعان معاً:<br>
+      <b>1) مساهمة الملكية</b> — كم نملك من المشروع.<br>
+      <b>2) مساهمات الشركاء</b> — لكل شريك: <b>وزن دوره</b> + <b>نقاط مالية</b> من قيمة الأموال.<br>
+      ويُحدّ المجموع بـ 100. أما أهمية <b>الشريك</b> فهي <b>متوسط</b> أهمية مشاريعه.<br><br>
+      <b>صحة التنفيذ</b> (0–100) تقيس الإنجاز: تمزج <b>التقدم</b> (المراحل والمهام) مع <b>التزام الشريك</b> ثم تخصم غرامة للتأخير. <b>التزام الشريك</b> يقيس مدى موثوقية تسليمه للمهام المستحقة. <b>التركيز</b> = الأهمية × (100 − الصحة) ÷ 100.`
+  },
+  ownership: {
+    en: `Added once per project based on the ownership type you choose in the project form:<br>
+      • <b>Majority Own</b> → adds the “majority own” points.<br>
+      • <b>Joint Venture</b> → adds <code>base × (stake% ÷ 100) × certainty</code>.<br>
+      • <b>No Ownership (client work)</b> → adds the “no ownership” points.`,
+    ar: `تُضاف مرة واحدة لكل مشروع حسب نوع الملكية المختار في نموذج المشروع:<br>
+      • <b>ملكية غالبة</b> ← تضيف نقاط «ملكية غالبة».<br>
+      • <b>مشروع مشترك</b> ← تضيف <code>الأساس × (الحصة٪ ÷ 100) × التأكد</code>.<br>
+      • <b>بدون ملكية</b> ← تضيف نقاط «بدون ملكية».`
+  },
+  internalTier: {
+    en: `For <b>internal projects</b> (no external partner) the ownership contribution is replaced by a tier you pick, reflecting business impact:<br>
+      • <b>Strategic</b> — new revenue / new market / major advantage.<br>
+      • <b>Operational</b> — efficiency, cost saving, automation.<br>
+      • <b>Basic</b> — small tool or experiment.<br>Internal projects have no partner contributions, so the tier is essentially the whole score.`,
+    ar: `في <b>المشاريع الداخلية</b> (بدون شريك) تُستبدل مساهمة الملكية بمستوى تختاره يعكس الأثر:<br>
+      • <b>استراتيجي</b> — إيراد جديد / سوق جديد / ميزة كبرى.<br>
+      • <b>تشغيلي</b> — كفاءة وخفض تكاليف وأتمتة.<br>
+      • <b>أساسي</b> — أداة صغيرة أو تجربة.<br>ولا توجد مساهمات شركاء، فيكون المستوى عملياً هو الدرجة كاملة.`
+  },
+  roleWeight: {
+    en: `Each partner contribution adds a fixed <b>role weight</b>. Strategic partners count most, vendors least. (For <b>Customers</b>, this weight is then scaled by deal size — see the next section.)`,
+    ar: `كل مساهمة شريك تضيف <b>وزن دور</b> ثابتاً. الشريك الاستراتيجي الأعلى والمورّد الأقل. (وبالنسبة <b>للعميل</b> يُضرب هذا الوزن في معامل حسب حجم الصفقة — انظر القسم التالي.)`
+  },
+  customerValueTier: {
+    en: `Only the <b>Customer</b> role weight is scaled by contract size, so a tiny or zero contract counts less than a large one. The total contract amount is compared to the tier limits (a Monthly Retainer is annualised: monthly × 12 first):<br>
+      • below Tier-1 limit → Tier-1 multiplier<br>• up to Tier-2 limit → Tier-2 multiplier<br>• up to Tier-3 limit → Tier-3 multiplier<br>• above Tier-3 limit → Tier-4 multiplier.<br>
+      <i>Example: a 200,000 SAR customer with default values → 20 × 0.5 = 10 role points.</i>`,
+    ar: `وزن <b>العميل</b> فقط يُضرب في معامل حسب حجم العقد، فالعقد الصغير أو الصفري يُحتسب أقل. تُقارن القيمة الإجمالية بحدود الشرائح (والأتعاب الشهرية تُحوّل لسنوية: الشهري × 12):<br>
+      • أقل من حد الشريحة 1 ← معامل 1<br>• حتى حد الشريحة 2 ← معامل 2<br>• حتى حد الشريحة 3 ← معامل 3<br>• أعلى من حد الشريحة 3 ← معامل 4.<br>
+      <i>مثال: عميل بـ 200,000 ر.س بالقيم الافتراضية ← 20 × 0.5 = 10 نقاط دور.</i>`
+  },
+  financial: {
+    en: `On top of the role weight, each contribution adds <b>financial points</b> by type:<br>
+      • <b>Revenue (fixed):</b> <code>min(maxRevenue, (amount ÷ duration months) ÷ monthly-revenue-divisor)</code> — rewards higher monthly cash flow.<br>
+      • <b>Monthly Retainer:</b> <code>min(maxRevenue, (monthly amount ÷ divisor) × retainer-multiplier)</code> — recurring income gets the multiplier boost.<br>
+      • <b>Revenue (percentage):</b> <code>min(maxRevenue, (percent × certainty) ÷ percent-divisor)</code>.<br>
+      • <b>Cost:</b> <code>min(maxCost, amount ÷ cost-divisor)</code>.<br>
+      “Divisor” = how many SAR equal one point (bigger divisor = fewer points). Certainty/duration defaults are used when a project has no dates.`,
+    ar: `بالإضافة لوزن الدور، تضيف كل مساهمة <b>نقاطاً مالية</b> حسب النوع:<br>
+      • <b>إيراد (ثابت):</b> <code>min(حد الإيراد، (المبلغ ÷ شهور المدة) ÷ مقسوم الإيراد الشهري)</code>.<br>
+      • <b>أتعاب شهرية:</b> <code>min(حد الإيراد، (الشهري ÷ المقسوم) × معامل الأتعاب)</code>.<br>
+      • <b>إيراد (نسبة):</b> <code>min(حد الإيراد، (النسبة × التأكد) ÷ مقسوم النسبة)</code>.<br>
+      • <b>تكلفة:</b> <code>min(حد التكلفة، المبلغ ÷ مقسوم التكلفة)</code>.<br>
+      «المقسوم» = كم ريالاً يعادل نقطة واحدة (كلما كبر قلّت النقاط).`
+  },
+  commitment: {
+    en: `Each task that has come due scores points by how late it was; the partner's commitment is the <b>average</b>. Meetings and our own internal tasks are excluded, and upcoming (not-yet-due) tasks aren't counted. Thresholds set the High/Medium/Low labels.`,
+    ar: `كل مهمة استحقّت تُمنح نقاطاً حسب مقدار تأخّرها، والتزام الشريك هو <b>المتوسط</b>. تُستثنى الاجتماعات ومهامنا الداخلية، ولا تُحتسب المهام غير المستحقة بعد. وتحدد العتبات تصنيف عالٍ/متوسط/منخفض.`
+  },
+  health: {
+    en: `Health = <code>(progress-weight × progress) + (commitment-weight × commitment) − delay penalty</code>.<br>
+      Progress itself blends milestones and tasks (<code>milestone-weight</code> + <code>task-weight</code>, which should sum to 1). The penalty is <code>per-task points × overdue tasks</code>, capped. Good/Warn thresholds set the green/amber/red colour. Projects with no tasks <i>and</i> no milestones show “Not rated”.`,
+    ar: `الصحة = <code>(وزن التقدم × التقدم) + (وزن الالتزام × الالتزام) − غرامة التأخير</code>.<br>
+      والتقدم يمزج المراحل والمهام (<code>وزن المراحل</code> + <code>وزن المهام</code> ومجموعهما 1). والغرامة = <code>نقاط لكل مهمة × المهام المتأخرة</code> بحدّ أقصى. وتحدد عتبتا جيد/تحذير اللون. والمشاريع بلا مهام ولا مراحل تظهر «لم يُقيّم».`
+  }
+};
+
+views.settings = () => {
+  const lang = currentLang === 'ar' ? 'ar' : 'en';
+  const section = (key) => {
+    const explain = CFG_EXPLAIN[key] ? `<div style="font-size:12.5px;line-height:1.7;color:var(--ink-muted);background:var(--bg-soft,#faf8f3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px">${CFG_EXPLAIN[key][lang]}</div>` : '';
+    const fields = Object.keys(IMPORTANCE_CONFIG[key]).map(f => {
+      const meta = (CFG_META[key] && CFG_META[key][f]) || { ar: f, en: f, step: 1 };
+      const label = lang === 'ar' ? meta.ar : meta.en;
+      const val = IMPORTANCE_CONFIG[key][f];
+      return `<div>
+        <label style="font-size:12px;color:var(--ink-muted);display:block;margin-bottom:3px">${label}</label>
+        <input type="number" step="${meta.step}" data-cfg-section="${key}" data-cfg-key="${f}" value="${val}" style="width:100%">
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:16px">
+      <h3 style="margin:0 0 10px;font-size:15px;color:var(--accent)">${t('cfg_' + key)}</h3>
+      ${explain}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">${fields}</div>
+    </div>`;
+  };
+  return `
+    ${backToDashBtn()}
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">${t('settingsTitle')}</h1>
+        <div class="page-sub">${t('settingsSubtitle')}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" onclick="if(confirm(t('cfgResetConfirm'))){resetConfig();render();}">${t('cfgResetBtn')}</button>
+        <button class="btn" onclick="saveConfigForm()">${t('cfgSaveBtn')}</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;border-inline-start:4px solid var(--accent)">
+      <h3 style="margin:0 0 8px;font-size:15px;color:var(--accent)">💡 ${t('cfgHowTitle')}</h3>
+      <div style="font-size:13px;line-height:1.8;color:var(--ink)">${CFG_EXPLAIN.overview[lang]}</div>
+    </div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">ℹ️ ${t('cfgNote')}</div>
+    ${section('ownership')}
+    ${section('internalTier')}
+    ${section('roleWeight')}
+    ${section('customerValueTier')}
+    ${section('financial')}
+    ${section('commitment')}
+    ${section('health')}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <button class="btn" onclick="saveConfigForm()">${t('cfgSaveBtn')}</button>
+    </div>
+  `;
+};
+
+// Read every config input, update IMPORTANCE_CONFIG, persist, and recalc everything.
+window.saveConfigForm = function() {
+  document.querySelectorAll('[data-cfg-section]').forEach(inp => {
+    const s = inp.getAttribute('data-cfg-section');
+    const k = inp.getAttribute('data-cfg-key');
+    const v = parseFloat(inp.value);
+    if (!isNaN(v) && IMPORTANCE_CONFIG[s] && IMPORTANCE_CONFIG[s][k] !== undefined) {
+      IMPORTANCE_CONFIG[s][k] = v;
+    }
+  });
+  saveConfig();
+  render();
+  alert(t('cfgSavedMsg'));
 };
 
 function viewPartner(id) {
@@ -4752,6 +5777,19 @@ window.viewTeamMember = viewTeamMember;
 
 function setFilter(key, value) {
   state.filters[key] = value;
+  render(state.detailParam);
+}
+
+// Partners list: click a sortable column header to sort by it; clicking the active
+// column toggles asc/desc. Default is importance descending.
+function setPartnerSort(key) {
+  const currentKey = state.filters.partnerSortKey === 'commitment' ? 'commitment' : 'importance';
+  if (currentKey === key) {
+    state.filters.partnerSortDir = (state.filters.partnerSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    state.filters.partnerSortKey = key;
+    state.filters.partnerSortDir = 'desc';
+  }
   render(state.detailParam);
 }
 
@@ -4797,7 +5835,12 @@ function setupDragDrop(projectId) {
 function showPartnerForm(partnerId) {
   const editing = partnerId ? getPartner(partnerId) : null;
   const knownTypes = ['development','supervision','ownership','vendor'];
-  const isCustom = editing && editing.type && !knownTypes.includes(editing.type);
+  // Remember previously-used custom categories so they persist as dropdown options
+  const customTypes = [...new Set((state.partners || [])
+    .map(pp => pp.type)
+    .filter(ty => ty && ty !== 'other' && !knownTypes.includes(ty)))];
+  const allKnown = knownTypes.concat(customTypes);
+  const isCustom = editing && editing.type && editing.type !== 'other' && !allKnown.includes(editing.type);
   const typeVal = isCustom ? 'other' : (editing?.type || 'development');
   const html = `
     <div class="form-row">
@@ -4811,6 +5854,7 @@ function showPartnerForm(partnerId) {
         <option value="supervision" ${typeVal==='supervision'?'selected':''}>${t('optSupPartner')}</option>
         <option value="ownership" ${typeVal==='ownership'?'selected':''}>${t('optOwnershipPartner')}</option>
         <option value="vendor" ${typeVal==='vendor'?'selected':''}>${t('partnerVendor')}</option>
+        ${customTypes.map(ct => `<option value="${escapeHtml(ct)}" ${typeVal===ct?'selected':''}>${escapeHtml(ct)}</option>`).join('')}
         <option value="other" ${typeVal==='other'?'selected':''}>${t('partnerTypeOther')}</option>
       </select>
     </div>
@@ -4840,16 +5884,7 @@ function showPartnerForm(partnerId) {
       <button type="button" class="btn ghost sm" onclick="addPartnerTeamRow()">${t('addPartnerMember')}</button>
     </div>
 
-    <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px">
-      <div style="font-size:13px;color:var(--accent-warm);font-weight:500;margin-bottom:6px">⭐ ${t('sectionImportanceQuestions')}</div>
-      <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px">${t('importanceSubtitle')}</div>
-    </div>
-
-    <div class="form-row">
-      <label>${t('fieldIncomeRating')}</label>
-      ${starsInput(editing?.incomeRating || 3)}
-      <div style="font-size:11px;color:var(--ink-faint);margin-top:6px">${t('incomeRatingHint')}</div>
-    </div>
+    <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px"></div>
 
     <div class="form-row" style="margin-top:18px">
       <label>${t('fieldNotes')}</label>
@@ -4896,10 +5931,14 @@ function savePartner(id) {
   if (!name) { alert(t('alertNameRequired')); return; }
   let type = document.getElementById('f-type').value;
   let customType = '';
+  const STANDARD_TYPES = ['development','supervision','ownership','vendor'];
   if (type === 'other') {
     customType = (document.getElementById('f-custom-type').value || '').trim();
     if (customType) type = customType; // store the custom string as the type
     else type = 'other';
+  } else if (!STANDARD_TYPES.includes(type)) {
+    // a previously-used custom category was picked from the dropdown
+    customType = type;
   }
   const team = (window._editingPartnerTeam || [])
     .filter(m => m.name && m.name.trim())
@@ -4911,7 +5950,6 @@ function savePartner(id) {
     contact: document.getElementById('f-contact').value.trim(),
     phone: document.getElementById('f-phone').value.trim(),
     email: document.getElementById('f-email').value.trim(),
-    incomeRating: parseInt(document.getElementById('f-income-rating').value, 10) || 3,
     notes: document.getElementById('f-notes').value.trim(),
     team
   };
@@ -4953,19 +5991,117 @@ window.applyPartnershipModelUI = function(preferredCurrency) {
     amountEl.placeholder = '30';
     hintEl.textContent = t('percentageHint');
   } else {
-    currencyEl.innerHTML = `
-      <option value="SAR">${t('currencySAR')}</option>
-      <option value="USD">${t('currencyUSD')}</option>
-    `;
-    if (previousCurrency === 'USD' || previousCurrency === 'SAR') {
-      currencyEl.value = previousCurrency;
-    } else {
-      currencyEl.value = 'SAR';
-    }
+    currencyEl.innerHTML = `<option value="SAR">${t('currencySAR')}</option>`;
+    currencyEl.value = 'SAR';
     amountEl.removeAttribute('max');
     amountEl.placeholder = '50000';
     hintEl.textContent = t('amountHint');
   }
+};
+
+// Ownership-type UI — show stake & certainty only for Joint Venture.
+window.applyOwnershipTypeUI = function() {
+  const otEl = document.getElementById('f-ownership-type');
+  const jvRow = document.getElementById('ownership-jv-row');
+  if (!otEl || !jvRow) return;
+  jvRow.classList.toggle('hidden', otEl.value !== 'jointVenture');
+};
+
+// Rebuild the per-partner contribution blocks for every checked partner,
+// preserving any values already entered (kept in window._projectContribs).
+window.refreshContributions = function() {
+  const box = document.getElementById('f-contributions-container');
+  if (!box) return;
+  const store = window._projectContribs || (window._projectContribs = {});
+  const checked = Array.from(document.querySelectorAll('#f-partners-container .partner-cb:checked')).map(cb => cb.value);
+  const internal = document.getElementById('f-internal-project')?.checked;
+  if (internal || checked.length === 0) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--ink-faint)">${internal ? t('internalProjectLabel') : t('fieldPartnerHint')}</div>`;
+    return;
+  }
+  const ROLES = ['Strategic Partner', 'Investor', 'Customer', 'Vendor'];
+  const ROLE_LBL = { 'Strategic Partner': t('role_strategic'), 'Investor': t('role_investor'), 'Customer': t('role_customer'), 'Vendor': t('role_vendor') };
+  const FIN = ['Revenue (fixed)', 'Revenue (percentage)', 'Cost', 'Monthly Retainer'];
+  const FIN_LBL = { 'Revenue (fixed)': t('ft_revenueFixed'), 'Revenue (percentage)': t('ft_revenuePercent'), 'Cost': t('ft_cost'), 'Monthly Retainer': t('ft_monthlyRetainer') };
+  box.innerHTML = checked.map(pid => {
+    const partner = getPartner(pid);
+    const c = store[pid] || (store[pid] = { partnerId: pid, role: 'Customer', financialType: 'Revenue (fixed)', amount: '', certainty: 0.4 });
+    const isPct = c.financialType === 'Revenue (percentage)';
+    const amountLbl = isPct ? t('percentOnlyLabel') : (c.financialType === 'Monthly Retainer' ? t('monthlyAmountLabel') : t('amountSARLabel'));
+    return `<div class="contrib-block" data-pid="${pid}" style="border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;background:var(--bg-card)">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px">${escapeHtml(partner ? partner.name : pid)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--ink-faint)">${t('roleLabel')}</label>
+          <select class="contrib-role" onchange="updateContrib('${pid}','role',this.value)">
+            ${ROLES.map(r => `<option value="${r}" ${c.role===r?'selected':''}>${ROLE_LBL[r]}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--ink-faint)">${t('financialTypeLabel')}</label>
+          <select class="contrib-fintype" onchange="updateContrib('${pid}','financialType',this.value)">
+            ${FIN.map(f => `<option value="${f}" ${c.financialType===f?'selected':''}>${FIN_LBL[f]}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="contrib-amount-label" style="font-size:11px;color:var(--ink-faint)">${amountLbl}</label>
+          <input type="number" min="0" step="0.01" class="contrib-amount" value="${c.amount !== undefined ? c.amount : ''}" placeholder="0" oninput="updateContrib('${pid}','amount',this.value)">
+        </div>
+        <div class="contrib-certainty-wrap" style="${isPct ? '' : 'display:none'}">
+          <label style="font-size:11px;color:var(--ink-faint)">${t('certaintyLabel')}</label>
+          <select class="contrib-certainty" onchange="updateContrib('${pid}','certainty',this.value)">
+            <option value="1.0" ${c.certainty===1.0?'selected':''}>${t('rc_proven')}</option>
+            <option value="0.7" ${c.certainty===0.7?'selected':''}>${t('rc_pilot')}</option>
+            <option value="0.4" ${(c.certainty===0.4||c.certainty===undefined)?'selected':''}>${t('rc_speculative')}</option>
+            <option value="0.2" ${c.certainty===0.2?'selected':''}>${t('rc_idea')}</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+};
+
+// Update a single contribution field; re-toggle amount label / certainty on type change.
+window.updateContrib = function(pid, field, value) {
+  const store = window._projectContribs || (window._projectContribs = {});
+  const c = store[pid] || (store[pid] = { partnerId: pid, role: 'Customer', financialType: 'Revenue (fixed)', amount: '', certainty: 0.4 });
+  if (field === 'certainty') c.certainty = parseFloat(value);
+  else c[field] = value;
+  if (field === 'financialType') {
+    const block = document.querySelector(`.contrib-block[data-pid="${pid}"]`);
+    if (block) {
+      const isPct = value === 'Revenue (percentage)';
+      const isRetainer = value === 'Monthly Retainer';
+      const lbl = block.querySelector('.contrib-amount-label');
+      const certWrap = block.querySelector('.contrib-certainty-wrap');
+      if (lbl) lbl.textContent = isPct ? t('percentOnlyLabel') : (isRetainer ? t('monthlyAmountLabel') : t('amountSARLabel'));
+      if (certWrap) certWrap.style.display = isPct ? '' : 'none';
+    }
+  }
+};
+
+// Internal-project checkbox — disables/clears partner selection, ownership & contribution fields.
+window.applyInternalProjectUI = function() {
+  const cb = document.getElementById('f-internal-project');
+  if (!cb) return;
+  const partnerCbs = document.querySelectorAll('#f-partners-container .partner-cb');
+  const otEl = document.getElementById('f-ownership-type');
+  const jvRow = document.getElementById('ownership-jv-row');
+  const otRow = document.getElementById('ownership-type-row');
+  const tierRow = document.getElementById('internal-tier-row');
+  const disabled = cb.checked;
+  partnerCbs.forEach(p => { if (disabled) p.checked = false; p.disabled = disabled; });
+  if (otEl) otEl.disabled = disabled;
+  // Internal → show tier selector, hide the partner ownership-type controls
+  if (tierRow) tierRow.classList.toggle('hidden', !disabled);
+  if (otRow) otRow.classList.toggle('hidden', disabled);
+  if (disabled) {
+    if (otEl) otEl.value = 'majorityOwn';
+    if (jvRow) jvRow.classList.add('hidden');
+  } else {
+    applyOwnershipTypeUI();
+  }
+  refreshContributions();
 };
 
 function deletePartner(id) {
@@ -4990,13 +6126,70 @@ function showProjectForm(projectId, defaultPartnerId) {
   const html = `
     <div class="form-row">
       <label>${t('fieldProjectName')}</label>
-      <input id="f-name" value="${escapeHtml(editing?.name || '')}">
+      <input id="f-name" value="${escapeHtml(editing ? (editing['name' + (currentLang==='ar'?'Ar':'En')] || '') : '')}">
     </div>
     <div class="form-row">
-      <label>${t('fieldPartner')}</label>
-      <select id="f-partner">
-        ${state.partners.map(p => `<option value="${p.id}" ${(editing?.partnerId||defaultPartnerId)===p.id?'selected':''}>${escapeHtml(p.name)} (${p.type==='development'?t('devShort'):p.type==='ownership'?t('ownershipShort'):t('supShort')})</option>`).join('')}
+      <label>${t('fieldPartner')} *</label>
+      <div id="f-partners-container" class="checkbox-grid">
+        <label style="grid-column:1/-1;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:4px">
+          <input type="checkbox" id="f-internal-project" onchange="applyInternalProjectUI()"
+            ${editing && editing.internalProject ? 'checked' : ''}>
+          <span><span class="cb-name">${t('internalProjectLabel')}</span></span>
+        </label>
+        ${state.partners.map(p => {
+          const checked = editing ? (editing.partnerIds || [editing.partnerId]).includes(p.id) : (defaultPartnerId === p.id);
+          const typeBadge = p.type==='development'?t('devShort'):p.type==='ownership'?t('ownershipShort'):p.type==='vendor'?t('partnerVendor'):p.type==='supervision'?t('supShort'):(p.customType||p.type);
+          return `<label><input type="checkbox" class="partner-cb" value="${p.id}" ${checked?'checked':''} onchange="refreshContributions()"> <span><span class="cb-name">${escapeHtml(p.name)}</span><br><span class="cb-sub">${typeBadge}</span></span></label>`;
+        }).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('fieldPartnerHint')}</div>
+    </div>
+    <div class="form-row hidden" id="internal-tier-row">
+      <label>${t('internalTierLabel')}</label>
+      <select id="f-internal-tier">
+        <option value="strategic" ${editing?.internalTier==='strategic'?'selected':''}>${t('tier_strategic')} — ${t('tier_strategic_desc')}</option>
+        <option value="operational" ${(editing?.internalTier||'operational')==='operational'?'selected':''}>${t('tier_operational')} — ${t('tier_operational_desc')}</option>
+        <option value="basic" ${editing?.internalTier==='basic'?'selected':''}>${t('tier_basic')} — ${t('tier_basic_desc')}</option>
       </select>
+    </div>
+    <div class="form-row" id="ownership-type-row">
+      <label>${t('ownershipTypeLabel')}</label>
+      <select id="f-ownership-type" onchange="applyOwnershipTypeUI()">
+        <option value="majorityOwn" ${(editing?.ownershipType||'noOwnership')==='majorityOwn'?'selected':''}>${t('ot_majorityOwn')}</option>
+        <option value="jointVenture" ${editing?.ownershipType==='jointVenture'?'selected':''}>${t('ot_jointVenture')}</option>
+        <option value="noOwnership" ${(editing?.ownershipType||'noOwnership')==='noOwnership'?'selected':''}>${t('ot_noOwnership')}</option>
+      </select>
+    </div>
+    <div class="form-row row-2 hidden" id="ownership-jv-row">
+      <div>
+        <label>${t('stakePercentLabel')}</label>
+        <input type="number" id="f-ownership-stake" min="0" max="100" step="0.1" value="${editing?.ownershipStake !== undefined ? editing.ownershipStake : ''}" placeholder="0">
+      </div>
+      <div>
+        <label>${t('revenueCertaintyLabel')}</label>
+        <select id="f-ownership-certainty">
+          <option value="1.0" ${(editing?.ownershipCertainty)===1.0?'selected':''}>${t('rc_proven')}</option>
+          <option value="0.7" ${(editing?.ownershipCertainty)===0.7?'selected':''}>${t('rc_pilot')}</option>
+          <option value="0.4" ${(editing?.ownershipCertainty)===0.4||editing?.ownershipCertainty===undefined?'selected':''}>${t('rc_speculative')}</option>
+          <option value="0.2" ${(editing?.ownershipCertainty)===0.2?'selected':''}>${t('rc_idea')}</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" id="contributions-row">
+      <label>${t('contributionsLabel')}</label>
+      <div id="f-contributions-container"></div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('contributionsHint')}</div>
+    </div>
+    <div class="form-row">
+      <label>${t('fieldProjectTeam')}</label>
+      <div id="f-team-container" class="checkbox-grid">
+        ${(state.team||[]).length === 0 ? '<div class="checkbox-grid-empty">' + t('noTeamMembers') + '</div>' :
+          (state.team||[]).map(m => {
+            const checked = editing && Array.isArray(editing.teamMemberIds) && editing.teamMemberIds.includes(m.id);
+            return `<label><input type="checkbox" class="team-cb" value="${m.id}" ${checked?'checked':''}> <span><span class="cb-name">${escapeHtml(m.name)}</span><br><span class="cb-sub">${escapeHtml(m.role||'')}</span></span></label>`;
+          }).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('fieldProjectTeamHint')}</div>
     </div>
     <div class="form-row">
       <label>${t('fieldDescription')}</label>
@@ -5013,37 +6206,6 @@ function showProjectForm(projectId, defaultPartnerId) {
       </div>
     </div>
 
-    <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px">
-      <div style="font-size:13px;color:var(--accent-warm);font-weight:500;margin-bottom:6px">💼 ${t('agreementSection')}</div>
-      <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px">${t('agreementSubtitle')}</div>
-    </div>
-
-    <div class="form-row">
-      <label>${t('fieldPartnershipModel')}</label>
-      <select id="f-partnership-model" onchange="applyPartnershipModelUI()">
-        <option value="percentage" ${editing?.partnershipModel==='percentage'?'selected':''}>${t('optPartnershipPercentage')}</option>
-        <option value="fixed" ${(editing?.partnershipModel||'fixed')==='fixed'?'selected':''}>${t('optPartnershipFixed')}</option>
-        <option value="other" ${editing?.partnershipModel==='other'?'selected':''}>${t('partnershipOther')}</option>
-      </select>
-    </div>
-    <div class="form-row" id="partnership-amount-row">
-      <label>${t('fieldPartnershipAmount')}</label>
-      <div style="display:flex;gap:8px">
-        <input type="number" id="f-partnership-amount" style="flex:1" min="0" step="0.01"
-               value="${editing?.partnershipAmount !== undefined ? editing.partnershipAmount : ''}"
-               placeholder="0">
-        <select id="f-partnership-currency" style="width:auto;min-width:170px"></select>
-      </div>
-      <div id="partnership-amount-hint" style="font-size:11px;color:var(--ink-faint);margin-top:4px"></div>
-    </div>
-    <div class="form-row ${editing?.partnershipModel==='other'?'':'hidden'}" id="partnership-custom-row">
-      <label>${t('fieldPartnershipCustomLabel')}</label>
-      <div style="display:flex;gap:8px">
-        <input id="f-partnership-custom-type" style="flex:1" value="${escapeHtml(editing?.partnershipCustomType || '')}" placeholder="${t('partnershipCustomPh')}">
-        <input id="f-partnership-custom-value" style="flex:1" value="${escapeHtml(editing?.partnershipModel==='other' ? (editing?.partnershipValue||'') : '')}" placeholder="${t('fieldPartnershipAmount')}">
-      </div>
-    </div>
-
     ${!editing ? `
     <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px">
       <div style="font-size:13px;color:var(--accent);font-weight:500;margin-bottom:6px">${t('sectionProjectMilestonesForm')}</div>
@@ -5057,9 +6219,14 @@ function showProjectForm(projectId, defaultPartnerId) {
     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>
   `;
   window._editingProjectMilestones = [];
+  // Seed contribution store from existing project (keyed by partnerId)
+  window._projectContribs = {};
+  (editing?.partnerContributions || []).forEach(c => { window._projectContribs[c.partnerId] = { ...c }; });
   openModal(editing ? t('editProjectTitle') : t('addProjectTitle'), html, foot);
-  // Initialize the dynamic amount/currency UI
-  applyPartnershipModelUI(editing?.partnershipCurrency);
+  // Initialize the dynamic ownership / contributions UI
+  applyOwnershipTypeUI();
+  refreshContributions();
+  applyInternalProjectUI();
   if (!editing) renderProjectMilestoneRows();
 }
 
@@ -5088,37 +6255,90 @@ function renderProjectMilestoneRows() {
 function saveProject(id) {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { alert(t('alertProjectNameRequired')); return; }
-  const partnershipModel = document.getElementById('f-partnership-model').value;
-  let partnershipAmount, partnershipCurrency, partnershipValue, partnershipCustomType = '';
-  if (partnershipModel === 'other') {
-    partnershipCustomType = (document.getElementById('f-partnership-custom-type').value || '').trim();
-    partnershipValue = (document.getElementById('f-partnership-custom-value').value || '').trim();
-    partnershipAmount = 0;
-    partnershipCurrency = '';
+
+  const isInternal = !!document.getElementById('f-internal-project')?.checked;
+  const partnerIds = isInternal ? [] : Array.from(document.querySelectorAll('#f-partners-container .partner-cb:checked')).map(cb => cb.value);
+  if (!isInternal && partnerIds.length === 0) { alert(t('alertSelectPartner')); return; }
+
+  // Ownership
+  let ownershipType, ownershipStake = 0, ownershipCertainty = 1.0;
+  let internalTier = null;
+  if (isInternal) {
+    ownershipType = 'majorityOwn'; ownershipStake = 0; ownershipCertainty = 1.0;
+    internalTier = document.getElementById('f-internal-tier')?.value || 'operational';
   } else {
-    partnershipAmount = parseFloat(document.getElementById('f-partnership-amount').value) || 0;
-    partnershipCurrency = document.getElementById('f-partnership-currency').value;
-    partnershipValue = formatPartnershipValue(partnershipAmount, partnershipCurrency, partnershipModel);
+    ownershipType = document.getElementById('f-ownership-type')?.value || 'noOwnership';
+    if (ownershipType === 'jointVenture') {
+      ownershipStake = parseFloat(document.getElementById('f-ownership-stake')?.value) || 0;
+      ownershipCertainty = parseFloat(document.getElementById('f-ownership-certainty')?.value) || IMPORTANCE_CONFIG.financial.defaultCertainty;
+    }
   }
+
+  // Partner contributions (one per selected partner)
+  let partnerContributions = [];
+  if (!isInternal) {
+    const store = window._projectContribs || {};
+    partnerContributions = partnerIds.map(pid => {
+      const c = store[pid] || { partnerId: pid, role: 'Customer', financialType: 'Revenue (fixed)', amount: 0 };
+      const entry = {
+        partnerId: pid,
+        role: c.role || 'Customer',
+        financialType: c.financialType || 'Revenue (fixed)',
+        amount: parseFloat(c.amount) || 0
+      };
+      if (entry.financialType === 'Revenue (percentage)') {
+        entry.certainty = (typeof c.certainty === 'number') ? c.certainty : IMPORTANCE_CONFIG.financial.defaultCertainty;
+      }
+      return entry;
+    });
+  }
+
+  // Derived display summary (project lists/reports still show an "agreement" badge/value)
+  const derivedModel = ownershipType === 'jointVenture' ? 'percentage' : 'fixed';
+  let derivedValue;
+  if (isInternal) {
+    derivedValue = t('em_internal');
+  } else if (ownershipType === 'jointVenture') {
+    derivedValue = (ownershipStake || 0) + '%';
+  } else {
+    const totalRevenue = partnerContributions
+      .filter(c => c.financialType === 'Revenue (fixed)')
+      .reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
+    derivedValue = totalRevenue > 0 ? (totalRevenue.toLocaleString('en-US')) + ' ' + t('currencySAR') : (ownershipType === 'majorityOwn' ? t('ot_majorityOwn') : t('ot_noOwnership'));
+  }
+
+  const teamMemberIds = Array.from(document.querySelectorAll('#f-team-container .team-cb:checked')).map(cb => cb.value);
   const data = {
     name,
-    partnerId: document.getElementById('f-partner').value,
+    partnerId: partnerIds[0] || '',
+    partnerIds,
+    teamMemberIds,
     description: document.getElementById('f-desc').value.trim(),
     startDate: document.getElementById('f-start').value,
     targetDate: document.getElementById('f-target').value,
     status: 'active',
-    partnershipModel,
-    partnershipAmount,
-    partnershipCurrency,
-    partnershipValue,
-    partnershipCustomType
+    internalProject: isInternal,
+    internalTier,
+    ownershipType,
+    ownershipStake,
+    ownershipCertainty,
+    partnerContributions,
+    // derived display-only fields (importance no longer depends on these)
+    partnershipModel: derivedModel,
+    partnershipValue: derivedValue,
+    partnershipCustomType: ''
   };
   if (id) {
     const p = getProject(id);
     Object.assign(p, data); // preserves p.attachments
+    setBilingualField(p, 'name', p.name);
+    ensureBilingual(p, 'name', detectContentLang(p.name) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
   } else {
     const newId = uid();
-    state.projects.push({ id: newId, ...data, attachments: [] });
+    const newP = { id: newId, ...data, attachments: [] };
+    setBilingualField(newP, 'name', newP.name);
+    state.projects.push(newP);
+    ensureBilingual(newP, 'name', detectContentLang(newP.name) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
     // Create optional milestone tasks defined in the project form
     (window._editingProjectMilestones || [])
       .filter(m => m.name && m.name.trim())
@@ -5268,13 +6488,40 @@ function deleteAttachment(projectId, attachmentId) {
   render(state.detailParam);
 }
 
+// NEW: Link attachment system
+function showAddLinkForm(projectId) {
+  const form = document.getElementById('link-form-' + projectId);
+  if (form) { form.style.display = 'block'; }
+}
+
+function saveLink(projectId) {
+  const name = document.getElementById('link-name-' + projectId)?.value.trim();
+  const url = document.getElementById('link-url-' + projectId)?.value.trim();
+  const desc = document.getElementById('link-desc-' + projectId)?.value.trim();
+  if (!name || !url) { alert(t('alertRequiredFields')); return; }
+  const project = getProject(projectId);
+  if (!project) return;
+  if (!Array.isArray(project.attachments)) project.attachments = [];
+  project.attachments.push({
+    id: 'link_' + uid(),
+    name,
+    url,
+    description: desc || '',
+    isLink: true,
+    addedAt: todayDate()
+  });
+  saveState();
+  toast(t('toastSaved'));
+  render(state.detailParam);
+}
+
 function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultType) {
   const editing = actionId ? state.actions.find(a => a.id === actionId) : null;
   if (state.projects.length === 0) {
     alert(t('alertNeedProjectFirst'));
     return;
   }
-  const projects = defaultPartnerId ? state.projects.filter(p => p.partnerId === defaultPartnerId) : state.projects;
+  const projects = defaultPartnerId ? state.projects.filter(p => (Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId]).includes(defaultPartnerId)) : state.projects;
   if (projects.length === 0) {
     alert(t('alertNoProjectsForPartner'));
     return;
@@ -5293,13 +6540,17 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row">
       <label id="title-label">${t('fieldActionTitle')}</label>
-      <input id="f-title" value="${escapeHtml(editing?.title || '')}" placeholder="">
+      <input id="f-title" value="${escapeHtml(editing ? (editing['title' + (currentLang==='ar'?'Ar':'En')] || '') : '')}" placeholder="">
     </div>
     <div class="form-row">
       <label>${t('fieldProjectName')}</label>
       <select id="f-project">
         ${projects.map(p => `<option value="${p.id}" data-partner="${p.partnerId}" ${(editing?.projectId||defaultProjectId)===p.id?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(getPartner(p.partnerId)?.name || '')}</option>`).join('')}
       </select>
+    </div>
+    <div class="form-row" id="start-date-row">
+      <label>${t('taskStartDate')}</label>
+      <input type="date" id="f-start-date" value="${editing?.startDate || todayDate()}">
     </div>
     <div class="form-row row-2">
       <div>
@@ -5377,7 +6628,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row" id="depends-on-row">
       <label>${t('fieldDependsOn')}</label>
-      <select id="f-depends-on" multiple size="4" style="min-height:80px"></select>
+      <div id="f-depends-on-container" class="checkbox-grid"></div>
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('dependsOnHint')}</div>
     </div>
     <div class="form-row" id="task-note-row">
@@ -5414,25 +6665,36 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
   const taskNoteRow = document.getElementById('task-note-row');
 
   // Build the Task Owner dropdown: internal team members + the project's partner team
+  // FIX: refreshOwnerOptions — uses project.partnerIds + project.teamMemberIds
   function refreshOwnerOptions() {
     const sel = document.getElementById('f-owner');
     if (!sel) return;
     const pid = projectEl.value;
     const proj = getProject(pid);
-    const partner = proj ? getPartner(proj.partnerId) : null;
     const cur = editing?.ownerId || '';
     let html = `<option value="">${t('ownerNone')}</option>`;
-    const internal = state.team || [];
+    // Only internal members explicitly assigned to THIS project may own its tasks.
+    const projTeamIds = Array.isArray(proj?.teamMemberIds) ? proj.teamMemberIds : [];
+    const internal = (state.team || []).filter(m => projTeamIds.includes(m.id));
     if (internal.length) {
       html += `<optgroup label="${t('ownerInternalGroup')}">` +
         internal.map(m => `<option value="i:${m.id}" ${cur===m.id && editing?.ownerKind==='internal'?'selected':''}>${escapeHtml(m.name)}</option>`).join('') +
         `</optgroup>`;
     }
-    const pteam = (partner && Array.isArray(partner.team)) ? partner.team : [];
-    if (pteam.length) {
-      html += `<optgroup label="${t('ownerPartnerGroup')} — ${escapeHtml(partner.name)}">` +
-        pteam.map(m => `<option value="p:${m.id}" ${cur===m.id && editing?.ownerKind==='partner'?'selected':''}>${escapeHtml(m.name)}</option>`).join('') +
-        `</optgroup>`;
+    // FIX #1: iterate ALL project partners for team members
+    const allPids = Array.isArray(proj?.partnerIds) ? proj.partnerIds : (proj?.partnerId ? [proj.partnerId] : []);
+    allPids.forEach(partnerId => {
+      const partner = getPartner(partnerId);
+      const pteam = (partner && Array.isArray(partner.team)) ? partner.team : [];
+      if (pteam.length) {
+        html += `<optgroup label="${t('ownerPartnerGroup')} — ${escapeHtml(partner.name)}">` +
+          pteam.map(m => `<option value="p:${m.id}" ${cur===m.id && editing?.ownerKind==='partner'?'selected':''}>${escapeHtml(m.name)}</option>`).join('') +
+          `</optgroup>`;
+      }
+    });
+    // Helpful hint when the project has no assignable owners yet
+    if (!html.includes('<optgroup')) {
+      html += `<option value="" disabled>— ${t('noAssignableOwners')} —</option>`;
     }
     sel.innerHTML = html;
   }
@@ -5440,12 +6702,11 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
   // Build the Depends-On multi-select: tasks in the same project, plus any
   // current dependencies that live in other projects (so they stay selectable).
   function refreshDependsOnOptions() {
-    const sel = document.getElementById('f-depends-on');
-    if (!sel) return;
+    const container = document.getElementById('f-depends-on-container');
+    if (!container) return;
     const pid = projectEl.value;
     const curIds = Array.isArray(editing?.dependsOnIds) ? editing.dependsOnIds : [];
     const tasks = state.actions.filter(a => isTask(a) && a.projectId === pid && (!editing || a.id !== editing.id));
-    // Include cross-project deps that aren't in the same-project list
     curIds.forEach(did => {
       if (!tasks.some(tk => tk.id === did)) {
         const ext = state.actions.find(a => a.id === did && isTask(a));
@@ -5455,8 +6716,12 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
         }
       }
     });
-    sel.innerHTML = tasks.map(tk =>
-      `<option value="${tk.id}" ${curIds.includes(tk.id)?'selected':''}>${escapeHtml(tk.title)}</option>`
+    if (tasks.length === 0) {
+      container.innerHTML = `<div class="checkbox-grid-empty">${t('dependsOnNone')}</div>`;
+      return;
+    }
+    container.innerHTML = tasks.map(tk =>
+      `<label><input type="checkbox" class="dep-cb" value="${tk.id}" ${curIds.includes(tk.id)?'checked':''}> <span>${escapeHtml(tk.title)}</span></label>`
     ).join('');
   }
 
@@ -5505,6 +6770,9 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     timeRow.classList.toggle('hidden', !isMeet);
     titleLabel.textContent = isMeet ? t('fieldMeetingTopic') : isMs ? t('fieldMilestoneTitle') : t('fieldActionTitle');
     dueLabel.textContent = isMeet ? t('fieldMeetingDate') : isMs ? t('fieldMilestoneDate') : t('fieldDueDate');
+    // NEW: hide start date for meetings
+    const startDateRow = document.getElementById('start-date-row');
+    if (startDateRow) startDateRow.style.display = isMeet ? 'none' : '';
     if (!titleInput.value) {
       titleInput.placeholder = isMeet ? t('fieldMeetingTopicPh') : isMs ? t('fieldMilestoneTitlePh') : t('fieldActionTitlePh');
     }
@@ -5584,6 +6852,7 @@ function saveAction(id) {
     type,
     projectId,
     partnerId,
+    startDate: document.getElementById('f-start-date')?.value || todayDate(),
     dueDate,
     meetingTime: type === 'meeting' ? document.getElementById('f-time').value : null,
     priority: document.getElementById('f-priority').value,
@@ -5605,8 +6874,7 @@ function saveAction(id) {
     if (ownerRaw.startsWith('i:')) { data.ownerKind = 'internal'; data.ownerId = ownerRaw.slice(2); }
     else if (ownerRaw.startsWith('p:')) { data.ownerKind = 'partner'; data.ownerId = ownerRaw.slice(2); }
     else { data.ownerKind = ''; data.ownerId = ''; }
-    const depSel = document.getElementById('f-depends-on');
-    data.dependsOnIds = depSel ? Array.from(depSel.selectedOptions).map(o => o.value).filter(Boolean) : [];
+    data.dependsOnIds = Array.from(document.querySelectorAll('#f-depends-on-container .dep-cb:checked')).map(cb => cb.value);
     data.note = (document.getElementById('f-task-note')?.value || '').trim();
   }
 
@@ -5651,8 +6919,13 @@ function saveAction(id) {
   if (id) {
     const a = state.actions.find(x => x.id === id);
     Object.assign(a, data);
+    setBilingualField(a, 'title', a.title); // dual-language storage + manual flag
+    ensureBilingual(a, 'title', detectContentLang(a.title) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
   } else {
-    state.actions.push({ id: uid(), ...data, createdAt: todayDate() });
+    const newA = { id: uid(), ...data, createdAt: todayDate() };
+    setBilingualField(newA, 'title', newA.title);
+    state.actions.push(newA);
+    ensureBilingual(newA, 'title', detectContentLang(newA.title) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); });
   }
   saveState();
   toast(t('toastSaved'));
@@ -5982,12 +7255,49 @@ function riskBadgeMini(level) {
   return `<span class="badge-mini ${cls}">${level.label}</span>`;
 }
 
+// NEW: stakeholder tag for a task (Internal Team / Partner: Name / Unassigned)
+function getStakeholderTag(a) {
+  if (a.ownerKind === 'internal') return { label: t('stakeholderInternal'), internal: true };
+  if (a.ownerKind === 'partner') {
+    const pa = state.partners.find(pp => (pp.team || []).some(m => m.id === a.ownerId));
+    return { label: t('stakeholderPartner', pa ? pa.name : '—'), internal: false };
+  }
+  return { label: t('stakeholderUnassigned'), internal: null };
+}
+// NEW: stakeholder NAME for the tasks table column (owner's affiliation, not project partner)
+function getTaskStakeholderName(a) {
+  if (a.ownerKind === 'internal') return t('stakeholderInternal');
+  if (a.ownerKind === 'partner') {
+    const pa = state.partners.find(pp => (pp.team || []).some(m => m.id === a.ownerId));
+    if (pa) return pa.name;
+  }
+  // fallback to the project's primary partner
+  const proj = getProject(a.projectId);
+  const pp = proj ? getPartner(proj.partnerId) : null;
+  return pp ? pp.name : '—';
+}
+// NEW: average delay (in days) across a set of tasks that are currently delayed
+function getAvgDelay(tasks) {
+  const delayedTasks = tasks.filter(a => isOpen(a) && getDelayDays(a) > 0);
+  if (delayedTasks.length === 0) return 0;
+  const total = delayedTasks.reduce((s, a) => s + getDelayDays(a), 0);
+  return Math.round(total / delayedTasks.length);
+}
+function stakeholderBadge(a) {
+  if (isMeeting(a)) return '—';
+  const s = getStakeholderTag(a);
+  const bg = s.internal === true ? '#e8f0e8' : s.internal === false ? '#faf0e0' : '#eee9dd';
+  const fg = s.internal === true ? '#4a7c59' : s.internal === false ? '#c47e2a' : '#5a6478';
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${escapeHtml(s.label)}</span>`;
+}
+
 function renderReportTasksTable(tasks) {
   if (tasks.length === 0) return `<div style="color:var(--ink-faint);font-size:13px;padding:10px">${t('reportNoData')}</div>`;
   return `
     <table class="rt">
       <thead><tr>
         <th>${t('colTitle')}</th>
+        <th>${t('colStakeholder')}</th>
         <th>${t('colPriority')}</th>
         <th>${t('colDate')}</th>
         <th>${t('colStatus')}</th>
@@ -6000,8 +7310,9 @@ function renderReportTasksTable(tasks) {
           const r = getRiskLevel(d);
           return `<tr>
             <td><strong>${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</strong>${a.seriesId ? ' <span style="color:var(--accent-warm);font-size:10px">🔄</span>' : ''}</td>
+            <td>${stakeholderBadge(a)}</td>
             <td><span class="badge-mini ${a.priority==='high'?'red':a.priority==='medium'?'amber':''}">${a.priority==='high'?t('priorityHigh'):a.priority==='medium'?t('priorityMedium'):t('priorityLow')}</span></td>
-            <td>${fmtDate(a.dueDate)}${a.meetingTime ? ' ' + fmtTime(a.meetingTime) : ''}</td>
+            <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}<div>${fmtDate(a.dueDate)}${a.meetingTime ? ' ' + fmtTime(a.meetingTime) : ''}</div></td>
             <td>${statusBadgeMini(a.status)}</td>
             <td>${isOpen(a) && d>0 ? riskBadgeMini(r) + ' ' + t('daysShort', d) : (isCompleted(a) && d>DELAY_THRESHOLD_DAYS ? `<span style="color:var(--amber)">+${d}</span>` : '—')}</td>
             <td style="max-width:240px;vertical-align:top">${(() => {
@@ -6118,7 +7429,8 @@ function printAllTasksReport(existingEntry) {
             <table class="rt" style="margin-top:12px;background:#fff">
               <thead><tr>
                 <th>${t('colTitle')}</th>
-                <th>${t('colTracking')}</th>
+                <th>${t('taskOwnerCol')}</th>
+                <th>${t('colStakeholder')}</th>
                 <th>${t('colStatus')}</th>
                 <th>${t('colDate')}</th>
                 <th>${t('colDelay')}</th>
@@ -6127,11 +7439,13 @@ function printAllTasksReport(existingEntry) {
                 ${sorted.map(a => {
                   const delay = getDelayDays(a);
                   const isLate = isOpen(a) && delay > 0;
+                  const stakeholder = a.ownerKind === 'internal' ? t('stakeholderInternal') : a.ownerKind === 'partner' ? (() => { const pa = state.partners.find(pp => (pp.team||[]).some(m => m.id === a.ownerId)); return t('stakeholderPartner', pa ? pa.name : ''); })() : t('stakeholderUnassigned');
                   return `<tr>
                     <td><strong>${escapeHtml(a.title)}</strong></td>
-                    <td style="max-width:260px;vertical-align:top">${trackingFullDisplay(a)}</td>
+                    <td style="vertical-align:top"><div style="font-weight:500">${escapeHtml(getOwnerName(a)||'—')}</div><div style="font-size:10px;color:#888">${a.ownerKind==='internal'?t('ownerKindInternal'):a.ownerKind==='partner'?t('ownerKindPartner'):''}</div></td>
+                    <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${a.ownerKind==='internal'?'#e8f0e8':'#faf0e0'};color:${a.ownerKind==='internal'?'#4a7c59':'#c47e2a'}">${stakeholder}</span></td>
                     <td>${statusPill(a)}</td>
-                    <td>${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
+                    <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999;margin-bottom:2px">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
                     <td>${delay > 0 ? `<span style="color:${isLate && delay>DELAY_THRESHOLD_DAYS?'var(--red)':'var(--amber)'};font-weight:${isLate?'500':'normal'}">${t('daysShort', delay)}</span>` : '—'}</td>
                   </tr>`;
                 }).join('')}
@@ -6174,39 +7488,47 @@ function printProjectTasksReport(projectId, existingEntry) {
   }
 
   function renderBlock(items) {
-    const completed = items.filter(isCompleted);
-    const pending = items.filter(a => isOpen(a) || isMissed(a));
+    // FIX: meetings never count as tasks or delays
+    const taskItems = items.filter(a => !isMeeting(a));
+    const meetingItems = items.filter(isMeeting);
+    const completed = taskItems.filter(isCompleted);
+    const pending = taskItems.filter(a => isOpen(a) || isMissed(a));
     const redFlagCount = pending.filter(a => getDelayDays(a) > 2).length;
     const sorted = sortItems(items);
     const stats = `
       <div class="stats4">
-        <div class="stat-cell"><div class="v">${items.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
+        <div class="stat-cell"><div class="v">${taskItems.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
         <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
         <div class="stat-cell"><div class="v" style="color:var(--amber)">${pending.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
         <div class="stat-cell stat-redflag"><div class="v" style="color:var(--red)">🚩 ${redFlagCount}</div><div class="l">${t('redFlagLabel')}</div></div>
       </div>
+      ${meetingItems.length ? `<div style="font-size:12px;color:var(--accent);margin:6px 0 0">🗓 ${meetingItems.length} ${t('reportMeetings')}</div>` : ''}
     `;
     const table = items.length === 0 ? `<div style="color:#888;padding:14px;text-align:center">${t('reportNoData')}</div>` : `
       <table class="rt">
         <thead><tr>
           <th>${t('colTitle')}</th>
+          <th>${t('colStakeholder')}</th>
           <th>${t('colDate')}</th>
           <th>${t('colStatus')}</th>
           <th>${t('colDelay')}</th>
-          <th>${t('colTracking')}</th>
+          <th>${t('taskOwnerCol')}</th>
           <th class="col-redflag">${t('redFlagShort')}</th>
         </tr></thead>
         <tbody>
           ${sorted.map(a => {
+            const meet = isMeeting(a);
             const pendingItem = isOpen(a) || isMissed(a);
-            const delay = pendingItem ? getDelayDays(a) : (isCompleted(a) ? getDelayDays(a) : 0);
-            const redFlag = pendingItem && delay > 2;
+            // meetings never produce a delay or red flag
+            const delay = (!meet && pendingItem) ? getDelayDays(a) : (!meet && isCompleted(a) ? getDelayDays(a) : 0);
+            const redFlag = !meet && pendingItem && delay > 2;
             return `<tr class="${redFlag ? 'row-redflag' : ''}">
-              <td><strong>${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</strong></td>
-              <td>${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
+              <td><strong>${meet ? '🗓 ' : ''}${escapeHtml(a.title)}</strong></td>
+              <td>${stakeholderBadge(a)}</td>
+              <td>${!meet && a.startDate ? `<div style="font-size:10px;color:#999;margin-bottom:2px">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
               <td>${statusPill(a)}</td>
-              <td>${delay > 0 ? `<span style="color:${redFlag?'var(--red)':'var(--amber)'};font-weight:${redFlag?'600':'normal'}">${t('daysShort', delay)}</span>` : '—'}</td>
-              <td style="max-width:240px;vertical-align:top">${trackingFullDisplay(a)}</td>
+              <td>${!meet && delay > 0 ? `<span style="color:${redFlag?'var(--red)':'var(--amber)'};font-weight:${redFlag?'600':'normal'}">${t('daysShort', delay)}</span>` : '—'}</td>
+              <td style="vertical-align:top"><div style="font-weight:500">${escapeHtml(getOwnerName(a)||'—')}</div><div style="font-size:10px;color:#888">${a.ownerKind==='internal'?t('ownerKindInternal'):a.ownerKind==='partner'?t('ownerKindPartner'):''}</div></td>
               <td class="col-redflag">${redFlag ? `<span class="redflag-cell">🚩 ${t('redFlagLabel')}</span>` : '—'}</td>
             </tr>`;
           }).join('')}
@@ -6221,9 +7543,6 @@ function printProjectTasksReport(projectId, existingEntry) {
     <div class="meta">${t('projectTasksReportTitle')}${partner ? ' · ' + escapeHtml(partner.name) : ''}</div>
 
     <div class="report-filter-bar no-print">
-      <button class="filter-pill active" data-filter="all" onclick="setReportTypeFilter('all')">${t('filterTypeAll')} (${allActions.length})</button>
-      <button class="filter-pill" data-filter="tasks" onclick="setReportTypeFilter('tasks')">${t('filterTypeTasks')} (${tasksOnly.length})</button>
-      <button class="filter-pill" data-filter="meetings" onclick="setReportTypeFilter('meetings')">${t('filterTypeMeetings')} (${meetingsOnly.length})</button>
       <label class="toggle-risk-pill active" id="risk-toggle">
         <input type="checkbox" id="risk-toggle-input" checked onchange="toggleRiskDisplay(this.checked)">
         ${t('toggleRiskFlag')}
@@ -6231,9 +7550,7 @@ function printProjectTasksReport(projectId, existingEntry) {
     </div>
 
     <h2>${t('reportSummary')}</h2>
-    <div id="content-all">${renderBlock(allActions)}</div>
-    <div id="content-tasks" style="display:none">${renderBlock(tasksOnly)}</div>
-    <div id="content-meetings" style="display:none">${renderBlock(meetingsOnly)}</div>
+    <div id="content-all">${renderBlock(tasksOnly)}</div>
 
     <div class="warning-note-section">
       <div class="label">⚠️ ${t('warningNoteLabel')}</div>
@@ -6266,11 +7583,12 @@ function printProjectReport(projectId, existingEntry) {
   const entry = existingEntry || saveReportEntry('project', { projectId }, p.name);
   const partner = getPartner(p.partnerId);
   const actions = getProjectActions(projectId);
-  const completed = actions.filter(isCompleted);
-  const open = actions.filter(isOpen);
-  const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+  // FIX: meetings excluded from ALL task counts and delay logic
   const meetings = actions.filter(isMeeting);
   const tasks = actions.filter(a => !isMeeting(a));
+  const completed = tasks.filter(isCompleted);
+  const open = tasks.filter(isOpen);
+  const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
   const attachments = p.attachments || [];
 
   const body = `
@@ -6280,7 +7598,7 @@ function printProjectReport(projectId, existingEntry) {
     <h2>${t('reportProjectInfo')}</h2>
     <div class="info-grid">
       <div><div class="lbl">${t('colPartner')}</div><div class="val">${partner ? escapeHtml(partner.name) : '—'}</div></div>
-      <div><div class="lbl">${t('colType')}</div><div class="val">${partner ? (partner.type==='development'?t('partnerDev'):partner.type==='ownership'?t('partnerOwnership'):t('partnerSup')) : '—'}</div></div>
+      <div><div class="lbl">${t('colType')}</div><div class="val">${partner ? getPartnerTypeLabel(partner.type, partner.customType) : '—'}</div></div>
       <div><div class="lbl">${t('statStartDate')}</div><div class="val">${fmtDate(p.startDate)}</div></div>
       <div><div class="lbl">${t('statTargetDate')}</div><div class="val">${fmtDate(p.targetDate)}</div></div>
       <div><div class="lbl">${t('fieldPartnershipModel').replace(' *','')}</div><div class="val">${p.partnershipModel==='percentage'?t('partnershipPercentageShort'):t('partnershipFixedShort')}</div></div>
@@ -6290,7 +7608,7 @@ function printProjectReport(projectId, existingEntry) {
 
     <h2>${t('reportSummary')}</h2>
     <div class="stats4">
-      <div class="stat-cell"><div class="v">${actions.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
+      <div class="stat-cell"><div class="v">${tasks.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
       <div class="stat-cell"><div class="v">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
       <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
       <div class="stat-cell"><div class="v" style="color:var(--red)">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
@@ -6332,14 +7650,17 @@ function printPartnerReport(partnerId, existingEntry) {
   const importance = getPartnerImportance(partnerId);
   const commitment = getPartnerCommitment(partnerId);
   const projects = getPartnerProjects(partnerId);
-  const actions = getPartnerActions(partnerId);
+  // FIX: exclude meetings from task counts (meetings tracked separately)
+  const actions = getPartnerActions(partnerId).filter(a => a.type !== 'meeting');
+  const partnerMeetingsCount = getPartnerActions(partnerId).filter(a => a.type === 'meeting').length;
   const completed = actions.filter(isCompleted);
   const open = actions.filter(isOpen);
   const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+  const avgDelay = getAvgDelay(actions); // NEW: average delay indicator
 
   const body = `
     <h1>👤 ${escapeHtml(p.name)}</h1>
-    <div class="meta">${t('partnerReportTitle')} · ${p.type==='development'?t('partnerDev'):p.type==='ownership'?t('partnerOwnership'):t('partnerSup')}</div>
+    <div class="meta">${t('partnerReportTitle')} · ${getPartnerTypeLabel(p.type, p.customType)}</div>
 
     <h2>${t('reportPartnerInfo')}</h2>
     <div class="info-grid">
@@ -6363,14 +7684,20 @@ function printPartnerReport(partnerId, existingEntry) {
       <div class="stat-cell"><div class="v">${importance.projectCount}</div><div class="l">${t('colProjects')}</div></div>
       <div class="stat-cell"><div class="v" style="color:${delayed.length>0?'var(--red)':'var(--green)'}">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
     </div>
+    <div class="stats4" style="margin-top:10px">
+      <div class="stat-cell"><div class="v">${actions.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
+      <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:${avgDelay>0?'var(--amber)':'var(--green)'}">${avgDelay} ${t('daysUnit')}</div><div class="l">${t('avgDelayLabel')}</div></div>
+    </div>
 
     <h2>${t('reportPartnerProjects')} (${projects.length})</h2>
     ${projects.length === 0 ? `<div style="color:var(--ink-faint);padding:10px">${t('reportNoData')}</div>` : `
       <table class="rt">
-        <thead><tr><th>${t('colProject')}</th><th>${t('cardAgreement')}</th><th>${t('statStartDate')}</th><th>${t('statTargetDate')}</th><th>${t('colActions')}</th></tr></thead>
+        <thead><tr><th>${t('colProject')}</th><th>${t('cardAgreement')}</th><th>${t('statStartDate')}</th><th>${t('statTargetDate')}</th><th>${t('colCompletedTotal')}</th></tr></thead>
         <tbody>
           ${projects.map(pr => {
-            const a = getProjectActions(pr.id);
+            const a = getProjectTasks(pr.id); // tasks only — meetings excluded from counts
             const c = a.filter(isCompleted).length;
             return `<tr>
               <td><strong>${escapeHtml(pr.name)}</strong><div style="font-size:11px;color:var(--ink-faint)">${escapeHtml(pr.description || '')}</div></td>
@@ -6380,7 +7707,7 @@ function printPartnerReport(partnerId, existingEntry) {
               </td>
               <td>${fmtDate(pr.startDate)}</td>
               <td>${fmtDate(pr.targetDate)}</td>
-              <td>${c}/${a.length}</td>
+              <td><strong style="color:var(--green)">${c}</strong> <span style="color:var(--ink-faint)">/ ${a.length}</span></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -6388,11 +7715,77 @@ function printPartnerReport(partnerId, existingEntry) {
     `}
 
     <h2>${t('reportPartnerTasks')}</h2>
-    ${delayed.length > 0 ? `<div class="group-label">⚠️ ${t('filterDelayed')} (${delayed.length})</div>${renderReportTasksTable(delayed.sort((a,b)=>getDelayDays(b)-getDelayDays(a)))}` : ''}
+    ${delayed.filter(a=>a.type!=='meeting').length > 0 ? `<div class="group-label">⚠️ ${t('filterDelayed')} (${delayed.filter(a=>a.type!=='meeting').length})</div>${renderReportTasksTable(delayed.filter(a=>a.type!=='meeting').sort((a,b)=>getDelayDays(b)-getDelayDays(a)))}` : ''}
     ${open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).length > 0 ? `<div class="group-label">${t('statusOpen')}</div>${renderReportTasksTable(open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS))}` : ''}
     ${completed.length > 0 ? `<div class="group-label">✓ ${t('statusCompleted')} (${completed.length})</div>${renderReportTasksTable(completed.slice(0, 20))}` : ''}
   `;
   openReportWindow(t('partnerReportTitle') + ' — ' + p.name, body, entry);
+}
+
+// NEW: Partner-facing report — shows only partner-owned tasks (to share with partner)
+function printPartnerFacingReport(partnerId) {
+  const p = getPartner(partnerId);
+  if (!p) return;
+  const projects = getPartnerProjects(partnerId);
+  // Only tasks owned by this partner's team members
+  const partnerMemberIds = (p.team || []).map(m => m.id);
+  const partnerTasks = state.actions.filter(a =>
+    a.type !== 'meeting' &&
+    a.ownerKind === 'partner' &&
+    partnerMemberIds.includes(a.ownerId)
+  );
+  const partnerMeetings = state.actions.filter(a =>
+    a.type === 'meeting' &&
+    projects.some(pr => pr.id === a.projectId)
+  ).filter(a => a.status === 'completed');
+
+  const open = partnerTasks.filter(isOpen);
+  const completed = partnerTasks.filter(isCompleted);
+  const delayed = open.filter(a => getDelayDays(a) > 0);
+  const avgDelay = getAvgDelay(partnerTasks); // NEW
+
+  const entry = saveReportEntry('partner-facing', { partnerId }, t('partnerFacingReport') + ' — ' + p.name);
+
+  // FIX: mirror internal report format (header + info-grid + stats4) minus scores
+  let body = `
+    <h1>🤝 ${escapeHtml(p.name)}</h1>
+    <div class="meta">${t('partnerFacingReport')} · ${getPartnerTypeLabel(p.type, p.customType)}</div>
+
+    <h2>${t('reportPartnerInfo')}</h2>
+    <div class="info-grid">
+      <div><div class="lbl">${t('fieldContact')}</div><div class="val">${escapeHtml(p.contact || '—')}</div></div>
+      <div><div class="lbl">${t('fieldPhone')}</div><div class="val">${escapeHtml(p.phone || '—')}</div></div>
+      <div><div class="lbl">${t('fieldEmail')}</div><div class="val">${escapeHtml(p.email || '—')}</div></div>
+      <div><div class="lbl">${t('colType')}</div><div class="val">${getPartnerTypeLabel(p.type, p.customType)}</div></div>
+    </div>
+
+    <h2>${t('reportSummary')}</h2>
+    <div class="stats4">
+      <div class="stat-cell"><div class="v">${partnerTasks.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
+      <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:${delayed.length>0?'var(--red)':'var(--green)'}">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
+    </div>
+    <div class="stats4" style="margin-top:10px">
+      <div class="stat-cell"><div class="v" style="color:${avgDelay>0?'var(--amber)':'var(--green)'}">${avgDelay} ${t('daysUnit')}</div><div class="l">${t('avgDelayLabel')}</div></div>
+    </div>
+
+    <h2>${t('reportPartnerTasks')}</h2>
+    ${delayed.length > 0 ? `<div class="group-label">⚠️ ${t('filterDelayed')} (${delayed.length})</div>${renderReportTasksTable(delayed.sort((a,b)=>getDelayDays(b)-getDelayDays(a)))}` : ''}
+    ${open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).length > 0 ? `<div class="group-label">${t('statusOpen')}</div>${renderReportTasksTable(open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')))}` : ''}
+    ${completed.length > 0 ? `<div class="group-label">✓ ${t('statusCompleted')} (${completed.length})</div>${renderReportTasksTable(completed.slice(0, 20))}` : ''}
+    ${partnerTasks.length === 0 ? `<div style="color:#888;padding:14px;text-align:center">${t('reportNoData')}</div>` : ''}`;
+
+  if (partnerMeetings.length > 0) {
+    body += `<h2 style="margin-top:20px">🗓 ${t('meetings')} (${partnerMeetings.length})</h2>`;
+    partnerMeetings.forEach(m => {
+      body += `<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:12px">
+        <strong>${escapeHtml(m.title)}</strong> — ${fmtDate(m.dueDate)} ${m.meetingTime||''}
+      </div>`;
+    });
+  }
+
+  openReportWindow(t('partnerFacingReport') + ' — ' + p.name, body, entry);
 }
 
 // Builds the printable daily-report popup. If existingEntry passed, reuses its
@@ -6616,7 +8009,7 @@ function renderNotificationBanner() {
         ${previewHTML}
       </div>
       <div class="notif-banner-actions">
-        <button class="btn sm" onclick="navigate('report')">${t('notifViewAll')}</button>
+        <button class="btn sm" onclick="goToAgendaToday()">${t('notifViewAll')}</button>
         <button class="btn ghost sm" onclick="dismissNotificationBanner()">${t('notifDismiss')}</button>
       </div>
     </div>
@@ -6720,7 +8113,7 @@ function exportCSV() {
       a.title,
       pr ? pr.name : '',
       p ? p.name : '',
-      p ? (p.type === 'development' ? t('devShort') : p.type === 'ownership' ? t('ownershipShort') : t('supShort')) : '',
+      p ? getPartnerTypeLabel(p.type, p.customType) : '',
       priorityMap[a.priority] || '',
       a.dueDate || '',
       a.meetingTime || '',
@@ -6804,8 +8197,30 @@ applyLangToDocument();
 if (!loadState()) {
   // First time, load sample data
   loadSampleData();
+  // NEW: apply startDate migration to seed tasks
+  state.actions.forEach(a => {
+    if (a.type !== 'meeting' && !a.startDate) {
+      const proj = state.projects.find(pr => pr.id === a.projectId);
+      if (proj && proj.startDate) a.startDate = proj.startDate;
+      else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
+      else a.startDate = todayDate();
+    }
+  });
+  // NEW: normalize seed projects (engagement model, revenue certainty, SAR currency)
+  state.projects.forEach(pr => {
+    if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
+    if (!pr.engagementModel) {
+      pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
+    }
+    if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
+      pr.revenueCertainty = ['joint-venture', 'own-strategic', 'own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
+    }
+  });
+  migrateProjectsToContributions();
 }
 state.currentView = 'dashboard';
+migrateBilingualContent(); // backfill dual-language title/name slots
+loadConfig(); // apply any saved importance-configuration overrides
 renderSidebar();
 render();
 // Schedule daily notification check (also runs immediately)
