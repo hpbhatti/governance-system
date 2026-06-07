@@ -1261,7 +1261,7 @@ async function loadConfig() {
       }
       return; // success (even if nothing stored yet → keep defaults)
     } catch (e) {
-      console.error('Supabase config load failed — using localStorage:', e);
+      console.error('Supabase config load failed — using localStorage:', describeSupabaseError(e));
       // fall through to localStorage
     }
   }
@@ -1279,7 +1279,7 @@ async function saveConfig() {
     const { error } = await supabaseClient.from('config').upsert({ id: 'global', settings: IMPORTANCE_CONFIG });
     if (error) throw error;
   } catch (e) {
-    console.error('Supabase config save failed — kept in local cache:', e);
+    console.error('Supabase config save failed — kept in local cache:', describeSupabaseError(e));
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
   }
 }
@@ -1744,6 +1744,7 @@ const T = {
     reportPartnerProjects: 'مشاريع الشريك',
     colCompletedTotal: 'المنجزة / الإجمالي',
     reportPartnerTasks: 'مهام الشريك',
+    reportTasksNoProject: 'مهام أخرى',
     reportNoData: 'لا توجد بيانات',
     reportProjectInfo: 'معلومات المشروع',
     reportPartnerInfo: 'معلومات الشريك',
@@ -1753,6 +1754,10 @@ const T = {
     reportOpenTasks: 'المفتوحة',
     reportDelayedTasks: 'المتأخرة',
     reportMeetings: 'الاجتماعات',
+    meetingsScheduled: 'اجتماعات مجدولة',
+    meetingsConducted: 'اجتماعات منعقدة',
+    meetingsUpcoming: 'اجتماعات قادمة',
+    colMeetingDateScheduled: 'تاريخ الجدولة',
     // Notifications
     enableNotifications: '🔔 تفعيل التنبيهات',
     notificationsEnabled: '✓ التنبيهات مفعلة',
@@ -1815,6 +1820,9 @@ const T = {
     linkedDeliverableNone: '— بدون ربط —',
     linkedDeliverableHint: 'اربط هذا الاجتماع بمهمة (مُخرج). إنهاء الاجتماع لا يُنهي المهمة.',
     participantsLabel: 'المشاركون',
+    participantPartnersLabel: 'الشركاء المشاركون',
+    participantPartnersHint: 'اختر الشركاء المشاركين في هذا الاجتماع (سيظهر في تقاريرهم).',
+    participantPartnersNone: 'لا يوجد شركاء في هذا المشروع',
     // Related meetings (inside a task / deliverable)
     sectionRelatedMeetings: 'الاجتماعات المرتبطة',
     relatedMeetingsHint: 'الاجتماعات التي تدعم هذه المهمة. يمكن ربط أكثر من اجتماع بنفس المهمة.',
@@ -2346,6 +2354,7 @@ const T = {
     reportPartnerProjects: 'Partner Projects',
     colCompletedTotal: 'Completed / Total',
     reportPartnerTasks: 'Partner Tasks',
+    reportTasksNoProject: 'Other tasks',
     reportNoData: 'No data',
     reportProjectInfo: 'Project Information',
     reportPartnerInfo: 'Partner Information',
@@ -2355,6 +2364,10 @@ const T = {
     reportOpenTasks: 'Open',
     reportDelayedTasks: 'Delayed',
     reportMeetings: 'Meetings',
+    meetingsScheduled: 'Meetings Scheduled',
+    meetingsConducted: 'Meetings Conducted',
+    meetingsUpcoming: 'Upcoming Meetings',
+    colMeetingDateScheduled: 'Date Scheduled',
     // Notifications
     enableNotifications: '🔔 Enable Notifications',
     notificationsEnabled: '✓ Notifications Enabled',
@@ -2417,6 +2430,9 @@ const T = {
     linkedDeliverableNone: '— Not linked —',
     linkedDeliverableHint: 'Link this meeting to a task (deliverable). Completing the meeting does NOT complete the task.',
     participantsLabel: 'Participants',
+    participantPartnersLabel: 'Participant Partners',
+    participantPartnersHint: 'Select which partners attend this meeting (it appears in their reports).',
+    participantPartnersNone: 'No partners on this project',
     // Related meetings (inside a task / deliverable)
     sectionRelatedMeetings: 'Related Meetings',
     relatedMeetingsHint: 'Meetings that support this task. Multiple meetings may be linked to the same task.',
@@ -2640,35 +2656,63 @@ let state = {
   filters: {}
 };
 
-// PRIMARY loader: fetch from Supabase in parallel; fall back to the localStorage cache on
-// any failure (offline / not configured). On success, refresh the local cache.
+// Turn a Supabase/Postgres error object into a readable string (instead of "[object Object]").
+function describeSupabaseError(e) {
+  if (!e) return 'unknown error';
+  if (typeof e === 'string') return e;
+  const parts = [];
+  if (e.message) parts.push(e.message);
+  if (e.code) parts.push('code=' + e.code);
+  if (e.details) parts.push('details=' + e.details);
+  if (e.hint) parts.push('hint=' + e.hint);
+  if (e.status) parts.push('status=' + e.status);
+  if (!parts.length) { try { return JSON.stringify(e); } catch (_) { return String(e); } }
+  return parts.join(' | ');
+}
+
+// PRIMARY loader: fetch fresh data from Supabase in parallel; ALWAYS prefer cloud data when
+// online so every user sees the same shared data on refresh. Per-table resilience: if one
+// table errors we keep its cached copy instead of discarding all cloud data; only a total
+// failure (every table errors) falls back fully to localStorage.
 async function loadState() {
-  if (supabaseClient) {
+  if (!supabaseClient) return loadStateFromLocalStorage();
+
+  // Read the existing cache once, as a baseline for any table that fails to load.
+  let cache = {};
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) {}
+
+  const results = await Promise.all(SUPABASE_TABLES.map(async t => {
     try {
-      const results = await Promise.all(
-        SUPABASE_TABLES.map(t => supabaseClient.from(t.table).select('*'))
-      );
-      const errored = results.find(r => r && r.error);
-      if (errored) throw errored.error;
-      SUPABASE_TABLES.forEach((t, i) => {
-        const rows = (results[i] && results[i].data) || [];
-        state[t.key] = rows.map(r => r.data).filter(Boolean);
-      });
-      state.lastReportNumber = computeLastReportNumber(state.reports);
-      // translationCache is a local-only cache; preserve any existing cached value
-      try {
-        const raw = localStorage.getItem(STORE_KEY);
-        state.translationCache = (raw ? JSON.parse(raw).translationCache : null) || {};
-      } catch (e) { state.translationCache = state.translationCache || {}; }
-      applyDataMigrations();
-      saveStateToLocalStorage(); // refresh the offline cache with the cloud data
-      return true;
+      const { data, error } = await supabaseClient.from(t.table).select('*');
+      if (error) return { t, error };
+      return { t, rows: data || [] };
     } catch (e) {
-      console.error('Supabase load failed — falling back to localStorage cache:', e);
-      return loadStateFromLocalStorage();
+      return { t, error: e };
     }
+  }));
+
+  const ok = results.filter(r => !r.error);
+  const failed = results.filter(r => r.error);
+
+  // Total failure → behave as offline and use the cache.
+  if (ok.length === 0) {
+    console.error('Supabase load failed — falling back to localStorage cache:', describeSupabaseError(failed[0] && failed[0].error));
+    return loadStateFromLocalStorage();
   }
-  return loadStateFromLocalStorage();
+
+  // Cloud wins for every table that loaded; cached copy kept for any that errored.
+  SUPABASE_TABLES.forEach(t => {
+    const r = results.find(x => x.t.table === t.table);
+    if (r && !r.error) state[t.key] = (r.rows || []).map(row => row.data).filter(Boolean);
+    else state[t.key] = Array.isArray(cache[t.key]) ? cache[t.key] : [];
+  });
+  state.lastReportNumber = computeLastReportNumber(state.reports);
+  state.translationCache = cache.translationCache || {}; // local-only cache
+  applyDataMigrations();
+  saveStateToLocalStorage(); // refresh the offline cache with the freshly merged cloud data
+
+  failed.forEach(r => console.error('Supabase load: table "' + r.t.table + '" failed — kept cached copy:', describeSupabaseError(r.error)));
+  return true;
 }
 
 // Derive the highest sequential report number from the reports list (e.g. RPT-2026-0005 → 5).
@@ -2832,7 +2876,7 @@ async function saveState() {
     const errored = results.find(r => r && r.error);
     if (errored) throw errored.error;
   } catch (e) {
-    console.error('Supabase save failed — changes kept in local cache:', e);
+    console.error('Supabase save failed — changes kept in local cache:', describeSupabaseError(e));
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
   }
 }
@@ -2853,7 +2897,7 @@ async function syncCloudDeletes(removed) {
     const errored = results.find(r => r && r.error);
     if (errored) throw errored.error;
   } catch (e) {
-    console.error('Supabase delete failed — change kept in local cache:', e);
+    console.error('Supabase delete failed — change kept in local cache:', describeSupabaseError(e));
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
   }
 }
@@ -3052,10 +3096,19 @@ function getOwnerName(task) {
     return m ? m.name : '';
   }
   if (task.ownerKind === 'partner') {
-    const partner = getPartner(task.partnerId);
-    if (partner && Array.isArray(partner.team)) {
-      const m = partner.team.find(x => x.id === task.ownerId);
+    // Prefer the task's own partner, then fall back to scanning every partner's team —
+    // the owner picker lets you assign any of the project's partners' members, so the
+    // owner may belong to a partner other than task.partnerId (or partnerId may be unset).
+    const direct = getPartner(task.partnerId);
+    if (direct && Array.isArray(direct.team)) {
+      const m = direct.team.find(x => x.id === task.ownerId);
       if (m) return m.name;
+    }
+    for (const partner of (state.partners || [])) {
+      if (Array.isArray(partner.team)) {
+        const m = partner.team.find(x => x.id === task.ownerId);
+        if (m) return m.name;
+      }
     }
   }
   return '';
@@ -3494,6 +3547,68 @@ function getProjectActions(projectId) { return state.actions.filter(a => a.proje
 function getProjectTasks(projectId) { return state.actions.filter(a => a.projectId === projectId && a.type !== 'meeting'); }
 function getProjectMeetings(projectId) { return state.actions.filter(a => a.projectId === projectId && a.type === 'meeting'); }
 function getPartnerActions(partnerId) { return state.actions.filter(a => a.partnerId === partnerId); }
+
+// Meetings where this partner is an explicit participant. Legacy meetings (no participant
+// list yet) fall back to the meeting's own partnerId so existing data still shows.
+function getPartnerMeetings(partnerId) {
+  return state.actions.filter(a => {
+    if (a.type !== 'meeting') return false;
+    if (Array.isArray(a.participantPartnerIds)) return a.participantPartnerIds.includes(partnerId);
+    return a.partnerId === partnerId;
+  });
+}
+
+// Tasks shown in a partner's reports: where the partner is the stakeholder (partnerId)
+// OR a task is owned by one of the partner's team members. Used by BOTH partner reports
+// so they show the same project-wise breakdown across all of the partner's projects.
+function getPartnerReportTasks(partnerId) {
+  const p = getPartner(partnerId);
+  const memberIds = (p && Array.isArray(p.team)) ? p.team.map(m => m.id) : [];
+  return state.actions.filter(a =>
+    a.type !== 'meeting' && (
+      a.partnerId === partnerId ||
+      (a.ownerKind === 'partner' && memberIds.includes(a.ownerId))
+    )
+  );
+}
+
+function meetingStatusLabel(s) {
+  return s === 'completed' ? t('optStatusCompleted')
+    : s === 'scheduled' ? t('statusScheduled')
+    : s === 'missed' ? t('statusMissed')
+    : s === 'postponed' ? t('statusPostponed')
+    : (s || '—');
+}
+
+// Render a "Meetings" section for a partner: a 3-stat summary (Scheduled / Conducted /
+// Upcoming) followed by the meeting details in ascending date order (Title, Date, Status).
+// Only meetings where the partner is a checked participant are included.
+function renderPartnerMeetingsSection(partnerId) {
+  const meetings = getPartnerMeetings(partnerId);
+  if (!meetings.length) return '';
+  const today = todayDate();
+  const scheduled = meetings.filter(m => m.status === 'scheduled').length;
+  const conducted = meetings.filter(m => m.status === 'completed').length;
+  const upcoming = meetings.filter(m => m.status === 'scheduled' && (m.dueDate || '') >= today).length;
+  const sorted = meetings.slice().sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  return `
+    <h2 style="margin-top:20px">🗓 ${t('reportMeetings')} (${meetings.length})</h2>
+    <div class="stats4" style="margin-bottom:12px">
+      <div class="stat-cell"><div class="v">${scheduled}</div><div class="l">${t('meetingsScheduled')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--green)">${conducted}</div><div class="l">${t('meetingsConducted')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--accent)">${upcoming}</div><div class="l">${t('meetingsUpcoming')}</div></div>
+    </div>
+    <table class="rt">
+      <thead><tr><th>${t('colTitle')}</th><th>${t('colMeetingDateScheduled')}</th><th>${t('colStatus')}</th></tr></thead>
+      <tbody>
+        ${sorted.map(m => `<tr>
+          <td><strong>${escapeHtml(m.title)}</strong></td>
+          <td>${fmtDate(m.dueDate)}${m.meetingTime ? ' · ' + fmtTime(m.meetingTime) : ''}</td>
+          <td>${meetingStatusLabel(m.status)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
 
 // --- Milestones & Project scoring ---
 function isMilestone(a) { return a && a.type !== 'meeting' && a.isMilestone === true; }
@@ -6942,6 +7057,11 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
       <label>${t('fieldParticipants')}</label>
       <input id="f-participants" value="${escapeHtml(editing?.participants || '')}" placeholder="${t('fieldParticipantsPh')}">
     </div>
+    <div class="form-row hidden" id="participant-partners-row">
+      <label>${t('participantPartnersLabel')}</label>
+      <div id="participant-partners-box" class="checkbox-grid"></div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('participantPartnersHint')}</div>
+    </div>
     <div class="form-row hidden" id="meeting-notes-row">
       <label>${t('fieldMeetingNotesLabel')}</label>
       <textarea id="f-meeting-notes" placeholder="${t('fieldMeetingNotesPh')}">${escapeHtml(editing ? (editing['meetingNotes' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
@@ -6996,6 +7116,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
   const recurrenceEl = document.getElementById('f-recurrence');
   const projectEl = document.getElementById('f-project');
   const participantsRow = document.getElementById('participants-row');
+  const participantPartnersRow = document.getElementById('participant-partners-row');
   const meetingNotesRow = document.getElementById('meeting-notes-row');
   const meetingLinkRow = document.getElementById('meeting-link-row');
   const linkedDeliverableRow = document.getElementById('linked-deliverable-row');
@@ -7037,6 +7158,29 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
       html += `<option value="" disabled>— ${t('noAssignableOwners')} —</option>`;
     }
     sel.innerHTML = html;
+  }
+
+  // Build the Participant-Partners checkboxes from the selected project's partners.
+  // New meetings default to all partners checked; editing reflects the saved selection.
+  function refreshParticipantPartners() {
+    const box = document.getElementById('participant-partners-box');
+    if (!box) return;
+    const proj = getProject(projectEl.value);
+    const pids = proj
+      ? (Array.isArray(proj.partnerIds) && proj.partnerIds.length ? proj.partnerIds : (proj.partnerId ? [proj.partnerId] : []))
+      : [];
+    if (!pids.length) {
+      box.innerHTML = `<div class="checkbox-grid-empty">${t('participantPartnersNone')}</div>`;
+      return;
+    }
+    // saved selection only when editing AND the meeting already has an explicit list
+    const saved = (editing && Array.isArray(editing.participantPartnerIds)) ? editing.participantPartnerIds : null;
+    box.innerHTML = pids.map(pid => {
+      const partner = getPartner(pid);
+      if (!partner) return '';
+      const checked = saved ? saved.includes(pid) : true; // default: all checked for new meetings
+      return `<label><input type="checkbox" class="pp-cb" value="${pid}" ${checked ? 'checked' : ''}> <span>${escapeHtml(partner.name)}</span></label>`;
+    }).join('');
   }
 
   // Build the Depends-On multi-select: tasks in the same project, plus any
@@ -7120,6 +7264,8 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     recurrenceRow.classList.toggle('hidden', !showRecurrence);
     // Meeting-only fields
     participantsRow.classList.toggle('hidden', !isMeet);
+    participantPartnersRow.classList.toggle('hidden', !isMeet);
+    if (isMeet) refreshParticipantPartners();
     meetingNotesRow.classList.toggle('hidden', !isMeet);
     meetingLinkRow.classList.toggle('hidden', !isMeet);
     linkedDeliverableRow.classList.toggle('hidden', !isMeet);
@@ -7158,7 +7304,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
   statusEl.addEventListener('change', toggleCompleted);
   recurrenceEl.addEventListener('change', applyRecurrence);
   projectEl.addEventListener('change', () => {
-    if (typeEl.value === 'meeting') refreshLinkedDeliverableOptions();
+    if (typeEl.value === 'meeting') { refreshLinkedDeliverableOptions(); refreshParticipantPartners(); }
     else { refreshOwnerOptions(); refreshDependsOnOptions(); }
   });
   applyType();
@@ -7207,6 +7353,8 @@ function saveAction(id) {
     data.meetingNotes = (document.getElementById('f-meeting-notes')?.value || '').trim();
     data.meetingLink = (document.getElementById('f-meeting-link')?.value || '').trim();
     data.linkedTaskId = document.getElementById('f-linked-task')?.value || '';
+    // which of the project's partners are participants (drives meeting visibility in partner reports)
+    data.participantPartnerIds = Array.from(document.querySelectorAll('#participant-partners-box .pp-cb:checked')).map(cb => cb.value);
   } else {
     // Task / milestone fields: owner (internal/partner), dependency, note, milestone flag
     data.isMilestone = isMilestoneSel;
@@ -7635,6 +7783,38 @@ function stakeholderBadge(a) {
   return `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${escapeHtml(s.label)}</span>`;
 }
 
+// Render a partner's tasks grouped BY PROJECT — each project heading followed by its
+// Open and Completed tasks. Tasks not in any of the given projects fall under "Other tasks".
+function renderPartnerTasksByProject(tasks, projects) {
+  if (!tasks || tasks.length === 0) {
+    return `<div style="color:#888;padding:14px;text-align:center">${t('reportNoData')}</div>`;
+  }
+  const projHeader = (name) => `<div style="margin:18px 0 8px;font-weight:700;font-size:14px;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:5px">📁 ${escapeHtml(name)}</div>`;
+  const block = (projTasks) => {
+    const open = projTasks.filter(isOpen).sort((a, b) => {
+      const d = getDelayDays(b) - getDelayDays(a);
+      return d !== 0 ? d : (a.dueDate || '').localeCompare(b.dueDate || '');
+    });
+    const completed = projTasks.filter(isCompleted)
+      .sort((a, b) => (b.completedDate || b.dueDate || '').localeCompare(a.completedDate || a.dueDate || ''));
+    let h = '';
+    if (open.length) h += `<div class="group-label">${t('statusOpen')} (${open.length})</div>${renderReportTasksTable(open)}`;
+    if (completed.length) h += `<div class="group-label">✓ ${t('statusCompleted')} (${completed.length})</div>${renderReportTasksTable(completed)}`;
+    return h;
+  };
+  let html = '';
+  (projects || []).forEach(pr => {
+    const projTasks = tasks.filter(a => a.projectId === pr.id);
+    if (!projTasks.length) return;
+    html += projHeader(pr.name) + block(projTasks);
+  });
+  // Tasks not linked to any of the partner's listed projects
+  const projIds = new Set((projects || []).map(p => p.id));
+  const orphans = tasks.filter(a => !projIds.has(a.projectId));
+  if (orphans.length) html += projHeader(t('reportTasksNoProject')) + block(orphans);
+  return html || `<div style="color:#888;padding:14px;text-align:center">${t('reportNoData')}</div>`;
+}
+
 function renderReportTasksTable(tasks) {
   if (tasks.length === 0) return `<div style="color:var(--ink-faint);font-size:13px;padding:10px">${t('reportNoData')}</div>`;
   return `
@@ -7994,9 +8174,9 @@ function printPartnerReport(partnerId, existingEntry) {
   const importance = getPartnerImportance(partnerId);
   const commitment = getPartnerCommitment(partnerId);
   const projects = getPartnerProjects(partnerId);
-  // FIX: exclude meetings from task counts (meetings tracked separately)
-  const actions = getPartnerActions(partnerId).filter(a => a.type !== 'meeting');
-  const partnerMeetingsCount = getPartnerActions(partnerId).filter(a => a.type === 'meeting').length;
+  // Tasks across ALL of the partner's projects (stakeholder OR owned by partner's members)
+  const actions = getPartnerReportTasks(partnerId);
+  const partnerMeetingsCount = getPartnerMeetings(partnerId).length;
   const completed = actions.filter(isCompleted);
   const open = actions.filter(isOpen);
   const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
@@ -8057,9 +8237,8 @@ function printPartnerReport(partnerId, existingEntry) {
     `}
 
     <h2>${t('reportPartnerTasks')}</h2>
-    ${delayed.filter(a=>a.type!=='meeting').length > 0 ? `<div class="group-label">⚠️ ${t('filterDelayed')} (${delayed.filter(a=>a.type!=='meeting').length})</div>${renderReportTasksTable(delayed.filter(a=>a.type!=='meeting').sort((a,b)=>getDelayDays(b)-getDelayDays(a)))}` : ''}
-    ${open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).length > 0 ? `<div class="group-label">${t('statusOpen')}</div>${renderReportTasksTable(open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS))}` : ''}
-    ${completed.length > 0 ? `<div class="group-label">✓ ${t('statusCompleted')} (${completed.length})</div>${renderReportTasksTable(completed.slice(0, 20))}` : ''}
+    ${renderPartnerTasksByProject(actions, projects)}
+    ${renderPartnerMeetingsSection(partnerId)}
   `;
   openReportWindow(t('partnerReportTitle') + ' — ' + p.name, body, entry);
 }
@@ -8069,17 +8248,8 @@ function printPartnerFacingReport(partnerId) {
   const p = getPartner(partnerId);
   if (!p) return;
   const projects = getPartnerProjects(partnerId);
-  // Only tasks owned by this partner's team members
-  const partnerMemberIds = (p.team || []).map(m => m.id);
-  const partnerTasks = state.actions.filter(a =>
-    a.type !== 'meeting' &&
-    a.ownerKind === 'partner' &&
-    partnerMemberIds.includes(a.ownerId)
-  );
-  const partnerMeetings = state.actions.filter(a =>
-    a.type === 'meeting' &&
-    projects.some(pr => pr.id === a.projectId)
-  ).filter(a => a.status === 'completed');
+  // Same comprehensive task set as the internal report (stakeholder OR owned by members)
+  const partnerTasks = getPartnerReportTasks(partnerId);
 
   const open = partnerTasks.filter(isOpen);
   const completed = partnerTasks.filter(isCompleted);
@@ -8113,19 +8283,8 @@ function printPartnerFacingReport(partnerId) {
     </div>
 
     <h2>${t('reportPartnerTasks')}</h2>
-    ${delayed.length > 0 ? `<div class="group-label">⚠️ ${t('filterDelayed')} (${delayed.length})</div>${renderReportTasksTable(delayed.sort((a,b)=>getDelayDays(b)-getDelayDays(a)))}` : ''}
-    ${open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).length > 0 ? `<div class="group-label">${t('statusOpen')}</div>${renderReportTasksTable(open.filter(a => getDelayDays(a) <= DELAY_THRESHOLD_DAYS).sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')))}` : ''}
-    ${completed.length > 0 ? `<div class="group-label">✓ ${t('statusCompleted')} (${completed.length})</div>${renderReportTasksTable(completed.slice(0, 20))}` : ''}
-    ${partnerTasks.length === 0 ? `<div style="color:#888;padding:14px;text-align:center">${t('reportNoData')}</div>` : ''}`;
-
-  if (partnerMeetings.length > 0) {
-    body += `<h2 style="margin-top:20px">🗓 ${t('meetings')} (${partnerMeetings.length})</h2>`;
-    partnerMeetings.forEach(m => {
-      body += `<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:12px">
-        <strong>${escapeHtml(m.title)}</strong> — ${fmtDate(m.dueDate)} ${m.meetingTime||''}
-      </div>`;
-    });
-  }
+    ${renderPartnerTasksByProject(partnerTasks, projects)}
+    ${renderPartnerMeetingsSection(partnerId)}`;
 
   openReportWindow(t('partnerFacingReport') + ' — ' + p.name, body, entry);
 }
@@ -8551,7 +8710,7 @@ async function resetData() {
       const errored = results.find(r => r && r.error);
       if (errored) throw errored.error;
     } catch (e) {
-      console.error('Supabase clear-all failed:', e);
+      console.error('Supabase clear-all failed:', describeSupabaseError(e));
       if (typeof toast === 'function') toast(t('offlineSaveWarning'));
     }
   }
