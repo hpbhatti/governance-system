@@ -1139,8 +1139,9 @@
 const STORE_KEY = 'governance_data_v1';
 
 /* ========== SUPABASE (Phase 1: public, shared database — no auth, no RLS) ========== */
-// Replace the two placeholders below with your project's values from Supabase → Settings → API.
-const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co/rest/v1/';
+// Project values from Supabase → Settings → API.
+// NOTE: the JS client needs the BASE project URL only — NOT the REST endpoint (no "/rest/v1/").
+const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
 // Expected schema (run once in the Supabase SQL editor):
 //   create table partners      (id text primary key, data jsonb);
@@ -1148,15 +1149,15 @@ const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
 //   create table projects      (id text primary key, data jsonb);
 //   create table actions       (id text primary key, data jsonb);
 //   create table reports       (id text primary key, data jsonb);
-// Until real credentials are provided (or if the CDN/network is unavailable) the app
-// transparently falls back to localStorage, exactly as before.
+//   create table config        (id text primary key, settings jsonb);
+// If the CDN/network is unavailable, the app transparently falls back to localStorage.
 const SUPABASE_ENABLED =
-  SUPABASE_URL !== 'https://ibjwoaitvpsjnyiedwkz.supabase.co/rest/v1/' &&
-  SUPABASE_ANON_KEY !== 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd ' &&
+  SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+  SUPABASE_ANON_KEY !== 'YOUR_ANON_KEY' &&
   typeof window !== 'undefined' && window.supabase &&
   typeof window.supabase.createClient === 'function';
 const supabaseClient = SUPABASE_ENABLED
-  ? window.supabase.createClient(https://ibjwoaitvpsjnyiedwkz.supabase.co/rest/v1/, sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd )
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 // Map each cloud table to its in-memory state key.
 const SUPABASE_TABLES = [
