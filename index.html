@@ -1098,6 +1098,8 @@
     .action-card { padding-top: 16px; padding-bottom: 16px; }
   }
 </style>
+<!-- Supabase client (Phase 1: public database, no auth/RLS) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -1135,6 +1137,36 @@
 <script>
 /* ========== STATE & STORAGE ========== */
 const STORE_KEY = 'governance_data_v1';
+
+/* ========== SUPABASE (Phase 1: public, shared database — no auth, no RLS) ========== */
+// Replace the two placeholders below with your project's values from Supabase → Settings → API.
+const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwzk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
+// Expected schema (run once in the Supabase SQL editor):
+//   create table partners      (id text primary key, data jsonb);
+//   create table internal_team (id text primary key, data jsonb);
+//   create table projects      (id text primary key, data jsonb);
+//   create table actions       (id text primary key, data jsonb);
+//   create table reports       (id text primary key, data jsonb);
+// Until real credentials are provided (or if the CDN/network is unavailable) the app
+// transparently falls back to localStorage, exactly as before.
+const SUPABASE_ENABLED =
+  SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+  SUPABASE_ANON_KEY !== 'YOUR_ANON_KEY' &&
+  typeof window !== 'undefined' && window.supabase &&
+  typeof window.supabase.createClient === 'function';
+const supabaseClient = SUPABASE_ENABLED
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+// Map each cloud table to its in-memory state key.
+const SUPABASE_TABLES = [
+  { table: 'partners',      key: 'partners' },
+  { table: 'internal_team', key: 'team' },
+  { table: 'projects',      key: 'projects' },
+  { table: 'actions',       key: 'actions' },
+  { table: 'reports',       key: 'reports' }
+];
+
 const LANG_KEY = 'governance_lang';
 const DELAY_THRESHOLD_DAYS = 3;
 
@@ -1202,23 +1234,53 @@ const IMPORTANCE_CONFIG = {
 const IMPORTANCE_DEFAULTS = JSON.parse(JSON.stringify(IMPORTANCE_CONFIG));
 
 // Deep-merge saved overrides into IMPORTANCE_CONFIG (mutates in place, keeping the const ref).
-function loadConfig() {
+// Deep-merge saved numeric overrides into IMPORTANCE_CONFIG (mutates in place, keeps const ref).
+function mergeConfig(saved) {
+  if (!saved || typeof saved !== 'object') return;
+  Object.keys(IMPORTANCE_CONFIG).forEach(section => {
+    if (saved[section] && typeof saved[section] === 'object') {
+      Object.keys(IMPORTANCE_CONFIG[section]).forEach(key => {
+        const v = saved[section][key];
+        if (typeof v === 'number' && !isNaN(v)) IMPORTANCE_CONFIG[section][key] = v;
+      });
+    }
+  });
+}
+
+// PRIMARY config loader: fetch the shared scoring settings from the Supabase `config` table
+// (id = 'global'), merge them in, and cache to localStorage. Falls back to localStorage on error.
+async function loadConfig() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.from('config').select('settings').eq('id', 'global').maybeSingle();
+      if (error) throw error;
+      if (data && data.settings && typeof data.settings === 'object') {
+        mergeConfig(data.settings);
+        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(IMPORTANCE_CONFIG)); } catch (e) {}
+      }
+      return; // success (even if nothing stored yet → keep defaults)
+    } catch (e) {
+      console.error('Supabase config load failed — using localStorage:', e);
+      // fall through to localStorage
+    }
+  }
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    Object.keys(IMPORTANCE_CONFIG).forEach(section => {
-      if (saved[section] && typeof saved[section] === 'object') {
-        Object.keys(IMPORTANCE_CONFIG[section]).forEach(key => {
-          const v = saved[section][key];
-          if (typeof v === 'number' && !isNaN(v)) IMPORTANCE_CONFIG[section][key] = v;
-        });
-      }
-    });
+    if (raw) mergeConfig(JSON.parse(raw));
   } catch (e) { /* ignore corrupt config */ }
 }
-function saveConfig() {
+
+// PRIMARY config saver: cache locally immediately, then upsert the shared settings to Supabase.
+async function saveConfig() {
   try { localStorage.setItem(CONFIG_KEY, JSON.stringify(IMPORTANCE_CONFIG)); } catch (e) {}
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient.from('config').upsert({ id: 'global', settings: IMPORTANCE_CONFIG });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Supabase config save failed — kept in local cache:', e);
+    if (typeof toast === 'function') toast(t('offlineSaveWarning'));
+  }
 }
 function resetConfig() {
   Object.keys(IMPORTANCE_DEFAULTS).forEach(section => {
@@ -1799,6 +1861,7 @@ const T = {
     toastDataImported: 'تم استيراد البيانات', toastUploaded: 'تم رفع المرفقات',
     toastNoteSaved: 'تم حفظ الملاحظة', toastAttachDeleted: 'تم حذف المرفق',
     toastDataCleared: 'تم مسح جميع البيانات',
+    offlineSaveWarning: '⚠️ غير متصل – التغييرات محفوظة محلياً فقط',
     toastUsePrintToPDF: 'استخدم نافذة الطباعة لحفظ PDF',
     // Alerts
     alertNameRequired: 'اسم الشريك مطلوب', alertProjectNameRequired: 'اسم المشروع مطلوب',
@@ -2400,6 +2463,7 @@ const T = {
     toastDataImported: 'Data imported', toastUploaded: 'Files uploaded',
     toastNoteSaved: 'Note saved', toastAttachDeleted: 'Attachment deleted',
     toastDataCleared: 'All data cleared',
+    offlineSaveWarning: '⚠️ Offline – changes saved locally only',
     toastUsePrintToPDF: 'Use the print dialog to save as PDF',
     // Alerts
     alertNameRequired: 'Partner name is required', alertProjectNameRequired: 'Project name is required',
@@ -2575,7 +2639,49 @@ let state = {
   filters: {}
 };
 
-function loadState() {
+// PRIMARY loader: fetch from Supabase in parallel; fall back to the localStorage cache on
+// any failure (offline / not configured). On success, refresh the local cache.
+async function loadState() {
+  if (supabaseClient) {
+    try {
+      const results = await Promise.all(
+        SUPABASE_TABLES.map(t => supabaseClient.from(t.table).select('*'))
+      );
+      const errored = results.find(r => r && r.error);
+      if (errored) throw errored.error;
+      SUPABASE_TABLES.forEach((t, i) => {
+        const rows = (results[i] && results[i].data) || [];
+        state[t.key] = rows.map(r => r.data).filter(Boolean);
+      });
+      state.lastReportNumber = computeLastReportNumber(state.reports);
+      // translationCache is a local-only cache; preserve any existing cached value
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        state.translationCache = (raw ? JSON.parse(raw).translationCache : null) || {};
+      } catch (e) { state.translationCache = state.translationCache || {}; }
+      applyDataMigrations();
+      saveStateToLocalStorage(); // refresh the offline cache with the cloud data
+      return true;
+    } catch (e) {
+      console.error('Supabase load failed — falling back to localStorage cache:', e);
+      return loadStateFromLocalStorage();
+    }
+  }
+  return loadStateFromLocalStorage();
+}
+
+// Derive the highest sequential report number from the reports list (e.g. RPT-2026-0005 → 5).
+function computeLastReportNumber(reports) {
+  let max = 0;
+  (reports || []).forEach(r => {
+    const m = (r && r.number ? String(r.number) : '').match(/(\d+)\s*$/);
+    if (m) { const n = parseInt(m[1], 10); if (!isNaN(n) && n > max) max = n; }
+  });
+  return max;
+}
+
+// Read cached data from localStorage into state (offline fallback). Returns true if data existed.
+function loadStateFromLocalStorage() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
@@ -2587,6 +2693,15 @@ function loadState() {
       state.team = data.team || [];
       state.lastReportNumber = data.lastReportNumber || 0;
       state.translationCache = data.translationCache || {};
+      applyDataMigrations();
+      return true;
+    }
+  } catch (e) { console.error('Load (localStorage) error:', e); }
+  return false;
+}
+
+// Apply all data migrations to the already-populated state (runs after loading from any source).
+function applyDataMigrations() {
       // Migration: ensure every action has a type
       state.actions.forEach(a => {
         if (!a.type) a.type = 'task';
@@ -2685,13 +2800,10 @@ function loadState() {
       });
       // Migration: convert old engagement model → ownershipType + partnerContributions
       migrateProjectsToContributions();
-      return true;
-    }
-  } catch (e) { console.error('Load error:', e); }
-  return false;
 }
 
-function saveState() {
+// Write the current state to localStorage (immediate local cache / offline copy).
+function saveStateToLocalStorage() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       partners: state.partners,
@@ -2703,6 +2815,52 @@ function saveState() {
       translationCache: state.translationCache
     }));
   } catch (e) { console.error('Save error:', e); }
+}
+
+// PRIMARY saver: cache locally immediately, then upsert all tables to Supabase in the
+// background. Never blocks the UI; warns via toast if the cloud sync fails.
+async function saveState() {
+  saveStateToLocalStorage(); // synchronous local cache first
+  if (!supabaseClient) return;
+  try {
+    const results = await Promise.all(SUPABASE_TABLES.map(t => {
+      const rows = (state[t.key] || []).map(o => ({ id: o.id, data: o }));
+      if (!rows.length) return Promise.resolve({ error: null });
+      return supabaseClient.from(t.table).upsert(rows, { onConflict: 'id' });
+    }));
+    const errored = results.find(r => r && r.error);
+    if (errored) throw errored.error;
+  } catch (e) {
+    console.error('Supabase save failed — changes kept in local cache:', e);
+    if (typeof toast === 'function') toast(t('offlineSaveWarning'));
+  }
+}
+
+// Delete specific rows from Supabase. `removed` = { tableName: [ids...] }. Runs in the
+// background and warns via toast on failure. Uses .eq for a single id, .in for many.
+async function syncCloudDeletes(removed) {
+  if (!supabaseClient) return;
+  try {
+    const jobs = [];
+    Object.keys(removed || {}).forEach(table => {
+      const ids = (removed[table] || []).filter(Boolean);
+      if (ids.length === 1) jobs.push(supabaseClient.from(table).delete().eq('id', ids[0]));
+      else if (ids.length > 1) jobs.push(supabaseClient.from(table).delete().in('id', ids));
+    });
+    if (!jobs.length) return;
+    const results = await Promise.all(jobs);
+    const errored = results.find(r => r && r.error);
+    if (errored) throw errored.error;
+  } catch (e) {
+    console.error('Supabase delete failed — change kept in local cache:', e);
+    if (typeof toast === 'function') toast(t('offlineSaveWarning'));
+  }
+}
+
+// Return the ids present in beforeArr but missing from afterArr (i.e. the removed records).
+function diffRemovedIds(beforeArr, afterArr) {
+  const after = new Set((afterArr || []).map(x => x.id));
+  return (beforeArr || []).map(x => x.id).filter(id => !after.has(id));
 }
 
 function uid() {
@@ -2994,6 +3152,18 @@ function endOfSundayWeek(dateStr) {
   d.setDate(d.getDate() + 6); // Saturday inclusive
   return d.toISOString().split('T')[0];
 }
+// Saudi working week: Sunday → Thursday (5 days). Returns the Sunday on/before the date,
+// and the Thursday of that same work week.
+function startOfWorkWeek(dateStr) {
+  const d = new Date(dateStr || todayDate());
+  d.setDate(d.getDate() - d.getDay()); // getDay() 0=Sunday → back to Sunday
+  return d.toISOString().split('T')[0];
+}
+function endOfWorkWeek(dateStr) {
+  const d = new Date(startOfWorkWeek(dateStr));
+  d.setDate(d.getDate() + 4); // Sunday + 4 = Thursday (inclusive)
+  return d.toISOString().split('T')[0];
+}
 function startOfMonth(dateStr) {
   const d = new Date(dateStr);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
@@ -3028,8 +3198,10 @@ function getReportPeriodRange(period, dateStr) {
   return null; // 'all' — comprehensive, to-date (no date filter)
 }
 
-function filterActionsByPeriod(actions, period, dateStr) {
-  const range = getReportPeriodRange(period, dateStr);
+function filterActionsByPeriod(actions, period, dateStr, workWeek) {
+  let range = getReportPeriodRange(period, dateStr);
+  // Tasks view opts into the Saudi working week (Sunday → Thursday) for "This Week".
+  if (workWeek && period === 'week') range = { start: startOfWorkWeek(dateStr), end: endOfWorkWeek(dateStr) };
   if (!range) return actions;
   return actions.filter(a => a.dueDate && a.dueDate >= range.start && a.dueDate <= range.end);
 }
@@ -4006,16 +4178,17 @@ function saveTeamMember(id) {
   render(state.detailParam);
 }
 
-function deleteTeamMember(id) {
+async function deleteTeamMember(id) {
   if (!confirm(t('deleteMemberConfirm'))) return;
   state.actions.forEach(a => {
     if (a.ownerKind === 'internal' && a.ownerId === id) { a.ownerId = ''; a.ownerKind = ''; }
   });
   state.team = state.team.filter(m => m.id !== id);
-  saveState();
+  saveState(); // upserts the actions whose owner was cleared + refreshes local cache
   toast(t('toastDeleted'));
   if (state.currentView === 'teamMemberDetail') navigate('team');
   else render();
+  await syncCloudDeletes({ internal_team: [id] });
 }
 
 views.dashboard = () => {
@@ -4294,6 +4467,10 @@ views.report = () => {
   const openTasks = open.filter(a => !isMeeting(a) && getDelayDays(a) === 0);
   const openTasksDelayed = open.filter(a => !isMeeting(a) && getDelayDays(a) > 0);
   const completedTasks = completed.filter(a => !isMeeting(a));
+  // Task-only counts for the summary cards — meetings are tracked separately and must NOT
+  // be counted as tasks.
+  const tasksOnly = actions.filter(a => !isMeeting(a));
+  const openTasksAll = open.filter(a => !isMeeting(a));
 
   // Period label for the header (also picked up by print)
   let periodLabel;
@@ -4353,15 +4530,15 @@ views.report = () => {
     <div class="stats">
       <div class="stat">
         <div class="stat-label">${t('statTotalInPeriod')}</div>
-        <div class="stat-value">${actions.length}</div>
+        <div class="stat-value">${tasksOnly.length}</div>
       </div>
       <div class="stat good">
         <div class="stat-label">${t('statCompletedInPeriod')}</div>
-        <div class="stat-value">${completed.length}</div>
+        <div class="stat-value">${completedTasks.length}</div>
       </div>
       <div class="stat warn">
         <div class="stat-label">${t('statOpenInPeriod')}</div>
-        <div class="stat-value">${open.length}</div>
+        <div class="stat-value">${openTasksAll.length}</div>
       </div>
       <div class="stat ${meetings.length>0?'':'good'}">
         <div class="stat-label">${t('statMeetingsConducted')}</div>
@@ -5118,7 +5295,7 @@ views.actions = () => {
 
   // Period filter
   if (period !== 'all') {
-    list = filterActionsByPeriod(list, period, actionDate);
+    list = filterActionsByPeriod(list, period, actionDate, true); // work-week (Sun–Thu) for "This Week"
   }
 
   if (projFilter !== 'all') list = list.filter(a => a.projectId === projFilter);
@@ -5131,7 +5308,9 @@ views.actions = () => {
   });
 
   // Period label for header
-  const range = getReportPeriodRange(period, actionDate);
+  let range = getReportPeriodRange(period, actionDate);
+  // "This Week" follows the Saudi working week (Sunday → Thursday) for the selected date.
+  if (period === 'week') range = { start: startOfWorkWeek(actionDate), end: endOfWorkWeek(actionDate) };
   let periodLabel = '';
   if (period === 'today') periodLabel = ` · ${fmtDate(actionDate)}`;
   else if (period === 'week' && range) periodLabel = ` · ${t('reportRange', fmtDate(range.start), fmtDate(range.end))}`;
@@ -6244,17 +6423,24 @@ window.applyInternalProjectUI = function() {
   refreshContributions();
 };
 
-function deletePartner(id) {
+async function deletePartner(id) {
   const p = getPartner(id);
   const projCount = getPartnerProjects(id).length;
   const actCount = getPartnerActions(id).length;
   if (!confirm(t('confirmDeletePartner', p.name, projCount, actCount))) return;
+  const beforeActions = state.actions.slice();
+  const beforeProjects = state.projects.slice();
   state.actions = state.actions.filter(a => a.partnerId !== id);
   state.projects = state.projects.filter(p => p.partnerId !== id);
   state.partners = state.partners.filter(p => p.id !== id);
   saveState();
   toast(t('toastDeleted'));
   render();
+  await syncCloudDeletes({
+    partners: [id],
+    projects: diffRemovedIds(beforeProjects, state.projects),
+    actions: diffRemovedIds(beforeActions, state.actions)
+  });
 }
 
 function showProjectForm(projectId, defaultPartnerId) {
@@ -6508,15 +6694,20 @@ function saveProject(id) {
   render(state.detailParam);
 }
 
-function deleteProject(id) {
+async function deleteProject(id) {
   const p = getProject(id);
   const actCount = getProjectActions(id).length;
   if (!confirm(t('confirmDeleteProject', p.name, actCount))) return;
+  const beforeActions = state.actions.slice();
   state.actions = state.actions.filter(a => a.projectId !== id);
   state.projects = state.projects.filter(p => p.id !== id);
   saveState();
   toast(t('toastDeleted'));
   render();
+  await syncCloudDeletes({
+    projects: [id],
+    actions: diffRemovedIds(beforeActions, state.actions)
+  });
 }
 
 /* ========== ATTACHMENTS ========== */
@@ -7082,7 +7273,7 @@ function saveAction(id) {
   render(state.detailParam);
 }
 
-function deleteAction(id) {
+async function deleteAction(id) {
   const a = state.actions.find(x => x.id === id);
   if (a.seriesId) {
     const seriesCount = state.actions.filter(x => x.seriesId === a.seriesId).length;
@@ -7104,10 +7295,12 @@ function deleteAction(id) {
   saveState();
   toast(t('toastDeleted'));
   render(state.detailParam);
+  await syncCloudDeletes({ actions: [id] });
 }
 
-function confirmDeleteAction(id, scope) {
+async function confirmDeleteAction(id, scope) {
   const a = state.actions.find(x => x.id === id);
+  const beforeActions = state.actions.slice();
   if (scope === 'series' && a.seriesId) {
     const count = state.actions.filter(x => x.seriesId === a.seriesId).length;
     state.actions = state.actions.filter(x => x.seriesId !== a.seriesId);
@@ -7119,6 +7312,7 @@ function confirmDeleteAction(id, scope) {
   saveState();
   closeModal();
   render(state.detailParam);
+  await syncCloudDeletes({ actions: diffRemovedIds(beforeActions, state.actions) });
 }
 
 function completeAction(id) {
@@ -8054,9 +8248,9 @@ function openDailyReportPopup(existingEntry) {
 
     <h2>${t('reportSummary')}</h2>
     <div class="stats4">
-      <div class="stat-cell"><div class="v">${actions.length}</div><div class="l">${t('statTotalInPeriod')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('statCompletedInPeriod')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--amber)">${open.length}</div><div class="l">${t('statOpenInPeriod')}</div></div>
+      <div class="stat-cell"><div class="v">${actions.filter(a => !isMeeting(a)).length}</div><div class="l">${t('statTotalInPeriod')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--green)">${completedTasks.length}</div><div class="l">${t('statCompletedInPeriod')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--amber)">${open.filter(a => !isMeeting(a)).length}</div><div class="l">${t('statOpenInPeriod')}</div></div>
       <div class="stat-cell"><div class="v">${meetings.length}</div><div class="l">${t('statMeetingsConducted')}</div></div>
     </div>
 
@@ -8079,7 +8273,7 @@ function reprintReport(entryId) {
 }
 
 // Delete a report from the archive
-function deleteReportEntry(entryId) {
+async function deleteReportEntry(entryId) {
   const entry = (state.reports || []).find(r => r.id === entryId);
   if (!entry) return;
   if (!confirm(t('confirmDeleteReport', entry.title || entry.number))) return;
@@ -8087,6 +8281,7 @@ function deleteReportEntry(entryId) {
   saveState();
   toast(t('toastReportDeleted'));
   render();
+  await syncCloudDeletes({ reports: [entryId] });
 }
 
 function openReportWindow(title, body, metadata) {
@@ -8343,53 +8538,74 @@ function importData(file) {
   reader.readAsText(file);
 }
 
-function resetData() {
+async function resetData() {
   if (!confirm(t('confirmClearAll1'))) return;
   if (!confirm(t('confirmClearAll2'))) return;
+  // Delete ALL rows from every Supabase table (partners, internal_team, projects, actions, reports)
+  if (supabaseClient) {
+    try {
+      const results = await Promise.all(
+        SUPABASE_TABLES.map(t => supabaseClient.from(t.table).delete().not('id', 'is', null))
+      );
+      const errored = results.find(r => r && r.error);
+      if (errored) throw errored.error;
+    } catch (e) {
+      console.error('Supabase clear-all failed:', e);
+      if (typeof toast === 'function') toast(t('offlineSaveWarning'));
+    }
+  }
+  // Clear local state + cache
   state.partners = [];
   state.projects = [];
   state.actions = [];
+  state.team = [];
+  state.reports = [];
   localStorage.removeItem(STORE_KEY);
   toast(t('toastDataCleared'));
   navigate('dashboard');
 }
 
 /* ========== INIT ========== */
-applyLangToDocument();
-if (!loadState()) {
-  // First time, load sample data
-  loadSampleData();
-  // NEW: apply startDate migration to seed tasks
-  state.actions.forEach(a => {
-    if (a.type !== 'meeting' && !a.startDate) {
-      const proj = state.projects.find(pr => pr.id === a.projectId);
-      if (proj && proj.startDate) a.startDate = proj.startDate;
-      else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
-      else a.startDate = todayDate();
-    }
-  });
-  // NEW: normalize seed projects (engagement model, revenue certainty, SAR currency)
-  state.projects.forEach(pr => {
-    if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
-    if (!pr.engagementModel) {
-      pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
-    }
-    if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
-      pr.revenueCertainty = ['joint-venture', 'own-strategic', 'own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
-    }
-  });
-  migrateProjectsToContributions();
-}
-state.currentView = 'dashboard';
-migrateBilingualContent(); // backfill dual-language title/name slots
-loadConfig(); // apply any saved importance-configuration overrides
-renderSidebar();
-render();
-// Heal any broken/missing auto-translations for the current language on load (best-effort, online).
-applyContentLanguage(currentLang);
-// Schedule daily notification check (also runs immediately)
-sendDailyNotification(false);
-setInterval(() => sendDailyNotification(false), 60 * 60 * 1000); // re-check hourly while tab open
+(async function init() {
+  applyLangToDocument();
+  // Load from Supabase (primary) with localStorage fallback. Awaited before any rendering.
+  await loadState();
+  // First run (no data in the cloud and no local cache) → seed sample data, then push to cloud.
+  if (!state.partners || state.partners.length === 0) {
+    loadSampleData();
+    // apply startDate migration to seed tasks
+    state.actions.forEach(a => {
+      if (a.type !== 'meeting' && !a.startDate) {
+        const proj = state.projects.find(pr => pr.id === a.projectId);
+        if (proj && proj.startDate) a.startDate = proj.startDate;
+        else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
+        else a.startDate = todayDate();
+      }
+    });
+    // normalize seed projects (engagement model, revenue certainty, SAR currency)
+    state.projects.forEach(pr => {
+      if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
+      if (!pr.engagementModel) {
+        pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
+      }
+      if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
+        pr.revenueCertainty = ['joint-venture', 'own-strategic', 'own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
+      }
+    });
+    migrateProjectsToContributions();
+    await saveState(); // seed the cloud database (and local cache)
+  }
+  state.currentView = 'dashboard';
+  migrateBilingualContent(); // backfill dual-language title/name slots
+  await loadConfig(); // apply shared importance-configuration (Supabase, with localStorage cache)
+  renderSidebar();
+  render();
+  // Heal any broken/missing auto-translations for the current language on load (best-effort, online).
+  applyContentLanguage(currentLang);
+  // Schedule daily notification check (also runs immediately)
+  sendDailyNotification(false);
+  setInterval(() => sendDailyNotification(false), 60 * 60 * 1000); // re-check hourly while tab open
+})();
 
 /* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
 function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
