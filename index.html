@@ -1398,6 +1398,13 @@ const T = {
     includePrevious: 'إضافة المهام المعلقة قبل هذا التاريخ',
     sectionCarriedOver: '📌 مهام معلقة من قبل',
     carriedOverHint: 'مهام كانت مستحقة قبل بداية الفترة ولم تُنجز بعد',
+    carriedOverCount: '{0} مهمة',
+    carriedOverMeta: '{0} مهمة مُرحّلة من قبل',
+    reportKindLabel: 'نوع التقرير',
+    reportTypeStatus: 'حسب الحالة',
+    reportTypeProject: 'حسب المشروع',
+    reportTypePartner: 'حسب الشريك',
+    statTotalDelayed: 'إجمالي المهام المتأخرة',
     riskCriticalGroup: 'خطورة حرجة', riskHighGroup: 'خطورة مرتفعة',
     riskMediumGroup: 'خطورة متوسطة', riskLowGroup: 'في الموعد / تأخير بسيط',
     noOpenActions: 'لا توجد مهام مفتوحة حالياً',
@@ -1439,7 +1446,9 @@ const T = {
     groupByProject: 'حسب المشروع',
     groupByPartner: 'حسب الشريك',
     groupNoneInPeriod: 'لا توجد بنود في هذه الفترة',
-    groupSummaryLine: '{0} بند · {1} منجز · {2} مفتوح · {3} اجتماع',
+    groupSummaryLine: '{0} مهمة · {1} منجزة · {2} مفتوحة · {3} متأخرة · متوسط التأخير {4} يوم · {5} اجتماع',
+    reportTasksSub: 'المهام', reportMeetingsSub: 'الاجتماعات',
+    colCompletionNote: 'ملاحظة الإنجاز', completionOnTime: 'في الموعد', completionDelayedBy: 'متأخر {0} يوم',
     // Section rename
     dailyAgenda: 'الأجندة اليومية',
     dailyAgendaSub: 'المهام والاجتماعات المقبلة',
@@ -1550,7 +1559,7 @@ const T = {
     delayCauseLabel: 'سبب التأخير',
     onTrackLabel: 'على المسار',
     notRatedLabel: 'لم يُقيّم بعد',
-    colOwnerNote: 'المسؤول / ملاحظة',
+    colOwnerNote: 'المسؤول',
     optMilestone: '🎯 معلم رئيسي',
     milestoneBadge: '🎯 معلم',
     fieldMilestoneTitle: 'عنوان المعلم',
@@ -2008,6 +2017,13 @@ const T = {
     includePrevious: 'Include pending tasks before this date',
     sectionCarriedOver: '📌 Carried Over (from before)',
     carriedOverHint: 'Open tasks dated before this period that have not been completed',
+    carriedOverCount: '{0} tasks',
+    carriedOverMeta: '{0} tasks carried over from before',
+    reportKindLabel: 'Report type',
+    reportTypeStatus: 'Status-wise',
+    reportTypeProject: 'Project-wise',
+    reportTypePartner: 'Partner-wise',
+    statTotalDelayed: 'Total Delayed Tasks',
     riskCriticalGroup: 'Critical Risk', riskHighGroup: 'High Risk',
     riskMediumGroup: 'Medium Risk', riskLowGroup: 'On Time / Slight Delay',
     noOpenActions: 'No open tasks currently',
@@ -2049,7 +2065,9 @@ const T = {
     groupByProject: 'By Project',
     groupByPartner: 'By Partner',
     groupNoneInPeriod: 'No items in this period',
-    groupSummaryLine: '{0} items · {1} done · {2} open · {3} meetings',
+    groupSummaryLine: '{0} tasks · {1} completed · {2} open · {3} delayed · avg delay {4}d · {5} meetings',
+    reportTasksSub: 'Tasks', reportMeetingsSub: 'Meetings',
+    colCompletionNote: 'Completion Note', completionOnTime: 'On time', completionDelayedBy: 'Delayed by {0} days',
     // Section rename
     dailyAgenda: 'Daily Agenda',
     dailyAgendaSub: 'Upcoming tasks & meetings',
@@ -2160,7 +2178,7 @@ const T = {
     delayCauseLabel: 'Delay cause',
     onTrackLabel: 'On track',
     notRatedLabel: 'Not rated yet',
-    colOwnerNote: 'Owner / Note',
+    colOwnerNote: 'Owner',
     optMilestone: '🎯 Milestone',
     milestoneBadge: '🎯 Milestone',
     fieldMilestoneTitle: 'Milestone Title',
@@ -7608,7 +7626,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .stat-cell .v { font-size: 22px; font-weight: 600; font-family: 'Reem Kufi', serif; color: var(--accent); }
       .stat-cell .l { font-size: 10px; color: var(--ink-faint); letter-spacing: 0.04em; text-transform: uppercase; }
       .rt { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
-      .rt th, .rt td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: start; vertical-align: top; }
+      .rt th, .rt td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: start; vertical-align: top; overflow-wrap: break-word; }
       .rt th { background: #faf8f3; font-weight: 500; color: var(--ink-muted); font-size: 11px; }
       .group-label { font-weight: 500; color: var(--accent-warm); margin: 14px 0 6px; font-size: 13px; }
       .badge-mini { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px;
@@ -7689,10 +7707,11 @@ function buildReportHTML(title, bodyHTML, metadata) {
         font-weight: normal;
       }
       @media print {
+        @page { size: A4 landscape; margin: 10mm; }
         body { background: #fff; }
         .report-toolbar { display: none; }
         .no-print { display: none !important; }
-        .report-page { box-shadow: none; padding: 20px; margin: 0; }
+        .report-page { box-shadow: none; padding: 12px; margin: 0; max-width: none; width: 100%; }
         .row-redflag { background: #fef2f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .warning-note-section { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         [contenteditable][data-placeholder]:empty::before { content: '' !important; }
@@ -7775,12 +7794,27 @@ function getAvgDelay(tasks) {
   const total = delayedTasks.reduce((s, a) => s + getDelayDays(a), 0);
   return Math.round(total / delayedTasks.length);
 }
+// Participant partner names for a meeting (from the checkboxes; legacy fallback to partnerId).
+function getMeetingParticipantNames(m) {
+  let ids = Array.isArray(m.participantPartnerIds) ? m.participantPartnerIds : (m.partnerId ? [m.partnerId] : []);
+  return ids.map(id => { const p = getPartner(id); return p ? p.name : null; }).filter(Boolean);
+}
 function stakeholderBadge(a) {
-  if (isMeeting(a)) return '—';
+  if (isMeeting(a)) {
+    const names = getMeetingParticipantNames(a);
+    if (!names.length) return '—';
+    return names.map(n => `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#faf0e0;color:#c47e2a;white-space:nowrap">${escapeHtml(n)}</span>`).join(' ');
+  }
   const s = getStakeholderTag(a);
+  let label = s.label;
+  if (s.internal === false) {
+    // Partner stakeholder → show the partner NAME only (no "Partner:" prefix)
+    const pa = state.partners.find(pp => (pp.team || []).some(m => m.id === a.ownerId));
+    label = pa ? pa.name : s.label.replace(/^[^:]*:\s*/, '');
+  }
   const bg = s.internal === true ? '#e8f0e8' : s.internal === false ? '#faf0e0' : '#eee9dd';
   const fg = s.internal === true ? '#4a7c59' : s.internal === false ? '#c47e2a' : '#5a6478';
-  return `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${escapeHtml(s.label)}</span>`;
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg}">${escapeHtml(label)}</span>`;
 }
 
 // Render a partner's tasks grouped BY PROJECT — each project heading followed by its
@@ -7818,7 +7852,11 @@ function renderPartnerTasksByProject(tasks, projects) {
 function renderReportTasksTable(tasks) {
   if (tasks.length === 0) return `<div style="color:var(--ink-faint);font-size:13px;padding:10px">${t('reportNoData')}</div>`;
   return `
-    <table class="rt">
+    <table class="rt" style="table-layout:fixed">
+      <colgroup>
+        <col style="width:22%"><col style="width:12%"><col style="width:9%"><col style="width:13%">
+        <col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:10%">
+      </colgroup>
       <thead><tr>
         <th>${t('colTitle')}</th>
         <th>${t('colStakeholder')}</th>
@@ -7827,30 +7865,39 @@ function renderReportTasksTable(tasks) {
         <th>${t('colStatus')}</th>
         <th>${t('colDelay')}</th>
         <th>${t('colOwnerNote')}</th>
+        <th>${t('colCompletionNote')}</th>
       </tr></thead>
       <tbody>
         ${tasks.map(a => {
           const d = getDelayDays(a);
           const r = getRiskLevel(d);
           return `<tr>
-            <td><strong>${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</strong>${a.seriesId ? ' <span style="color:var(--accent-warm);font-size:10px">🔄</span>' : ''}</td>
+            <td><strong>${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</strong>${a.seriesId ? ' <span style="color:var(--accent-warm);font-size:10px">🔄</span>' : ''}${(() => { const pr = getProject(a.projectId); return pr ? `<div style="font-size:10px;color:var(--accent);margin-top:2px">📁 ${escapeHtml(pr.name)}</div>` : ''; })()}</td>
             <td>${stakeholderBadge(a)}</td>
-            <td><span class="badge-mini ${a.priority==='high'?'red':a.priority==='medium'?'amber':''}">${a.priority==='high'?t('priorityHigh'):a.priority==='medium'?t('priorityMedium'):t('priorityLow')}</span></td>
-            <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}<div>${fmtDate(a.dueDate)}${a.meetingTime ? ' ' + fmtTime(a.meetingTime) : ''}</div></td>
-            <td>${statusBadgeMini(a.status)}</td>
-            <td>${isOpen(a) && d>0 ? riskBadgeMini(r) + ' ' + t('daysShort', d) : (isCompleted(a) && d>DELAY_THRESHOLD_DAYS ? `<span style="color:var(--amber)">+${d}</span>` : '—')}</td>
-            <td style="max-width:240px;vertical-align:top">${(() => {
+            <td style="white-space:nowrap"><span class="badge-mini ${a.priority==='high'?'red':a.priority==='medium'?'amber':''}">${a.priority==='high'?t('priorityHigh'):a.priority==='medium'?t('priorityMedium'):t('priorityLow')}</span></td>
+            <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}<div style="white-space:nowrap">${fmtDate(a.dueDate)}${a.meetingTime ? ' ' + fmtTime(a.meetingTime) : ''}</div></td>
+            <td style="white-space:nowrap">${statusBadgeMini(a.status)}</td>
+            <td>${(!isMeeting(a) && isOpen(a) && d > 0) ? riskBadgeMini(r) + ' ' + t('daysShort', d) : '—'}</td>
+            <td style="vertical-align:top">${(() => {
+              const owner = getOwnerName(a);
+              return owner ? (a.ownerKind === 'internal' ? '🧑‍💼 ' : '🤝 ') + escapeHtml(owner) : '—';
+            })()}</td>
+            <td style="max-width:220px;vertical-align:top">${(() => {
               if (isMeeting(a)) {
                 const lt = a.linkedTaskId ? state.actions.find(x => x.id === a.linkedTaskId && isTask(x)) : null;
                 return a.meetingNotes ? escapeHtml(a.meetingNotes) : (lt ? '🔗 ' + escapeHtml(lt.title) : '—');
               }
-              const parts = [];
-              const owner = getOwnerName(a);
-              if (owner) parts.push((a.ownerKind === 'internal' ? '🧑‍💼 ' : '🤝 ') + escapeHtml(owner));
+              if (isCompleted(a)) {
+                const late = getDelayDays(a); // business days completed after due (0 if on/before)
+                return late > 0
+                  ? `<span style="color:var(--amber)">${t('completionDelayedBy', late)}</span>`
+                  : `<span style="color:var(--green)">✓ ${t('completionOnTime')}</span>`;
+              }
+              // open task → show blocker / free-text note (preserved here)
               const cause = getTaskDelayCause(a);
-              if (cause.key === 'dep') parts.push('⛓ ' + escapeHtml(cause.label));
-              else if (a.note) parts.push(escapeHtml(a.note));
-              return parts.length ? parts.join('<br>') : '—';
+              if (cause.key === 'dep') return '⛓ ' + escapeHtml(cause.label);
+              if (a.note) return escapeHtml(a.note);
+              return '—';
             })()}</td>
           </tr>`;
         }).join('')}
@@ -7963,7 +8010,7 @@ function printAllTasksReport(existingEntry) {
                 ${sorted.map(a => {
                   const delay = getDelayDays(a);
                   const isLate = isOpen(a) && delay > 0;
-                  const stakeholder = a.ownerKind === 'internal' ? t('stakeholderInternal') : a.ownerKind === 'partner' ? (() => { const pa = state.partners.find(pp => (pp.team||[]).some(m => m.id === a.ownerId)); return t('stakeholderPartner', pa ? pa.name : ''); })() : t('stakeholderUnassigned');
+                  const stakeholder = a.ownerKind === 'internal' ? t('stakeholderInternal') : a.ownerKind === 'partner' ? (() => { const pa = state.partners.find(pp => (pp.team||[]).some(m => m.id === a.ownerId)); return pa ? pa.name : '—'; })() : t('stakeholderUnassigned');
                   return `<tr>
                     <td><strong>${escapeHtml(a.title)}</strong></td>
                     <td style="vertical-align:top"><div style="font-weight:500">${escapeHtml(getOwnerName(a)||'—')}</div><div style="font-size:10px;color:#888">${a.ownerKind==='internal'?t('ownerKindInternal'):a.ownerKind==='partner'?t('ownerKindPartner'):''}</div></td>
@@ -8337,6 +8384,12 @@ function openDailyReportPopup(existingEntry) {
   const completedTasks = completed.filter(a => !isMeeting(a));
   const sortByDue = (a, b) => (a.dueDate || '').localeCompare(b.dueDate || '');
 
+  // Report type (grouping) + delay stats (used when carried-over/pending tasks are included)
+  const groupLabel = groupBy === 'partner' ? t('reportTypePartner') : groupBy === 'project' ? t('reportTypeProject') : t('reportTypeStatus');
+  const allDelayed = [...carriedOver, ...openTasksDelayed];
+  const delayedCount = allDelayed.length;
+  const avgDelayVal = getAvgDelay(allDelayed);
+
   function section(label, items, sortFn) {
     if (items.length === 0) return '';
     const sorted = sortFn ? [...items].sort(sortFn) : items;
@@ -8345,7 +8398,9 @@ function openDailyReportPopup(existingEntry) {
 
   let bodySections = '';
   if (carriedOver.length > 0) {
-    bodySections += section(t('sectionCarriedOver'), carriedOver, sortByDue);
+    bodySections += `<h2>${t('sectionCarriedOver')} — ${t('carriedOverCount', carriedOver.length)}</h2>
+      <div class="group-label" style="color:var(--ink-faint);font-weight:normal">${t('carriedOverHint')}</div>
+      ${renderReportTasksTable([...carriedOver].sort(sortByDue))}`;
   }
 
   if (actions.length === 0 && carriedOver.length === 0) {
@@ -8370,19 +8425,27 @@ function openDailyReportPopup(existingEntry) {
     });
     keys.forEach(key => {
       const items = groups[key];
-      const ordered = [
-        ...items.filter(x=>isTask(x)&&isOpen(x)&&getDelayDays(x)>0).sort((a,b)=>getDelayDays(b)-getDelayDays(a)),
-        ...items.filter(x=>isTask(x)&&isOpen(x)&&getDelayDays(x)===0).sort(sortByDue),
-        ...items.filter(isMeeting).sort(sortByDue),
-        ...items.filter(x=>isTask(x)&&isCompleted(x)).sort(sortByDue),
-        ...items.filter(x=>isTask(x)&&isMissed(x))
+      const taskItems = items.filter(isTask);
+      const meetingItems = items.filter(isMeeting).sort(sortByDue);
+      const orderedTasks = [
+        ...taskItems.filter(x => isOpen(x) && getDelayDays(x) > 0).sort((a, b) => getDelayDays(b) - getDelayDays(a)),
+        ...taskItems.filter(x => isOpen(x) && getDelayDays(x) === 0).sort(sortByDue),
+        ...taskItems.filter(isCompleted).sort(sortByDue),
+        ...taskItems.filter(isMissed)
       ];
-      const done = items.filter(x=>isTask(x)&&isCompleted(x)).length;
-      const openCnt = items.filter(x=>isTask(x)&&isOpen(x)).length;
-      const mtgCnt = items.filter(isMeeting).length;
-      bodySections += `<h2>${groupBy==='partner'?'👤':'📁'} ${escapeHtml(nameOf(key))}</h2>
-        <div class="group-label">${t('groupSummaryLine', items.length, done, openCnt, mtgCnt)}</div>
-        ${renderReportTasksTable(ordered)}`;
+      const done = taskItems.filter(isCompleted).length;
+      const openCnt = taskItems.filter(isOpen).length;
+      const delayedCnt = taskItems.filter(x => isOpen(x) && getDelayDays(x) > 0).length;
+      const avgD = getAvgDelay(taskItems);
+      bodySections += `<h2>${groupBy === 'partner' ? '👤' : '📁'} ${escapeHtml(nameOf(key))}</h2>
+        <div class="group-label">${t('groupSummaryLine', taskItems.length, done, openCnt, delayedCnt, avgD, meetingItems.length)}</div>`;
+      // Clear separation: tasks first, then meetings (meetings are NOT tasks)
+      if (orderedTasks.length) {
+        bodySections += `<div class="group-label" style="color:var(--accent)">📋 ${t('reportTasksSub')} (${orderedTasks.length})</div>${renderReportTasksTable(orderedTasks)}`;
+      }
+      if (meetingItems.length) {
+        bodySections += `<div class="group-label" style="color:var(--accent)">🗓 ${t('reportMeetingsSub')} (${meetingItems.length})</div>${renderReportTasksTable(meetingItems)}`;
+      }
     });
   } else if (period === 'all') {
     const sorted = [...open].sort((a, b) => getDelayDays(b) - getDelayDays(a));
@@ -8404,7 +8467,7 @@ function openDailyReportPopup(existingEntry) {
 
   const body = `
     <h1>📋 ${t('reportSectionNav')}</h1>
-    <div class="meta">${escapeHtml(periodLabel)}${includePrevious && carriedOver.length>0 ? ` · +${carriedOver.length} ${t('sectionCarriedOver').replace('📌 ','')}` : ''}</div>
+    <div class="meta"><strong>${t('reportKindLabel')}: ${groupLabel}</strong> · ${escapeHtml(periodLabel)}${includePrevious && carriedOver.length>0 ? ` · ${t('carriedOverMeta', carriedOver.length)}` : ''}</div>
 
     <h2>${t('reportSummary')}</h2>
     <div class="stats4">
@@ -8412,6 +8475,10 @@ function openDailyReportPopup(existingEntry) {
       <div class="stat-cell"><div class="v" style="color:var(--green)">${completedTasks.length}</div><div class="l">${t('statCompletedInPeriod')}</div></div>
       <div class="stat-cell"><div class="v" style="color:var(--amber)">${open.filter(a => !isMeeting(a)).length}</div><div class="l">${t('statOpenInPeriod')}</div></div>
       <div class="stat-cell"><div class="v">${meetings.length}</div><div class="l">${t('statMeetingsConducted')}</div></div>
+      ${includePrevious ? `
+      <div class="stat-cell"><div class="v" style="color:var(--red)">${delayedCount}</div><div class="l">${t('statTotalDelayed')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:${avgDelayVal>0?'var(--amber)':'var(--green)'}">${avgDelayVal} ${t('daysUnit')}</div><div class="l">${t('avgDelayLabel')}</div></div>
+      ` : ''}
     </div>
 
     ${bodySections}
@@ -8766,6 +8833,25 @@ async function resetData() {
   sendDailyNotification(false);
   setInterval(() => sendDailyNotification(false), 60 * 60 * 1000); // re-check hourly while tab open
 })();
+
+// Fast cross-device sync: re-pull cloud data when the tab regains focus / becomes visible,
+// so changes made elsewhere (e.g. a meeting scheduled on another device) appear within
+// seconds instead of waiting. Skipped while a modal/form is open so it never disrupts edits.
+let _lastCloudRefresh = Date.now();
+async function refreshFromCloud(force) {
+  if (!supabaseClient) return;
+  const modal = document.getElementById('modal');
+  if (modal && modal.classList.contains('active')) return; // don't interrupt an open form
+  const now = Date.now();
+  if (!force && now - _lastCloudRefresh < 4000) return;     // throttle bursts
+  _lastCloudRefresh = now;
+  try {
+    await loadState();
+    render(state.detailParam);
+  } catch (e) { /* keep showing current data on failure */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(); });
+window.addEventListener('focus', () => refreshFromCloud());
 
 /* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
 function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
