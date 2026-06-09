@@ -4804,11 +4804,21 @@ function renderReportGrouped(actions, groupBy) {
     return [...delayedOpen, ...openOnTime, ...mtgs, ...done, ...missed];
   };
 
+  // Sub-section heading (Tasks / Meetings) shown inside each group — mirrors the exported report
+  const subLabel = (icon, text, n) =>
+    `<div style="font-weight:600;font-size:13px;color:var(--accent);margin:16px 0 8px">${icon} ${text} <span style="color:var(--ink-faint);font-weight:400">(${n})</span></div>`;
+
   return orderedKeys.map(key => {
     const items = groups[key];
+    // Tasks (kept in urgency order) and meetings are rendered as SEPARATE sub-sections,
+    // matching the exported partner-/project-wise reports (meetings are NOT tasks).
+    const taskItems = orderItems(items).filter(x => !isMeeting(x));
+    const mtgItems = items.filter(isMeeting).sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
     const done = items.filter(x => isTask(x) && isCompleted(x)).length;
     const openCnt = items.filter(x => isTask(x) && isOpen(x)).length;
-    const mtgCnt = items.filter(isMeeting).length;
+    const delayedCnt = items.filter(x => isTask(x) && isOpen(x) && getDelayDays(x) > 0).length;
+    const avgD = getAvgDelay(items.filter(isTask));
+    const mtgCnt = mtgItems.length;
     const sub = groupSubName(key, items);
     return `
       <div class="section report-group">
@@ -4818,9 +4828,10 @@ function renderReportGrouped(actions, groupBy) {
             ${sub ? `<span style="font-size:12px;color:var(--ink-faint);font-weight:400;margin-inline-start:8px">${escapeHtml(sub)}</span>` : ''}
             <span class="accent-line"></span>
           </div>
-          <div style="font-size:11px;color:var(--ink-muted)">${t('groupSummaryLine', items.length, done, openCnt, mtgCnt)}</div>
+          <div style="font-size:11px;color:var(--ink-muted)">${t('groupSummaryLine', taskItems.length, done, openCnt, delayedCnt, avgD, mtgCnt)}</div>
         </div>
-        ${orderItems(items).map(renderActionCard).join('')}
+        ${taskItems.length ? subLabel('📋', t('reportTasksSub'), taskItems.length) + taskItems.map(renderActionCard).join('') : ''}
+        ${mtgItems.length ? subLabel('🗓', t('reportMeetingsSub'), mtgItems.length) + mtgItems.map(renderActionCard).join('') : ''}
       </div>
     `;
   }).join('');
@@ -4828,7 +4839,13 @@ function renderReportGrouped(actions, groupBy) {
 
 // Comprehensive view: keeps the original risk-grouped open-actions display
 function renderReportComprehensive(open, completed) {
-  const sorted = [...open].sort((a, b) => getDelayDays(b) - getDelayDays(a));
+  // Meetings are NOT tasks → pull them out so they appear in their own section (kept on top,
+  // matching the period status view and the exported report) and never leak into the risk
+  // groups or the completed-tasks list.
+  const meetings = completed.filter(isMeeting).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const completedTasks = completed.filter(a => !isMeeting(a));
+  const openTasks = open.filter(a => !isMeeting(a));
+  const sorted = [...openTasks].sort((a, b) => getDelayDays(b) - getDelayDays(a));
   const byRisk = { critical: [], high: [], medium: [], low: [] };
   sorted.forEach(a => {
     const r = getRiskLevel(getDelayDays(a)).key;
@@ -4839,6 +4856,15 @@ function renderReportComprehensive(open, completed) {
     medium: t('riskMediumGroup'), low: t('riskLowGroup')
   };
   return `
+    ${meetings.length > 0 ? `
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">${t('sectionMeetingsConducted')} (${meetings.length})<span class="accent-line"></span></div>
+          <div style="font-size:11px;color:var(--ink-faint)">${t('meetingsConductedHint')}</div>
+        </div>
+        ${meetings.map(renderActionCard).join('')}
+      </div>
+    ` : ''}
     ${['critical','high','medium','low'].map(key => {
       const list = byRisk[key];
       if (list.length === 0) return '';
@@ -4851,15 +4877,15 @@ function renderReportComprehensive(open, completed) {
         </div>
       `;
     }).join('')}
-    ${completed.length > 0 ? `
+    ${completedTasks.length > 0 ? `
       <div class="section">
         <div class="section-head">
-          <div class="section-title">${t('sectionTasksCompletedInPeriod')} (${completed.length})<span class="accent-line"></span></div>
+          <div class="section-title">${t('sectionTasksCompletedInPeriod')} (${completedTasks.length})<span class="accent-line"></span></div>
         </div>
-        ${completed.slice(0, 30).map(renderActionCard).join('')}
+        ${completedTasks.slice(0, 30).map(renderActionCard).join('')}
       </div>
     ` : ''}
-    ${open.length === 0 ? `<div class="table-wrap"><div class="empty"><div class="empty-icon">✓</div>${t('noOpenActions')}</div></div>` : ''}
+    ${openTasks.length === 0 ? `<div class="table-wrap"><div class="empty"><div class="empty-icon">✓</div>${t('noOpenActions')}</div></div>` : ''}
   `;
 }
 
@@ -7803,7 +7829,7 @@ function stakeholderBadge(a) {
   if (isMeeting(a)) {
     const names = getMeetingParticipantNames(a);
     if (!names.length) return '—';
-    return names.map(n => `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#faf0e0;color:#c47e2a;white-space:nowrap">${escapeHtml(n)}</span>`).join(' ');
+    return names.map(n => `<span style="display:inline-block;max-width:100%;font-size:10px;padding:2px 8px;border-radius:10px;background:#faf0e0;color:#c47e2a;white-space:normal;overflow-wrap:anywhere;line-height:1.5">${escapeHtml(n)}</span>`).join(' ');
   }
   const s = getStakeholderTag(a);
   let label = s.label;
@@ -7814,7 +7840,7 @@ function stakeholderBadge(a) {
   }
   const bg = s.internal === true ? '#e8f0e8' : s.internal === false ? '#faf0e0' : '#eee9dd';
   const fg = s.internal === true ? '#4a7c59' : s.internal === false ? '#c47e2a' : '#5a6478';
-  return `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg}">${escapeHtml(label)}</span>`;
+  return `<span style="display:inline-block;max-width:100%;font-size:10px;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};white-space:normal;overflow-wrap:anywhere;line-height:1.5">${escapeHtml(label)}</span>`;
 }
 
 // Render a partner's tasks grouped BY PROJECT — each project heading followed by its
@@ -7875,7 +7901,7 @@ function renderReportTasksTable(tasks) {
             <td><strong>${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</strong>${a.seriesId ? ' <span style="color:var(--accent-warm);font-size:10px">🔄</span>' : ''}${(() => { const pr = getProject(a.projectId); return pr ? `<div style="font-size:10px;color:var(--accent);margin-top:2px">📁 ${escapeHtml(pr.name)}</div>` : ''; })()}</td>
             <td>${stakeholderBadge(a)}</td>
             <td style="white-space:nowrap"><span class="badge-mini ${a.priority==='high'?'red':a.priority==='medium'?'amber':''}">${a.priority==='high'?t('priorityHigh'):a.priority==='medium'?t('priorityMedium'):t('priorityLow')}</span></td>
-            <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}<div style="white-space:nowrap">${fmtDate(a.dueDate)}${a.meetingTime ? ' ' + fmtTime(a.meetingTime) : ''}</div></td>
+            <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}<div><span style="white-space:nowrap">${fmtDate(a.dueDate)}</span>${a.meetingTime ? `<span style="display:block;white-space:nowrap;font-size:11px;color:var(--ink-muted)">${fmtTime(a.meetingTime)}</span>` : ''}</div></td>
             <td style="white-space:nowrap">${statusBadgeMini(a.status)}</td>
             <td>${(!isMeeting(a) && isOpen(a) && d > 0) ? riskBadgeMini(r) + ' ' + t('daysShort', d) : '—'}</td>
             <td style="vertical-align:top">${(() => {
@@ -8448,15 +8474,20 @@ function openDailyReportPopup(existingEntry) {
       }
     });
   } else if (period === 'all') {
-    const sorted = [...open].sort((a, b) => getDelayDays(b) - getDelayDays(a));
+    // Conducted meetings first (on top) — kept out of the tasks lists; matches the on-screen view
+    if (meetings.length > 0) {
+      bodySections += section(t('sectionMeetingsConducted'), meetings, sortByDue);
+    }
+    const sorted = [...open].filter(a => !isMeeting(a)).sort((a, b) => getDelayDays(b) - getDelayDays(a));
     const byRisk = { critical: [], high: [], medium: [], low: [] };
     sorted.forEach(a => { byRisk[getRiskLevel(getDelayDays(a)).key].push(a); });
     const labels = { critical: t('riskCriticalGroup'), high: t('riskHighGroup'), medium: t('riskMediumGroup'), low: t('riskLowGroup') };
     ['critical','high','medium','low'].forEach(key => {
       bodySections += section(labels[key], byRisk[key]);
     });
-    if (completed.length > 0) {
-      bodySections += section(t('sectionTasksCompletedInPeriod'), completed.slice(0, 30));
+    // Completed TASKS only — meetings already shown in their own section above
+    if (completedTasks.length > 0) {
+      bodySections += section(t('sectionTasksCompletedInPeriod'), [...completedTasks].sort(sortByDue).slice(0, 30));
     }
   } else {
     bodySections += section(t('sectionMeetingsConducted'), meetings, sortByDue);
