@@ -1934,8 +1934,8 @@ const T = {
     noTeamMembers: 'لا يوجد أعضاء فريق بعد',
     fieldDescription: 'الوصف', fieldStartDate: 'تاريخ البدء', fieldTargetDate: 'الموعد المستهدف',
     devShort: 'تطوير', supShort: 'إشراف',
-    addActionTitle: 'إضافة مهمة', editActionTitle: 'تعديل مهمة',
-    fieldActionType: 'نوع المهمة *', fieldActionTitle: 'عنوان المهمة *',
+    addActionTitle: 'إضافة إجراء', editActionTitle: 'تعديل إجراء',
+    fieldActionType: 'نوع الإجراء *', fieldActionTitle: 'عنوان المهمة *',
     fieldMeetingTopic: 'موضوع الاجتماع *',
     fieldActionTitlePh: 'مثال: تسليم التقرير الشهري', fieldMeetingTopicPh: 'مثال: اجتماع المراجعة الأسبوعي',
     fieldDueDate: 'الموعد *', fieldMeetingDate: 'تاريخ الاجتماع *',
@@ -2559,8 +2559,8 @@ const T = {
     noTeamMembers: 'No internal team members yet',
     fieldDescription: 'Description', fieldStartDate: 'Start Date', fieldTargetDate: 'Target Date',
     devShort: 'dev', supShort: 'supervised',
-    addActionTitle: 'Add Task', editActionTitle: 'Edit Task',
-    fieldActionType: 'Task Type *', fieldActionTitle: 'Task Title *',
+    addActionTitle: 'Add Action', editActionTitle: 'Edit Action',
+    fieldActionType: 'Action Type *', fieldActionTitle: 'Task Title *',
     fieldMeetingTopic: 'Meeting Topic *',
     fieldActionTitlePh: 'e.g., Submit monthly report', fieldMeetingTopicPh: 'e.g., Weekly review meeting',
     fieldDueDate: 'Due Date *', fieldMeetingDate: 'Meeting Date *',
@@ -4734,7 +4734,7 @@ function renderActionCard(a, opts) {
           ${priorityBadge(a.priority)}
           ${isOpen(a) && delay > 0 ? `<span class="badge ${risk.cls}">${t('riskColon')} ${risk.label}</span>` : ''}
           ${joinMeetingBtn(a)}
-          ${showEdit ? `<button class="btn ghost sm" onclick="showActionForm('${a.id}')">${t('edit')}</button>` : ''}
+          ${showEdit ? `${isOpen(a) ? `<button class="btn ghost sm" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}<button class="btn ghost sm" onclick="showActionForm('${a.id}')">${t('edit')}</button><button class="btn ghost sm" style="color:var(--red)" onclick="deleteAction('${a.id}')">${t('delete')}</button>` : ''}
         </div>
       </div>
       ${meeting && a.meetingNotes ? `<div class="ac-reason">🗒 ${escapeHtml(a.meetingNotes)}</div>` : ''}
@@ -5316,8 +5316,8 @@ views.partners = () => {
               </td>
               <td>${importance.projectCount}</td>
               <td>${commitment.completed}/${commitment.total} <span style="color:var(--ink-faint);font-size:11px">${t('colDelayedCount', commitment.delayed)}</span></td>
-              <td>
-                <div class="importance">
+              <td style="text-align:center">
+                <div class="importance" style="justify-content:center">
                   <div class="imp-bar"><div class="imp-fill ${commitment.level}" style="width:${commitmentBarWidth(commitment)}%"></div></div>
                   <span style="font-size:12px;color:var(--ink-muted)">${commitmentScoreText(commitment)}</span>
                 </div>
@@ -6325,6 +6325,7 @@ views.partnerDetail = (partnerId) => {
         <div class="section">
           <div class="section-head">
             <div class="section-title">${t('sectionPartnerMeetings')} (${pMeetings.length})<span class="accent-line"></span></div>
+            <button class="btn sm" onclick="showActionForm(null,null,'${p.id}','meeting')">${t('scheduleMeeting')}</button>
           </div>
           ${pMeetings.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noPartnerMeetings')}</div></div>` : `
             <div class="table-wrap">
@@ -6626,7 +6627,14 @@ function setMeetingDueSort(scope) {
   const key = scope === 'partner' ? 'partnerMeetingSort' : 'projMeetingSort';
   const cur = state.filters[key] === 'asc' ? 'asc' : 'desc';
   state.filters[key] = cur === 'asc' ? 'desc' : 'asc';
+  // Preserve scroll position so the page doesn't jump to the top after re-render
+  const _main = document.getElementById('main-content');
+  const _mTop = _main ? _main.scrollTop : 0;
+  const _wTop = window.scrollY || window.pageYOffset || 0;
   render(state.detailParam);
+  const _m2 = document.getElementById('main-content');
+  if (_m2) _m2.scrollTop = _mTop;
+  if (_wTop) window.scrollTo(0, _wTop);
 }
 function setProjectSort(key) {
   const valid = ['name', 'partner', 'start', 'target', 'focus'];
