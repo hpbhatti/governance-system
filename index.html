@@ -1229,8 +1229,9 @@
   }
   /* === END NEW Timeline CSS === */
 </style>
-<!-- Supabase client (Phase 1: public database, no auth/RLS) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase client (Phase 1: public database, no auth/RLS). Pinned to a known
+     stable v2 that supports both legacy and new (sb_publishable_) API keys. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -1300,6 +1301,33 @@ function isCacheFresh() {
 // Invalidate the cache so the next load re-fetches from the cloud.
 function invalidateCache() {
   try { localStorage.removeItem(CACHE_META_KEY); } catch (e) {}
+}
+
+/* Per-request network timeout. A hanging Supabase request (e.g. a paused free-tier
+   project, or a flaky connection) used to be left open indefinitely while only the
+   OUTER init timeout fired — leaving the cache un-stamped and forcing the app to
+   re-hang on every load and every tab focus. We now race each query against an
+   AbortController so a stuck request fails fast, the function actually completes,
+   and the cache/fallback logic runs correctly. */
+const SUPABASE_REQUEST_TIMEOUT_MS = 7000;
+function withRequestTimeout(queryBuilder, ms) {
+  ms = ms || SUPABASE_REQUEST_TIMEOUT_MS;
+  // supabase-js query builders support .abortSignal(); pair it with a timer so
+  // the request is genuinely cancelled (frees the connection) on timeout.
+  let timer = null;
+  const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  try { if (ac && typeof queryBuilder.abortSignal === 'function') queryBuilder.abortSignal(ac.signal); } catch (e) {}
+  const timeout = new Promise(resolve => {
+    timer = setTimeout(() => {
+      try { if (ac) ac.abort(); } catch (e) {}
+      resolve({ data: null, error: { message: 'request timed out', __timeout: true } });
+    }, ms);
+  });
+  return Promise.race([
+    Promise.resolve(queryBuilder).then(res => { if (timer) clearTimeout(timer); return res; },
+                                       err => { if (timer) clearTimeout(timer); return { data: null, error: err }; }),
+    timeout
+  ]);
 }
 
 /* ========== SUPABASE (Phase 1: public, shared database — no auth, no RLS) ========== */
@@ -1422,7 +1450,7 @@ function mergeConfig(saved) {
 async function loadConfig() {
   if (supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from('config').select('settings').eq('id', 'global').maybeSingle();
+      const { data, error } = await withRequestTimeout(supabaseClient.from('config').select('settings').eq('id', 'global').maybeSingle());
       if (error) throw error;
       if (data && data.settings && typeof data.settings === 'object') {
         mergeConfig(data.settings);
@@ -2893,8 +2921,9 @@ async function loadState(force) {
     try {
       // Explicit column selection: the per-row payload lives in the `data` jsonb
       // column, so we fetch only `id, data` (never select('*'), which could pull
-      // any extra/added columns we don't use).
-      const { data, error } = await supabaseClient.from(t.table).select('id, data');
+      // any extra/added columns we don't use). Wrapped in a per-request timeout so
+      // a hanging request aborts cleanly instead of stalling the whole load.
+      const { data, error } = await withRequestTimeout(supabaseClient.from(t.table).select('id, data'));
       if (error) return { t, error };
       return { t, rows: data || [] };
     } catch (e) {
@@ -2908,6 +2937,7 @@ async function loadState(force) {
   // Total failure → behave as offline and use the cache.
   if (ok.length === 0) {
     console.error('Supabase load failed — falling back to localStorage cache:', describeSupabaseError(failed[0] && failed[0].error));
+    invalidateCache(); // not in sync with the cloud → don't let the TTL suppress the next retry
     return loadStateFromLocalStorage();
   }
 
@@ -10460,15 +10490,17 @@ async function resetData() {
   //    the cloud returned newer data. Never blocks or blanks the UI.
   (async () => {
     try {
-      const hadCloud = await withTimeout(loadState(), 8000, 'loadState');
+      // Per-request timeouts inside loadState now guarantee it completes (~7s worst
+      // case) instead of hanging, so the outer guard is a generous safety net only.
+      const hadCloud = await withTimeout(loadState(), 12000, 'loadState');
       // If cloud had nothing and we just seeded locally, push the seed up.
       if (state.partners && state.partners.length === 0) {
-        if (seedIfEmpty()) await withTimeout(saveState(), 8000, 'saveState');
+        if (seedIfEmpty()) await withTimeout(saveState(), 12000, 'saveState');
       } else if (seededNow && hadCloud) {
         // Cloud actually had data; our seed was premature — cloud already applied.
       }
       try { migrateBilingualContent(); } catch (e) {}
-      await withTimeout(loadConfig(), 8000, 'loadConfig');
+      await withTimeout(loadConfig(), 12000, 'loadConfig');
       // Re-render with reconciled data.
       try { renderSidebar(); } catch (e) {}
       try { render(); } catch (e) {}
@@ -10489,6 +10521,7 @@ async function resetData() {
 // so changes made elsewhere (e.g. a meeting scheduled on another device) appear within
 // seconds instead of waiting. Skipped while a modal/form is open so it never disrupts edits.
 let _lastCloudRefresh = Date.now();
+let _cloudFailUntil = 0; // cooldown timestamp after a failed sync (avoid hammering a down backend)
 async function refreshFromCloud(force) {
   if (!supabaseClient) return;
   const modal = document.getElementById('modal');
@@ -10498,12 +10531,19 @@ async function refreshFromCloud(force) {
   // every table on each tab focus / visibility change (the main egress drain).
   if (!force && isCacheFresh()) return;
   const now = Date.now();
+  // Backoff: after a failed sync, don't retry on every focus/visibility for a while
+  // (manual/forced refresh always allowed).
+  if (!force && now < _cloudFailUntil) return;
   if (!force && now - _lastCloudRefresh < 4000) return;     // throttle bursts
   _lastCloudRefresh = now;
   try {
-    await loadState(force);   // force bypasses the TTL inside loadState too
+    const okLoad = await loadState(force);   // force bypasses the TTL inside loadState too
+    // If the cloud is unreachable the cache stays un-stamped; start a 30s cooldown
+    // so background refreshes don't repeatedly hang against a down/paused backend.
+    if (!isCacheFresh()) _cloudFailUntil = Date.now() + 30000;
+    else _cloudFailUntil = 0;
     render(state.detailParam);
-  } catch (e) { /* keep showing current data on failure */ }
+  } catch (e) { _cloudFailUntil = Date.now() + 30000; /* keep showing current data on failure */ }
 }
 // Re-pull cloud data when the tab regains focus / becomes visible, but ONLY if the
 // local cache has gone stale (older than the TTL). Fresh cache → no network call.
