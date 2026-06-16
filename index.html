@@ -1269,6 +1269,39 @@
 /* ========== STATE & STORAGE ========== */
 const STORE_KEY = 'governance_data_v1';
 
+/* ========== CLIENT-SIDE CACHE (TTL) ==========
+   Egress optimisation: the cloud tables are only re-fetched when the locally
+   cached copy is older than CACHE_TTL_MS, or when a fetch is explicitly forced
+   (e.g. right after the user saves a change). This eliminates the redundant
+   full-table downloads that previously happened on every page load and on every
+   tab focus / visibility change. The cached payload itself lives in STORE_KEY
+   (written by saveStateToLocalStorage); here we only track WHEN it was fetched. */
+const CACHE_META_KEY = 'governance_cache_meta_v1';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Timestamp (ms) of the last successful cloud fetch, 0 if never / unknown.
+function getCacheTimestamp() {
+  try {
+    const raw = localStorage.getItem(CACHE_META_KEY);
+    if (!raw) return 0;
+    const meta = JSON.parse(raw);
+    return (meta && typeof meta.lastFetched === 'number') ? meta.lastFetched : 0;
+  } catch (e) { return 0; }
+}
+// Stamp the cache as fetched "now" (called after a successful load or save).
+function setCacheTimestamp(ts) {
+  try { localStorage.setItem(CACHE_META_KEY, JSON.stringify({ lastFetched: ts == null ? Date.now() : ts })); } catch (e) {}
+}
+// Is the local cache still fresh (younger than the TTL)?
+function isCacheFresh() {
+  const ts = getCacheTimestamp();
+  return ts > 0 && (Date.now() - ts) < CACHE_TTL_MS;
+}
+// Invalidate the cache so the next load re-fetches from the cloud.
+function invalidateCache() {
+  try { localStorage.removeItem(CACHE_META_KEY); } catch (e) {}
+}
+
 /* ========== SUPABASE (Phase 1: public, shared database — no auth, no RLS) ========== */
 // Project values from Supabase → Settings → API.
 // NOTE: the JS client needs the BASE project URL only — NOT the REST endpoint (no "/rest/v1/").
@@ -2840,8 +2873,17 @@ function describeSupabaseError(e) {
 // online so every user sees the same shared data on refresh. Per-table resilience: if one
 // table errors we keep its cached copy instead of discarding all cloud data; only a total
 // failure (every table errors) falls back fully to localStorage.
-async function loadState() {
+async function loadState(force) {
   if (!supabaseClient) return loadStateFromLocalStorage();
+
+  // TTL CACHE: if the local cache is still fresh and this isn't a forced refresh,
+  // serve the cached data and skip the network entirely (the big egress saving).
+  if (!force && isCacheFresh()) {
+    const had = loadStateFromLocalStorage();
+    if (had) return true;
+    // Cache metadata said "fresh" but the payload was missing/empty → fall through
+    // and fetch from the cloud to repair the cache.
+  }
 
   // Read the existing cache once, as a baseline for any table that fails to load.
   let cache = {};
@@ -2849,7 +2891,10 @@ async function loadState() {
 
   const results = await Promise.all(SUPABASE_TABLES.map(async t => {
     try {
-      const { data, error } = await supabaseClient.from(t.table).select('*');
+      // Explicit column selection: the per-row payload lives in the `data` jsonb
+      // column, so we fetch only `id, data` (never select('*'), which could pull
+      // any extra/added columns we don't use).
+      const { data, error } = await supabaseClient.from(t.table).select('id, data');
       if (error) return { t, error };
       return { t, rows: data || [] };
     } catch (e) {
@@ -2876,6 +2921,10 @@ async function loadState() {
   state.translationCache = cache.translationCache || {}; // local-only cache
   applyDataMigrations();
   saveStateToLocalStorage(); // refresh the offline cache with the freshly merged cloud data
+
+  // Only stamp the cache as fully fetched when every table loaded successfully;
+  // if some failed we keep the cache "stale" so the next load retries them.
+  if (failed.length === 0) setCacheTimestamp(Date.now());
 
   failed.forEach(r => console.error('Supabase load: table "' + r.t.table + '" failed — kept cached copy:', describeSupabaseError(r.error)));
   return true;
@@ -3041,8 +3090,13 @@ async function saveState() {
     }));
     const errored = results.find(r => r && r.error);
     if (errored) throw errored.error;
+    // Local cache and cloud are now identical → mark the cache fresh so the next
+    // load (and any focus/visibility refresh within the TTL) skips a re-fetch.
+    setCacheTimestamp(Date.now());
   } catch (e) {
     console.error('Supabase save failed — changes kept in local cache:', describeSupabaseError(e));
+    // The cloud may be out of sync with our local copy → force a re-fetch next time.
+    invalidateCache();
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
   }
 }
@@ -3062,8 +3116,12 @@ async function syncCloudDeletes(removed) {
     const results = await Promise.all(jobs);
     const errored = results.find(r => r && r.error);
     if (errored) throw errored.error;
+    // Cloud delete succeeded → local cache (already updated by the caller) matches
+    // the cloud, so keep the cache fresh and avoid an unnecessary re-fetch.
+    setCacheTimestamp(Date.now());
   } catch (e) {
     console.error('Supabase delete failed — change kept in local cache:', describeSupabaseError(e));
+    invalidateCache(); // force a re-sync on the next load
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
   }
 }
@@ -9264,6 +9322,7 @@ async function resetData() {
   state.team = [];
   state.reports = [];
   localStorage.removeItem(STORE_KEY);
+  invalidateCache(); // drop the TTL stamp so any future data re-fetches cleanly
   toast(t('toastDataCleared'));
   navigate('dashboard');
 }
@@ -10434,16 +10493,22 @@ async function refreshFromCloud(force) {
   if (!supabaseClient) return;
   const modal = document.getElementById('modal');
   if (modal && modal.classList.contains('active')) return; // don't interrupt an open form
+  // TTL GUARD: unless the caller explicitly forces it, skip the network entirely
+  // while the local cache is still fresh. This stops the app from re-downloading
+  // every table on each tab focus / visibility change (the main egress drain).
+  if (!force && isCacheFresh()) return;
   const now = Date.now();
   if (!force && now - _lastCloudRefresh < 4000) return;     // throttle bursts
   _lastCloudRefresh = now;
   try {
-    await loadState();
+    await loadState(force);   // force bypasses the TTL inside loadState too
     render(state.detailParam);
   } catch (e) { /* keep showing current data on failure */ }
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(); });
-window.addEventListener('focus', () => refreshFromCloud());
+// Re-pull cloud data when the tab regains focus / becomes visible, but ONLY if the
+// local cache has gone stale (older than the TTL). Fresh cache → no network call.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false); });
+window.addEventListener('focus', () => refreshFromCloud(false));
 
 /* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
 function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
