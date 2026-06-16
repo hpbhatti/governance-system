@@ -1097,6 +1097,137 @@
     /* Action cards a touch roomier vertically */
     .action-card { padding-top: 16px; padding-bottom: 16px; }
   }
+
+  /* ============================================================ */
+  /* === NEW: Project Timeline (Gantt) feature — isolated CSS === */
+  /* All classes prefixed with tl- to avoid any conflict with     */
+  /* existing styles. Nothing here overrides existing rules.      */
+  /* ============================================================ */
+  .tl-wrap {
+    margin-top: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px 16px;
+  }
+  .tl-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tl-toolbar .tl-label {
+    font-size: 12px;
+    color: var(--ink-muted);
+    margin-inline-end: 4px;
+  }
+  .tl-scale-group { display: inline-flex; gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .tl-scale-btn {
+    background: var(--bg-card);
+    border: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--ink-muted);
+    font-family: inherit;
+  }
+  .tl-scale-btn:not(:last-child) { border-right: 1px solid var(--line); }
+  [dir="rtl"] .tl-scale-btn:not(:last-child) { border-right: 0; border-left: 1px solid var(--line); }
+  .tl-scale-btn.active { background: var(--accent); color: #fff; }
+  .tl-scale-btn:hover:not(.active) { background: #f4ede0; color: var(--ink); }
+  .tl-export-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--ink-muted);
+    font-family: inherit;
+  }
+  .tl-export-btn:hover { background: #f4ede0; color: var(--ink); border-color: var(--gold); }
+  .tl-spacer { flex: 1; }
+  .tl-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 520px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    /* Time always flows left→right regardless of UI direction */
+    direction: ltr;
+  }
+  .tl-svg { display: block; background: transparent; }
+  .tl-empty { padding: 24px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+  .tl-legend {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #faf8f3;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+  .tl-legend-group { display: flex; flex-wrap: wrap; gap: 14px 18px; }
+  .tl-legend-section { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+  .tl-legend-title { font-weight: 600; color: var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tl-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .tl-legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.08);
+    flex-shrink: 0;
+  }
+  .tl-legend-swatch.tl-diamond {
+    transform: rotate(45deg);
+    width: 9px;
+    height: 9px;
+    border-radius: 1px;
+  }
+  /* Full-screen timeline overlay */
+  .tl-host-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    background: var(--bg, #f5f1e8) !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    overflow: auto !important;
+    display: block !important;
+  }
+  .tl-host-fullscreen .tl-wrap {
+    height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    margin-top: 0;
+  }
+  .tl-host-fullscreen .tl-container {
+    max-height: none !important;
+    flex: 1 1 auto;
+  }
+  body.tl-fs-active { overflow: hidden; }
+  /* Print: when triggered from the timeline-only print path, hide everything else */
+  @media print {
+    /* Inline-print fallback (used only if the dedicated print window is blocked).
+       Hide everything, then reveal just the timeline host and its ancestors via
+       a re-positioned overlay so the deeply-nested host can print on its own. */
+    body.tl-printing * { visibility: hidden !important; }
+    body.tl-printing .tl-print-host,
+    body.tl-printing .tl-print-host * { visibility: visible !important; }
+    body.tl-printing .tl-print-host {
+      position: absolute !important;
+      left: 0 !important; top: 0 !important; width: 100% !important;
+      display: block !important;
+    }
+    body.tl-printing .tl-toolbar { display: none !important; }
+    body.tl-printing .tl-container { max-height: none !important; overflow: visible !important; border: 0 !important; }
+  }
+  /* === END NEW Timeline CSS === */
 </style>
 <!-- Supabase client (Phase 1: public database, no auth/RLS) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1229,6 +1360,11 @@ const IMPORTANCE_CONFIG = {
     delayPenaltyCap: 20,
     goodThreshold: 65,
     warnThreshold: 40
+  },
+  risk: {
+    lowMax: 3,
+    mediumMax: 7,
+    highMax: 14
   }
 };
 // Pristine defaults snapshot (for "reset to defaults")
@@ -1369,7 +1505,7 @@ const T = {
     statTotalPartners: 'إجمالي الشركاء', statDevSup: '{0} تطوير · {1} إشراف · {2} ملكية',
     statActiveProjects: 'المشاريع النشطة', statActionsCompleted: '{0} مهمة منجزة',
     statDelayedActions: 'مهام متأخرة', statOfTotal: 'من أصل {0} مفتوحة',
-    statCritical: 'حالات حرجة', statCriticalSub: 'تأخير أكثر من 14 يوم',
+    statCritical: 'حالات حرجة', statCriticalSub: 'تأخير أكثر من {0} يوم',
     sectionTopDelayed: 'أبرز المهام المتأخرة', viewFullReport: 'عرض التقرير الكامل',
     sectionTopPartners: 'الشركاء الأكثر أهمية', sectionLowPartners: 'شركاء بحاجة متابعة',
     noDelayed: 'لا توجد مهام متأخرة 🎉', noPartnersYet: 'لا يوجد شركاء بعد',
@@ -1378,7 +1514,7 @@ const T = {
     colDelayed: 'متأخر', colAvgDelay: 'متوسط التأخير', actionsCount: '{0} مهمة',
     // Report
     statTotalOpen: 'إجمالي المهام المفتوحة', statDelayedAfterDue: 'متأخرة عن الموعد',
-    statCriticalShort: 'حرجة (+14 يوم)', statOnTime: 'في الموعد',
+    statCriticalShort: 'حرجة (+{0} يوم)', statOnTime: 'في الموعد',
     // Report period filter
     reportPeriodLabel: 'الفترة',
     reportPeriodToday: 'تقرير اليوم',
@@ -1439,7 +1575,7 @@ const T = {
     filterAll: 'الكل', filterOpenOrScheduled: 'مفتوح / مجدول', filterDelayed: 'متأخر',
     filterOverdue: 'فات موعدها',
     filterMissed: 'لم يتم', filterCompleted: 'مكتمل',
-    filterCritical: 'حرجة (+14 يوم)',
+    filterCritical: 'حرجة (+{0} يوم)',
     drillDown: 'التفاصيل', drillHint: 'اضغط لعرض التفاصيل',
     reportGroupByLabel: 'طريقة العرض',
     groupByStatus: 'حسب الحالة (افتراضي)',
@@ -1595,6 +1731,10 @@ const T = {
     actionsPeriodWeek: 'هذا الأسبوع',
     actionsPeriodMonth: 'هذا الشهر',
     toggleIncludeMeetings: '🗓 إظهار الاجتماعات',
+    taskSortLabel: 'ترتيب المهام', taskSortDefault: 'الترتيب الافتراضي', taskSortPartnerAZ: 'الشريك / المشروع أ→ي', taskSortPartnerZA: 'الشريك / المشروع ي→أ',
+    colAgenda: 'جدول الأعمال', taskSortDueAsc: 'تاريخ الاستحقاق (الأقرب أولاً)', taskSortDueDesc: 'تاريخ الاستحقاق (الأبعد أولاً)',
+    reportCriticalTasks: 'مهام حرجة', reportAvgDelay: 'متوسط التأخير', reportTotalMeetings: 'إجمالي الاجتماعات', reportMeetingsDone: 'اجتماعات منعقدة', reportMeetingsScheduled: 'اجتماعات مجدولة',
+    reportMeetingsMissed: 'اجتماعات فائتة', meetingSortLabel: 'ترتيب الاجتماعات', meetingSortDateAsc: 'تاريخ الاجتماع (الأقرب أولاً)', meetingSortDateDesc: 'تاريخ الاجتماع (الأبعد أولاً)',
     filterByProject: 'كل المشاريع',
     exportTasksReportGlobal: '📊 تقرير شامل بالمهام',
     globalReportTitle: 'تقرير شامل بمهام جميع المشاريع',
@@ -1658,6 +1798,7 @@ const T = {
     cfgHowTitle: 'كيف تعمل المعادلات؟',
     cfg_commitment: 'التزام الشريك (نقاط حسب التأخير)',
     cfg_health: 'صحة التنفيذ',
+    cfg_risk: 'عتبات مخاطر التأخير',
     cfgNote: 'القيم أرقام فقط. عتبات النسب من 0 إلى 100. الأوزان مثل 0.6 و0.4 يجب أن يكون مجموعها 1.',
     internalTierLabel: 'مستوى المشروع الداخلي',
     tier_strategic: 'استراتيجي',
@@ -1842,6 +1983,7 @@ const T = {
     linkMeetingCheckboxHint: 'حدد الاجتماعات التي تدعم هذه المهمة',
     // Project meetings section
     sectionProjectMeetings: '🗓 اجتماعات المشروع',
+    sectionPartnerMeetings: '🗓 اجتماعات الشريك', noPartnerMeetings: 'لا توجد اجتماعات مع هذا الشريك',
     noProjectMeetings: 'لا توجد اجتماعات لهذا المشروع',
     linkedToLabel: 'مرتبط بـ',
     // Calendar
@@ -1988,7 +2130,7 @@ const T = {
     statTotalPartners: 'Total Partners', statDevSup: '{0} dev · {1} supervised · {2} owned',
     statActiveProjects: 'Active Projects', statActionsCompleted: '{0} tasks completed',
     statDelayedActions: 'Delayed Tasks', statOfTotal: 'of {0} open',
-    statCritical: 'Critical Cases', statCriticalSub: 'Delayed more than 14 days',
+    statCritical: 'Critical Cases', statCriticalSub: 'Delayed more than {0} days',
     sectionTopDelayed: 'Most Delayed Tasks', viewFullReport: 'View Full Report',
     sectionTopPartners: 'Most Important Partners', sectionLowPartners: 'Partners Needing Follow-up',
     noDelayed: 'No delayed tasks 🎉', noPartnersYet: 'No partners yet',
@@ -1997,7 +2139,7 @@ const T = {
     colDelayed: 'Delayed', colAvgDelay: 'Avg. Delay', actionsCount: '{0} tasks',
     // Report
     statTotalOpen: 'Total Open Tasks', statDelayedAfterDue: 'Delayed Past Due',
-    statCriticalShort: 'Critical (+14d)', statOnTime: 'On Time',
+    statCriticalShort: 'Critical (+{0}d)', statOnTime: 'On Time',
     // Report period filter
     reportPeriodLabel: 'Period',
     reportPeriodToday: "Today's Report",
@@ -2058,7 +2200,7 @@ const T = {
     filterAll: 'All', filterOpenOrScheduled: 'Open / Scheduled', filterDelayed: 'Delayed (3+ days)',
     filterOverdue: 'Overdue',
     filterMissed: 'Missed', filterCompleted: 'Completed',
-    filterCritical: 'Critical (+14d)',
+    filterCritical: 'Critical (+{0}d)',
     drillDown: 'Details', drillHint: 'Click to view details',
     reportGroupByLabel: 'Grouping',
     groupByStatus: 'By Status (default)',
@@ -2214,6 +2356,10 @@ const T = {
     actionsPeriodWeek: 'This Week',
     actionsPeriodMonth: 'This Month',
     toggleIncludeMeetings: '🗓 Show Meetings',
+    taskSortLabel: 'Sort tasks', taskSortDefault: 'Default order', taskSortPartnerAZ: 'Partner / Project A→Z', taskSortPartnerZA: 'Partner / Project Z→A',
+    colAgenda: 'Agenda', taskSortDueAsc: 'Due date (earliest first)', taskSortDueDesc: 'Due date (latest first)',
+    reportCriticalTasks: 'Critical Tasks', reportAvgDelay: 'Avg. Delay', reportTotalMeetings: 'Total Meetings', reportMeetingsDone: 'Meetings Done', reportMeetingsScheduled: 'Meetings Scheduled',
+    reportMeetingsMissed: 'Meetings Missed', meetingSortLabel: 'Sort meetings', meetingSortDateAsc: 'Meeting date (earliest first)', meetingSortDateDesc: 'Meeting date (latest first)',
     filterByProject: 'All Projects',
     exportTasksReportGlobal: '📊 All Tasks Report',
     globalReportTitle: 'All Tasks Across Projects Report',
@@ -2277,6 +2423,7 @@ const T = {
     cfgHowTitle: 'How the scoring works',
     cfg_commitment: 'Partner commitment (points by delay)',
     cfg_health: 'Execution health',
+    cfg_risk: 'Risk delay thresholds',
     cfgNote: 'Values are numbers only. Percentage thresholds are 0–100. Weights like 0.6 and 0.4 should sum to 1.',
     internalTierLabel: 'Internal project tier',
     tier_strategic: 'Strategic',
@@ -2461,6 +2608,7 @@ const T = {
     linkMeetingCheckboxHint: 'Select the meetings that support this task',
     // Project meetings section
     sectionProjectMeetings: '🗓 Project Meetings',
+    sectionPartnerMeetings: '🗓 Partner Meetings', noPartnerMeetings: 'No meetings with this partner',
     noProjectMeetings: 'No meetings for this project',
     linkedToLabel: 'Linked to',
     // Calendar
@@ -3296,6 +3444,11 @@ function toggleIncludePrevious(checked) {
   state.filters.reportIncludePrevious = checked;
   render();
 }
+function setActionSort(v) {
+  state.filters.actionSort = v;
+  render(state.detailParam);
+}
+
 function setActionPeriod(p) {
   state.filters.actionPeriod = p;
   render();
@@ -3327,10 +3480,27 @@ function getFileIcon(type, name) {
 
 // Risk level for an open action based on days overdue
 function getRiskLevel(daysOverdue) {
-  if (daysOverdue <= DELAY_THRESHOLD_DAYS) return { key: 'low', label: t('riskLow'), cls: 'green' };
-  if (daysOverdue <= 7) return { key: 'medium', label: t('riskMedium'), cls: 'amber' };
-  if (daysOverdue <= 14) return { key: 'high', label: t('riskHigh'), cls: 'red' };
+  const R = IMPORTANCE_CONFIG.risk || {};
+  const lowMax    = (typeof R.lowMax    === 'number' && !isNaN(R.lowMax))    ? R.lowMax    : DELAY_THRESHOLD_DAYS;
+  const mediumMax = (typeof R.mediumMax === 'number' && !isNaN(R.mediumMax)) ? R.mediumMax : 7;
+  const highMax   = (typeof R.highMax   === 'number' && !isNaN(R.highMax))   ? R.highMax   : 14;
+  if (daysOverdue <= lowMax)    return { key: 'low', label: t('riskLow'), cls: 'green' };
+  if (daysOverdue <= mediumMax) return { key: 'medium', label: t('riskMedium'), cls: 'amber' };
+  if (daysOverdue <= highMax)   return { key: 'high', label: t('riskHigh'), cls: 'red' };
   return { key: 'critical', label: t('riskCritical'), cls: 'crit' };
+}
+
+// True when an open task's delay puts it in the "critical" risk band.
+// Reads the live threshold from settings so counts stay in sync with the badges.
+function isCriticalRisk(a) {
+  return isOpen(a) && getRiskLevel(getDelayDays(a)).key === 'critical';
+}
+
+// The "critical" delay threshold (in business days) — anything ABOVE this is critical.
+// Mirrors the highMax read inside getRiskLevel so labels stay in sync with the bands.
+function getCriticalThreshold() {
+  const R = IMPORTANCE_CONFIG.risk || {};
+  return (typeof R.highMax === 'number' && !isNaN(R.highMax)) ? R.highMax : 14;
 }
 
 // Calculate partner importance score
@@ -4331,7 +4501,7 @@ views.dashboard = () => {
   // Task statistics exclude meetings (meetings are tracked separately, not as tasks)
   const openActions = state.actions.filter(a => isTask(a) && isOpen(a));
   const delayedActions = openActions.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
-  const criticalActions = openActions.filter(a => getDelayDays(a) > 14);
+  const criticalActions = openActions.filter(isCriticalRisk);
   const completedTasksCount = state.actions.filter(a => isTask(a) && isCompleted(a)).length;
 
   const partnersEnriched = state.partners.map(p => ({
@@ -4386,7 +4556,7 @@ views.dashboard = () => {
       <div class="stat danger clickable" onclick="goToTasksFiltered('critical')" title="${t('drillHint')}">
         <div class="stat-label">${t('statCritical')}</div>
         <div class="stat-value">${criticalActions.length}</div>
-        <div class="stat-meta">${t('statCriticalSub')}</div>
+        <div class="stat-meta">${t('statCriticalSub', getCriticalThreshold())}</div>
         <span class="stat-drill">${t('drillDown')} ›</span>
       </div>
     </div>
@@ -4533,7 +4703,9 @@ views.dashboard = () => {
   `;
 };
 
-function renderActionCard(a) {
+function renderActionCard(a, opts) {
+  const hidePartner = !!(opts && typeof opts === 'object' && opts.hidePartner === true);
+  const showEdit = !!(opts && typeof opts === 'object' && opts.showEdit === true);
   const delay = getDelayDays(a);
   const risk = getRiskLevel(delay);
   const partner = getPartner(a.partnerId);
@@ -4547,7 +4719,8 @@ function renderActionCard(a) {
           <div class="ac-title">${meeting ? '🗓 ' : (isMilestone(a) ? '🎯 ' : '')}${escapeHtml(a.title)}${isMilestone(a) ? ` <span class="badge sup" style="font-size:10px">${t('milestoneBadge')}</span>` : ''}</div>
           <div class="ac-meta">
             <div class="ac-meta-item">${t('metaProject')} ${escapeHtml(project ? project.name : '—')}</div>
-            <div class="ac-meta-item">${t('metaPartner')} ${escapeHtml(partner ? partner.name : '—')}</div>
+            ${hidePartner ? '' : `<div class="ac-meta-item">${t('metaPartner')} ${escapeHtml(partner ? partner.name : '—')}</div>`}
+            ${!meeting && a.startDate ? `<div class="ac-meta-item">${t('metaDate')} ${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}
             <div class="ac-meta-item">${t('metaDate')} ${meeting ? t('meetingDateLabel') : t('dueLabel')}: ${fmtDate(a.dueDate)}${meeting && a.meetingTime ? ' — ' + fmtTime(a.meetingTime) : ''}</div>
             ${!meeting && getOwnerName(a) ? `<div class="ac-meta-item">${t('ownerLabel')}: ${ownerTag(a)}${isInternalOwned(a) ? ` · <span style="color:var(--ink-faint)">${t('internalOwnedNote')}</span>` : ''}</div>` : ''}
             ${!meeting && Array.isArray(a.dependsOnIds) && a.dependsOnIds.length > 0 ? `<div class="ac-meta-item">⛓ ${t('blockedByLabel')}: ${a.dependsOnIds.map(did => { const dt = state.actions.find(x=>x.id===did); return `<span class="badge" style="font-size:10px;margin-inline:2px">${escapeHtml(dt ? dt.title : '—')}</span>`; }).join(' ')}</div>` : ''}
@@ -4561,6 +4734,7 @@ function renderActionCard(a) {
           ${priorityBadge(a.priority)}
           ${isOpen(a) && delay > 0 ? `<span class="badge ${risk.cls}">${t('riskColon')} ${risk.label}</span>` : ''}
           ${joinMeetingBtn(a)}
+          ${showEdit ? `<button class="btn ghost sm" onclick="showActionForm('${a.id}')">${t('edit')}</button>` : ''}
         </div>
       </div>
       ${meeting && a.meetingNotes ? `<div class="ac-reason">🗒 ${escapeHtml(a.meetingNotes)}</div>` : ''}
@@ -5065,14 +5239,21 @@ views.partners = () => {
   if (filter !== 'all') list = list.filter(p => p.type === filter);
   if (search) list = list.filter(p => p.name.toLowerCase().includes(search) || (p.contact||'').toLowerCase().includes(search));
 
-  const sortKey = state.filters.partnerSortKey === 'commitment' ? 'commitment' : 'importance';
+  const PARTNER_SORT_KEYS = ['name', 'type', 'importance', 'commitment'];
+  const sortKey = PARTNER_SORT_KEYS.includes(state.filters.partnerSortKey) ? state.filters.partnerSortKey : 'importance';
   const sortDir = state.filters.partnerSortDir === 'asc' ? 'asc' : 'desc';
   const enriched = list.map(p => ({
     p,
     importance: getPartnerImportance(p.id),
     commitment: getPartnerCommitment(p.id)
   })).sort((a, b) => {
-    // null/not-rated scores always sort to the bottom
+    if (sortKey === 'name' || sortKey === 'type') {
+      const av = (sortKey === 'name' ? (a.p.name || '') : (a.p.type || '')).toString().toLowerCase();
+      const bv = (sortKey === 'name' ? (b.p.name || '') : (b.p.type || '')).toString().toLowerCase();
+      const cmp = av.localeCompare(bv);
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
+    // numeric scores (importance / commitment); null/not-rated always sort to the bottom
     const av = (sortKey === 'commitment' ? a.commitment.score : a.importance.score);
     const bv = (sortKey === 'commitment' ? b.commitment.score : b.importance.score);
     const aNull = (av === null || av === undefined), bNull = (bv === null || bv === undefined);
@@ -5081,8 +5262,11 @@ views.partners = () => {
     if (bNull) return -1;
     return sortDir === 'asc' ? av - bv : bv - av;
   });
-  const impArrow = sortKey === 'importance' ? (sortDir === 'asc' ? '▲' : '▼') : '';
-  const commitArrow = sortKey === 'commitment' ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  const partnerArrow = (k) => sortKey === k ? (sortDir === 'asc' ? '▲' : '▼') : '↕';
+  const nameArrow = partnerArrow('name');
+  const typeArrow = partnerArrow('type');
+  const impArrow = partnerArrow('importance');
+  const commitArrow = partnerArrow('commitment');
 
   return `
     ${backToDashBtn()}
@@ -5109,8 +5293,8 @@ views.partners = () => {
       <table>
         <thead>
           <tr>
-            <th>${t('colPartner')}</th>
-            <th>${t('colType')}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setPartnerSort('name')" title="${t('colPartner')}">${t('colPartner')} ${nameArrow}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setPartnerSort('type')" title="${t('colType')}">${t('colType')} ${typeArrow}</th>
             <th style="cursor:pointer;user-select:none" onclick="setPartnerSort('importance')" title="${t('colImportance')}">${t('colImportance')} ${impArrow}</th>
             <th>${t('colProjects')}</th>
             <th>${t('colActions')}</th>
@@ -5162,6 +5346,47 @@ views.projects = () => {
   else if (filter !== 'all') list = list.filter(p => (Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId]).includes(filter));
   if (search) list = list.filter(p => p.name.toLowerCase().includes(search));
 
+  // Column sorting: partner / start / target / focus (asc/desc); '' = original order
+  const PROJECT_SORT_KEYS = ['name', 'partner', 'start', 'target', 'focus'];
+  const projSortKey = PROJECT_SORT_KEYS.includes(state.filters.projectSortKey) ? state.filters.projectSortKey : '';
+  const projSortDir = state.filters.projectSortDir === 'asc' ? 'asc' : 'desc';
+  const projArrow = (k) => projSortKey === k ? (projSortDir === 'asc' ? '▲' : '▼') : '↕';
+  const projNameArrow = projArrow('name');
+  const projPartnerArrow = projArrow('partner');
+  const projStartArrow = projArrow('start');
+  const projTargetArrow = projArrow('target');
+  const projFocusArrow = projArrow('focus');
+  if (projSortKey) {
+    const dirM = projSortDir === 'asc' ? 1 : -1;
+    const partnerNameOf = (p) => {
+      if (p.internalProject) return '';
+      const ids = Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId];
+      const pa = getPartner(ids[0]);
+      return pa ? (pa.name || '') : '';
+    };
+    list = list.slice().sort((a, b) => {
+      if (projSortKey === 'name') {
+        return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()) * dirM;
+      }
+      if (projSortKey === 'partner') {
+        return partnerNameOf(a).toLowerCase().localeCompare(partnerNameOf(b).toLowerCase()) * dirM;
+      }
+      if (projSortKey === 'start' || projSortKey === 'target') {
+        const fld = projSortKey === 'start' ? 'startDate' : 'targetDate';
+        const av = a[fld] || '', bv = b[fld] || '';
+        if (!av && !bv) return 0;
+        if (!av) return 1;   // blanks always to the bottom
+        if (!bv) return -1;
+        return av.localeCompare(bv) * dirM;
+      }
+      // focus
+      const sa = getProjectScore(a.id), sb = getProjectScore(b.id);
+      const fa = (sa && sa.focus !== null && sa.focus !== undefined) ? sa.focus : -1;
+      const fb = (sb && sb.focus !== null && sb.focus !== undefined) ? sb.focus : -1;
+      return (fa - fb) * dirM;
+    });
+  }
+
   return `
     ${backToDashBtn()}
     <div class="page-head">
@@ -5184,13 +5409,13 @@ views.projects = () => {
       <table>
         <thead>
           <tr>
-            <th>${t('colProject')}</th>
-            <th>${t('colPartner')}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setProjectSort('name')" title="${t('colProject')}">${t('colProject')} ${projNameArrow}</th>
+            <th style="cursor:pointer;user-select:none" onclick="setProjectSort('partner')" title="${t('colPartner')}">${t('colPartner')} ${projPartnerArrow}</th>
             <th>${t('cardAgreement')}</th>
-            <th>${t('colStartDate')}</th>
-            <th>${t('colTargetDate')}</th>
+            <th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="setProjectSort('start')" title="${t('colStartDate')}">${t('colStartDate')} ${projStartArrow}</th>
+            <th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="setProjectSort('target')" title="${t('colTargetDate')}">${t('colTargetDate')} ${projTargetArrow}</th>
             <th>${t('colActions')}</th>
-            <th>${t('colAttachments')}</th>
+            <th class="th-focus-sort" style="cursor:pointer;user-select:none;white-space:nowrap" onclick="setProjectSort('focus')" title="${t('focusTooltip')}">${t('colFocus')} <span style="color:var(--accent-warm)">${projFocusArrow}</span></th>
             <th></th>
           </tr>
         </thead>
@@ -5219,7 +5444,7 @@ views.projects = () => {
               <td>${fmtDate(p.startDate)}</td>
               <td>${fmtDate(p.targetDate)}</td>
               <td>${completedActs}/${acts.length}</td>
-              <td>${attachCount > 0 ? `📎 ${attachCount}` : '—'}</td>
+              <td>${(() => { const sc = getProjectScore(p.id); if (!sc || sc.focus === null) return `<span class="sub">${t('notRatedLabel')}</span>`; return `<span class="badge ${focusBadgeClass(sc.focusLevel)}" style="white-space:nowrap" title="${t('focusTooltip')}">${focusLevelLabel(sc.focusLevel)} · ${sc.focus}</span>`; })()}</td>
               <td>
                 <div class="row-actions">
                   <button class="row-btn" onclick="viewProject('${p.id}')">${t('view')}</button>
@@ -5375,7 +5600,7 @@ views.projectDetail = (projectId) => {
         <button class="btn sm" onclick="showActionForm(null,'${p.id}')">${t('addAction')}</button>
       </div>
       ${open.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
-        open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(renderActionCard).join('')}
+        open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderActionCard(a, {showEdit:true})).join('')}
     </div>
 
     ${completed.length > 0 ? `
@@ -5410,9 +5635,9 @@ views.projectDetail = (projectId) => {
       ${projectMeetings.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noProjectMeetings')}</div></div>` : `
         <div class="table-wrap">
           <table>
-            <thead><tr><th>${t('colMeetingTopic')}</th><th>${t('colDate')}</th><th>${t('colStatus')}</th><th>${t('linkedToLabel')}</th><th></th></tr></thead>
+            <thead><tr><th>${t('colMeetingTopic')}</th><th style="cursor:pointer;user-select:none" onclick="setMeetingDueSort('project')" title="${t('colDate')}">${t('colDate')} ${state.filters.projMeetingSort==='asc'?'▲':'▼'}</th><th>${t('colStatus')}</th><th>${t('linkedToLabel')}</th><th></th></tr></thead>
             <tbody>
-              ${projectMeetings.sort((a,b)=>(b.dueDate||'').localeCompare(a.dueDate||'')).map(a => {
+              ${[...projectMeetings].sort((a,b)=>{const _c=(a.dueDate||'').localeCompare(b.dueDate||''); return state.filters.projMeetingSort==='asc' ? _c : -_c;}).map(a => {
                 const linkedTask = a.linkedTaskId ? state.actions.find(x => x.id === a.linkedTaskId && isTask(x)) : null;
                 return `<tr>
                   <td>
@@ -5430,12 +5655,22 @@ views.projectDetail = (projectId) => {
         </div>
       `}
     </div>
+
+    <!-- === NEW: Project Timeline (Gantt) — read-only, opt-in view === -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">${tlT('sectionTitle')}<span class="accent-line"></span></div>
+        <button id="tl-toggle-btn-${p.id}" class="btn ghost sm" onclick="toggleProjectTimeline('${p.id}')">${tlT('toggleShow')}</button>
+      </div>
+      <div id="tl-host-${p.id}" class="tl-print-host" style="display:none"></div>
+    </div>
   `;
 };
 
 views.actions = () => {
   const filter = state.filters.actionStatus || 'all';
   const projFilter = state.filters.actionProject || 'all';
+  const partnerFilter = state.filters.actionPartner || 'all';
   const period = state.filters.actionPeriod || 'all';
   const actionDate = state.filters.actionDate || todayDate();
   const includeMeetings = !!state.filters.includeMeetings;
@@ -5450,7 +5685,7 @@ views.actions = () => {
   if (filter === 'completed') list = list.filter(isCompleted);
   if (filter === 'overdue') list = list.filter(a => isOpen(a) && getDelayDays(a) > 0);
   if (filter === 'delayed') list = list.filter(a => isOpen(a) && getDelayDays(a) > DELAY_THRESHOLD_DAYS);
-  if (filter === 'critical') list = list.filter(a => isOpen(a) && getDelayDays(a) > 14);
+  if (filter === 'critical') list = list.filter(isCriticalRisk);
   if (filter === 'missed') list = list.filter(isMissed);
 
   // Period filter
@@ -5459,13 +5694,36 @@ views.actions = () => {
   }
 
   if (projFilter !== 'all') list = list.filter(a => a.projectId === projFilter);
+  if (partnerFilter === '__internal__') list = list.filter(a => a.ownerKind === 'internal');
+  else if (partnerFilter !== 'all') list = list.filter(a => getTaskStakeholderPartnerId(a) === partnerFilter);
   if (search) list = list.filter(a => a.title.toLowerCase().includes(search));
 
-  list = list.sort((a, b) => {
-    const aOpen = isOpen(a), bOpen = isOpen(b);
-    if (aOpen !== bOpen) return aOpen ? -1 : 1;
-    return getDelayDays(b) - getDelayDays(a);
-  });
+  // NEW: optional Partner/Project name sort (groups a partner's tasks together)
+  const actionSort = state.filters.actionSort || '';
+  if (actionSort === 'partnerAsc' || actionSort === 'partnerDesc') {
+    const dirM = actionSort === 'partnerAsc' ? 1 : -1;
+    const sortKeyOf = (x) => {
+      const sn = (getTaskStakeholderName(x) || '').toLowerCase();
+      const pr = getProject(x.projectId);
+      return sn + '\u0000' + (pr ? pr.name.toLowerCase() : '');
+    };
+    list = list.slice().sort((a, b) => {
+      const ka = sortKeyOf(a), kb = sortKeyOf(b);
+      if (ka !== kb) return ka < kb ? -dirM : dirM;
+      const aOpen = isOpen(a), bOpen = isOpen(b);
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      return getDelayDays(b) - getDelayDays(a);
+    });
+  } else if (actionSort === 'dueDateAsc' || actionSort === 'dueDateDesc') {
+    const dd = actionSort === 'dueDateDesc' ? -1 : 1;
+    list = list.slice().sort((a, b) => dd * ((a.dueDate || '').localeCompare(b.dueDate || '')));
+  } else {
+    list = list.sort((a, b) => {
+      const aOpen = isOpen(a), bOpen = isOpen(b);
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      return getDelayDays(b) - getDelayDays(a);
+    });
+  }
 
   // Period label for header
   let range = getReportPeriodRange(period, actionDate);
@@ -5494,7 +5752,7 @@ views.actions = () => {
       <button class="filter-chip ${filter==='open'?'active':''}" onclick="setFilter('actionStatus','open')">${t('filterOpenOrScheduled')}</button>
       <button class="filter-chip ${filter==='overdue'?'active':''}" onclick="setFilter('actionStatus','overdue')">⚠️ ${t('filterOverdue')}</button>
       <button class="filter-chip ${filter==='delayed'?'active':''}" onclick="setFilter('actionStatus','delayed')">${t('filterDelayed')}</button>
-      <button class="filter-chip ${filter==='critical'?'active':''}" onclick="setFilter('actionStatus','critical')">🔴 ${t('filterCritical')}</button>
+      <button class="filter-chip ${filter==='critical'?'active':''}" onclick="setFilter('actionStatus','critical')">🔴 ${t('filterCritical', getCriticalThreshold())}</button>
       <button class="filter-chip ${filter==='missed'?'active':''}" onclick="setFilter('actionStatus','missed')">${t('filterMissed')}</button>
       <button class="filter-chip ${filter==='completed'?'active':''}" onclick="setFilter('actionStatus','completed')">${t('filterCompleted')}</button>
       <input type="text" class="search-input" placeholder="${t('searching')}" value="${escapeHtml(search)}" oninput="setFilter('actionSearch', this.value)">
@@ -5504,6 +5762,11 @@ views.actions = () => {
       <select class="search-input" style="max-width:220px;min-width:180px" onchange="setFilter('actionProject', this.value)">
         <option value="all">📁 ${t('filterByProject')}</option>
         ${state.projects.map(p => `<option value="${p.id}" ${projFilter===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
+      </select>
+      <select class="search-input" style="max-width:220px;min-width:180px" onchange="setFilter('actionPartner', this.value)">
+        <option value="all">👤 ${t('allPartners')}</option>
+        <option value="__internal__" ${partnerFilter==='__internal__'?'selected':''}>${t('stakeholderInternal')}</option>
+        ${[...state.partners].sort((x,y)=>(x.name||'').localeCompare(y.name||'')).map(p => `<option value="${p.id}" ${partnerFilter===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>
       <select class="search-input" style="max-width:200px;min-width:160px" onchange="setActionPeriod(this.value)">
         <option value="all" ${period==='all'?'selected':''}>📅 ${t('actionsPeriodAll')}</option>
@@ -5518,10 +5781,17 @@ views.actions = () => {
         <input type="checkbox" ${includeMeetings?'checked':''} onchange="toggleIncludeMeetings(this.checked)">
         ${t('toggleIncludeMeetings')}
       </label>
+      <select class="search-input" style="max-width:240px;min-width:190px" onchange="setActionSort(this.value)" title="${t('taskSortLabel')}">
+        <option value="" ${actionSort===''?'selected':''}>↕ ${t('taskSortDefault')}</option>
+        <option value="partnerAsc" ${actionSort==='partnerAsc'?'selected':''}>${t('taskSortPartnerAZ')}</option>
+        <option value="partnerDesc" ${actionSort==='partnerDesc'?'selected':''}>${t('taskSortPartnerZA')}</option>
+        <option value="dueDateAsc" ${actionSort==='dueDateAsc'?'selected':''}>${t('taskSortDueAsc')}</option>
+        <option value="dueDateDesc" ${actionSort==='dueDateDesc'?'selected':''}>${t('taskSortDueDesc')}</option>
+      </select>
     </div>
 
     <div class="table-wrap">
-      ${list.length === 0 ? `<div class="empty"><div class="empty-icon">✓</div>${t('noActionsMatch')}</div>` : `
+      ${list.filter(a => !isMeeting(a)).length === 0 ? `<div class="empty"><div class="empty-icon">✓</div>${t('noActionsMatch')}</div>` : `
       <table>
         <thead>
           <tr>
@@ -5536,7 +5806,7 @@ views.actions = () => {
           </tr>
         </thead>
         <tbody>
-          ${list.map(a => {
+          ${list.filter(a => !isMeeting(a)).map(a => {
             const partner = getPartner(a.partnerId);
             const project = getProject(a.projectId);
             const delay = getDelayDays(a);
@@ -5572,6 +5842,54 @@ views.actions = () => {
         </tbody>
       </table>`}
     </div>
+    ${(state.filters.includeMeetings && list.some(isMeeting)) ? `
+    <div class="ext-meetings-section" style="margin-top:26px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="section-title">🗓 ${t('statMeetingsTotal')} (${list.filter(isMeeting).length})<span class="accent-line"></span></div>
+        <select class="search-input" style="max-width:240px;min-width:185px" onchange="setFilter('meetingSort', this.value)" title="${t('meetingSortLabel')}">
+          <option value="dateAsc" ${(state.filters.meetingSort||'dateAsc')==='dateAsc'?'selected':''}>📅 ${t('meetingSortDateAsc')}</option>
+          <option value="dateDesc" ${state.filters.meetingSort==='dateDesc'?'selected':''}>📅 ${t('meetingSortDateDesc')}</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>${t('colAgenda')}</th><th>${t('colPartnerProject')}</th><th>${t('colStatus')}</th>
+            <th>${t('colPriority')}</th><th>${t('colDate')}</th><th>${t('colDelay')}</th><th>${t('colRisk')}</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${[...list.filter(isMeeting)].sort((a,b)=>{const _d=(a.dueDate||'').localeCompare(b.dueDate||''); return state.filters.meetingSort==='dateDesc' ? -_d : _d;}).map(a => {
+              const project = getProject(a.projectId);
+              const delay = getDelayDays(a);
+              const risk = isOpen(a) ? getRiskLevel(delay) : null;
+              return `
+              <tr>
+                <td>
+                  <div class="name">🗓 ${escapeHtml(a.title)}</div>
+                  ${a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
+                </td>
+                <td>
+                  <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
+                  <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
+                </td>
+                <td>${statusBadge(a.status)}</td>
+                <td>${priorityBadge(a.priority)}</td>
+                <td>${fmtDate(a.dueDate)}</td>
+                <td>${delay > 0 && !isCompleted(a) ? t('daysShort', delay) : (isCompleted(a) && delay > 0 ? `<span style="color:var(--ink-faint)">+${delay}</span>` : '—')}</td>
+                <td>${risk ? `<span class="badge ${risk.cls}">${risk.label}</span>` : (isMissed(a) ? `<span class="badge dark">${t('statusMissed')}</span>` : '—')}</td>
+                <td>
+                  <div class="row-actions">
+                    ${isOpen(a) ? `<button class="row-btn" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}
+                    <button class="row-btn" onclick="showActionForm('${a.id}')">${t('edit')}</button>
+                    <button class="row-btn danger" onclick="deleteAction('${a.id}')">${t('delete')}</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
   `;
 };
 
@@ -5871,7 +6189,7 @@ views.partnerDetail = (partnerId) => {
   const importance = getPartnerImportance(partnerId);
   const commitment = getPartnerCommitment(partnerId);
   const projects = getPartnerProjects(partnerId);
-  const actions = getPartnerActions(partnerId);
+  const actions = getPartnerReportTasks(partnerId); // FIX: match Tasks-tab/report attribution (partnerId OR owned by partner's team member)
   const open = actions.filter(a => isTask(a) && isOpen(a));
   const completed = actions.filter(a => isTask(a) && isCompleted(a));
 
@@ -5971,7 +6289,7 @@ views.partnerDetail = (partnerId) => {
             <button class="btn sm" onclick="showActionForm(null,null,'${p.id}')">${t('addAction')}</button>
           </div>
           ${open.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
-            open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(renderActionCard).join('')}
+            open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderActionCard(a, {hidePartner:true, showEdit:true})).join('')}
         </div>
 
         ${completed.length > 0 ? `
@@ -5981,12 +6299,14 @@ views.partnerDetail = (partnerId) => {
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>${t('colAction')}</th><th>${t('colDate')}</th><th>${t('colCompletedDate')}</th><th>${t('colDelay')}</th></tr></thead>
+              <thead><tr><th>${t('colAction')}</th><th>${t('colProject')}</th><th>${t('colDate')}</th><th>${t('colCompletedDate')}</th><th>${t('colDelay')}</th></tr></thead>
               <tbody>
                 ${completed.slice(0, 8).map(a => {
                   const d = getDelayDays(a);
+                  const cProj = getProject(a.projectId);
                   return `<tr>
                     <td><div class="name">${escapeHtml(a.title)}</div></td>
+                    <td><span class="sub">📁 ${escapeHtml(cProj ? cProj.name : '—')}</span></td>
                     <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
                     <td>${fmtDate(a.completedDate)}</td>
                     <td>${d > 0 ? `<span class="badge ${d>DELAY_THRESHOLD_DAYS?'amber':'neutral'}">${t('daysShort', d)}</span>` : `<span class="badge green">${t('onTime')}</span>`}</td>
@@ -5996,6 +6316,37 @@ views.partnerDetail = (partnerId) => {
             </table>
           </div>
         </div>` : ''}
+
+        ${(() => {
+          const pMeetings = getPartnerMeetings(p.id);
+          const mdir = state.filters.partnerMeetingSort === 'asc' ? 'asc' : 'desc';
+          const sorted = [...pMeetings].sort((a,b)=>{const _c=(a.dueDate||'').localeCompare(b.dueDate||''); return mdir==='asc' ? _c : -_c;});
+          return `
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">${t('sectionPartnerMeetings')} (${pMeetings.length})<span class="accent-line"></span></div>
+          </div>
+          ${pMeetings.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noPartnerMeetings')}</div></div>` : `
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>${t('colMeetingTopic')}</th><th>${t('colProject')}</th><th>${t('colStatus')}</th><th style="cursor:pointer;user-select:none" onclick="setMeetingDueSort('partner')" title="${t('colDate')}">${t('colDate')} ${mdir==='asc'?'▲':'▼'}</th><th></th></tr></thead>
+                <tbody>
+                  ${sorted.map(a => {
+                    const mProj = getProject(a.projectId);
+                    return `<tr>
+                      <td><div class="name">🗓 ${escapeHtml(a.title)}</div>${a.participants ? `<div class="sub">👥 ${escapeHtml(a.participants)}</div>` : ''}</td>
+                      <td><span class="sub">📁 ${escapeHtml(mProj ? mProj.name : '—')}</span></td>
+                      <td>${statusBadge(a.status)}</td>
+                      <td>${fmtDate(a.dueDate)}${a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}</td>
+                      <td><div class="row-actions">${joinMeetingBtn(a)}<button class="row-btn" onclick="showActionForm('${a.id}')">${t('edit')}</button></div></td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>`;
+        })()}
       </div>
     </div>
   `;
@@ -6016,7 +6367,7 @@ function navigate(view, param) {
 // Dashboard drill-down: jump to the right view pre-filtered.
 window.goToTasksFiltered = function(filter) {
   if (filter === 'critical') {
-    // Critical Cases → Tasks tab with the "Critical (+14d)" filter applied
+    // Critical Cases → Tasks tab with the "Critical" filter applied (threshold from settings)
     state.filters.actionStatus = 'critical';
     state.filters.actionPeriod = 'all';
     navigate('actions');
@@ -6093,6 +6444,11 @@ const CFG_META = {
     delayPenaltyCap:    { ar: 'حد الخصم', en: 'Penalty cap', step: 1 },
     goodThreshold:      { ar: 'عتبة جيد', en: 'Good threshold', step: 1 },
     warnThreshold:      { ar: 'عتبة تحذير', en: 'Warn threshold', step: 1 }
+  },
+  risk: {
+    lowMax:    { ar: 'مخاطرة منخفضة – الحد الأقصى (أيام)', en: 'Low risk – max days (grace)', step: 1 },
+    mediumMax: { ar: 'مخاطرة متوسطة – الحد الأقصى (أيام)', en: 'Medium risk – max days', step: 1 },
+    highMax:   { ar: 'مخاطرة مرتفعة – الحد الأقصى (أيام)', en: 'High risk – max days', step: 1 }
   }
 };
 
@@ -6165,6 +6521,10 @@ const CFG_EXPLAIN = {
       Progress itself blends milestones and tasks (<code>milestone-weight</code> + <code>task-weight</code>, which should sum to 1). The penalty is <code>per-task points × overdue tasks</code>, capped. Good/Warn thresholds set the green/amber/red colour. Projects with no tasks <i>and</i> no milestones show “Not rated”.`,
     ar: `الصحة = <code>(وزن التقدم × التقدم) + (وزن الالتزام × الالتزام) − غرامة التأخير</code>.<br>
       والتقدم يمزج المراحل والمهام (<code>وزن المراحل</code> + <code>وزن المهام</code> ومجموعهما 1). والغرامة = <code>نقاط لكل مهمة × المهام المتأخرة</code> بحدّ أقصى. وتحدد عتبتا جيد/تحذير اللون. والمشاريع بلا مهام ولا مراحل تظهر «لم يُقيّم».`
+  },
+  risk: {
+    en: `Sets how many <b>business days late</b> a task may be before it escalates to the next risk level. The bands are contiguous: <b>Low</b> ≤ low-max, <b>Medium</b> ≤ medium-max, <b>High</b> ≤ high-max, and <b>Critical</b> = anything beyond high-max. These thresholds drive the colour-coded risk badges on tasks and in reports — they do not change any score, only how delays are flagged.`,
+    ar: `تحدد كم <b>يوم عمل تأخير</b> يُسمح به للمهمة قبل أن ترتفع لمستوى المخاطرة التالي. والنطاقات متتابعة: <b>منخفضة</b> ≤ الحد المنخفض، <b>متوسطة</b> ≤ الحد المتوسط، <b>مرتفعة</b> ≤ الحد المرتفع، و<b>حرجة</b> = أي تأخير يتجاوز الحد المرتفع. وتتحكم هذه العتبات في شارات المخاطرة الملوّنة على المهام والتقارير دون تغيير أي درجة.`
   }
 };
 
@@ -6210,6 +6570,7 @@ views.settings = () => {
     ${section('customerValueTier')}
     ${section('financial')}
     ${section('commitment')}
+    ${section('risk')}
     ${section('health')}
     <div style="display:flex;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="saveConfigForm()">${t('cfgSaveBtn')}</button>
@@ -6261,13 +6622,38 @@ function setFilter(key, value) {
 
 // Partners list: click a sortable column header to sort by it; clicking the active
 // column toggles asc/desc. Default is importance descending.
+function setMeetingDueSort(scope) {
+  const key = scope === 'partner' ? 'partnerMeetingSort' : 'projMeetingSort';
+  const cur = state.filters[key] === 'asc' ? 'asc' : 'desc';
+  state.filters[key] = cur === 'asc' ? 'desc' : 'asc';
+  render(state.detailParam);
+}
+function setProjectSort(key) {
+  const valid = ['name', 'partner', 'start', 'target', 'focus'];
+  if (!valid.includes(key)) return;
+  const currentKey = valid.includes(state.filters.projectSortKey) ? state.filters.projectSortKey : '';
+  if (currentKey === key) {
+    state.filters.projectSortDir = (state.filters.projectSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    state.filters.projectSortKey = key;
+    // dates & partner default ascending; focus defaults high→low
+    state.filters.projectSortDir = (key === 'focus') ? 'desc' : 'asc';
+  }
+  render(state.detailParam);
+}
+// Backward-compatible wrapper (Focus header previously called this)
+function toggleProjectFocusSort() { setProjectSort('focus'); }
+
 function setPartnerSort(key) {
-  const currentKey = state.filters.partnerSortKey === 'commitment' ? 'commitment' : 'importance';
+  const valid = ['name', 'type', 'importance', 'commitment'];
+  if (!valid.includes(key)) return;
+  const currentKey = valid.includes(state.filters.partnerSortKey) ? state.filters.partnerSortKey : 'importance';
   if (currentKey === key) {
     state.filters.partnerSortDir = (state.filters.partnerSortDir === 'asc') ? 'desc' : 'asc';
   } else {
     state.filters.partnerSortKey = key;
-    state.filters.partnerSortDir = 'desc';
+    // text columns default A→Z; score columns default high→low
+    state.filters.partnerSortDir = (key === 'name' || key === 'type') ? 'asc' : 'desc';
   }
   render(state.detailParam);
 }
@@ -6280,6 +6666,8 @@ function render(param) {
   } else if (view === 'projectDetail') {
     main.innerHTML = views.projectDetail(param || state.detailParam);
     setupDragDrop(param || state.detailParam);
+    // NEW: if the timeline was open before this re-render, restore it with fresh data
+    if (typeof window.tlRefreshIfOpen === 'function') window.tlRefreshIfOpen(param || state.detailParam);
   } else if (view === 'teamMemberDetail') {
     main.innerHTML = views.teamMemberDetail(param || state.detailParam);
   } else if (views[view]) {
@@ -7628,7 +8016,15 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .report-page {
         max-width: 900px; margin: 0 auto; padding: 36px 40px; background: #fff;
         margin-top: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        position: relative; z-index: 1;
       }
+      /* Centered SCE logo watermark — fixed so it repeats on every printed page,
+         sits behind the report content (page background is transparent). */
+      .report-watermark {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        pointer-events: none; z-index: 4;
+      }
+      .report-watermark img { width: 44%; max-width: 480px; height: auto; opacity: 0.10; }
       h1 { font-family: 'Reem Kufi', serif; font-size: 26px; margin: 0 0 6px;
            border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
       h2 { font-family: 'Reem Kufi', serif; font-size: 16px; color: var(--accent);
@@ -7738,6 +8134,8 @@ function buildReportHTML(title, bodyHTML, metadata) {
         .report-toolbar { display: none; }
         .no-print { display: none !important; }
         .report-page { box-shadow: none; padding: 12px; margin: 0; max-width: none; width: 100%; }
+        .report-watermark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .report-watermark img { opacity: 0.12; }
         .row-redflag { background: #fef2f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .warning-note-section { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         [contenteditable][data-placeholder]:empty::before { content: '' !important; }
@@ -7756,6 +8154,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
   ${baseStyles}
 </head>
 <body>
+  <div class="report-watermark"><img src="${SCE_LOGO}" alt=""></div>
   <div class="report-toolbar">
     <button onclick="window.print()">🖨 ${t('printReport').replace('🖨 ','')}</button>
     <button class="ghost" onclick="window.close()">${t('close')}</button>
@@ -7802,6 +8201,15 @@ function getStakeholderTag(a) {
   return { label: t('stakeholderUnassigned'), internal: null };
 }
 // NEW: stakeholder NAME for the tasks table column (owner's affiliation, not project partner)
+function getTaskStakeholderPartnerId(a) {
+  if (a.ownerKind === 'internal') return '__internal__';
+  if (a.ownerKind === 'partner') {
+    const pa = state.partners.find(pp => (pp.team || []).some(m => m.id === a.ownerId));
+    if (pa) return pa.id;
+  }
+  const proj = getProject(a.projectId);
+  return proj && proj.partnerId ? proj.partnerId : null;
+}
 function getTaskStakeholderName(a) {
   if (a.ownerKind === 'internal') return t('stakeholderInternal');
   if (a.ownerKind === 'partner') {
@@ -7979,6 +8387,11 @@ function printAllTasksReport(existingEntry) {
   const totalCompleted = filteredTasks.filter(isCompleted).length;
   const totalOpen = filteredTasks.filter(isOpen).length;
   const totalDelayed = filteredTasks.filter(a => isOpen(a) && getDelayDays(a) > 0).length;
+  const totalCritical = filteredTasks.filter(isCriticalRisk).length;
+  const avgDelayAll = getAvgDelay(filteredTasks);
+  const meetingsDone = filteredMeetings.filter(isCompleted).length;
+  const meetingsMissed = filteredMeetings.filter(isMissed).length;
+  const meetingsScheduled = filteredMeetings.length - meetingsDone - meetingsMissed;
 
   const projectsWithTasks = projects.filter(p =>
     getProjectActions(p.id).filter(shouldInclude).filter(a => !isMeeting(a)).length > 0
@@ -7995,7 +8408,12 @@ function printAllTasksReport(existingEntry) {
       <div class="stat-cell"><div class="v" style="color:var(--green)">${totalCompleted}</div><div class="l">${t('reportCompletedTasks')}</div></div>
       <div class="stat-cell"><div class="v" style="color:var(--amber)">${totalOpen}</div><div class="l">${t('reportOpenTasks')}</div></div>
       <div class="stat-cell"><div class="v" style="color:var(--red)">${totalDelayed}</div><div class="l">${t('reportDelayedTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--accent)">🗓 ${filteredMeetings.length}</div><div class="l">${t('statMeetingsTotal')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--crit)">${totalCritical}</div><div class="l">${t('reportCriticalTasks')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--accent-warm)">${avgDelayAll > 0 ? t('daysShort', avgDelayAll) : '—'}</div><div class="l">${t('reportAvgDelay')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--accent)">🗓 ${filteredMeetings.length}</div><div class="l">${t('reportTotalMeetings')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--green)">${meetingsDone}</div><div class="l">${t('reportMeetingsDone')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--amber)">${meetingsScheduled}</div><div class="l">${t('reportMeetingsScheduled')}</div></div>
+      <div class="stat-cell"><div class="v" style="color:var(--red)">${meetingsMissed}</div><div class="l">${t('reportMeetingsMissed')}</div></div>
     </div>
 
     <h2>${t('reportProjectHeader')}</h2>
@@ -8003,7 +8421,8 @@ function printAllTasksReport(existingEntry) {
       projectsWithTasks.map(p => {
         const allFiltered = getProjectActions(p.id).filter(shouldInclude);
         const tasks = allFiltered.filter(a => !isMeeting(a));
-        const meetingsCount = allFiltered.filter(isMeeting).length;
+        const projMeetings = allFiltered.filter(isMeeting);
+        const meetingsCount = projMeetings.length;
         const sorted = sortTasks(tasks);
         const partner = getPartner(p.partnerId);
         const compCount = tasks.filter(isCompleted).length;
@@ -8043,12 +8462,30 @@ function printAllTasksReport(existingEntry) {
                     <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${a.ownerKind==='internal'?'#e8f0e8':'#faf0e0'};color:${a.ownerKind==='internal'?'#4a7c59':'#c47e2a'}">${stakeholder}</span></td>
                     <td>${statusPill(a)}</td>
                     <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999;margin-bottom:2px">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
-                    <td>${delay > 0 ? `<span style="color:${isLate && delay>DELAY_THRESHOLD_DAYS?'var(--red)':'var(--amber)'};font-weight:${isLate?'500':'normal'}">${t('daysShort', delay)}</span>` : '—'}</td>
+                    <td>${(() => { const _r = (isOpen(a) && delay > 0) ? getRiskLevel(delay) : null; const _days = delay > 0 ? `<span style="color:${isLate && delay>DELAY_THRESHOLD_DAYS?'var(--red)':'var(--amber)'};font-weight:${isLate?'500':'normal'}">${t('daysShort', delay)}</span>` : '—'; const _badge = _r ? ` <span class="badge-mini ${_r.cls}">${_r.label}</span>` : ''; return _days + _badge; })()}</td>
                   </tr>`;
                 }).join('')}
               </tbody>
             </table>
             `}
+            ${projMeetings.length > 0 ? `
+            <div style="margin-top:14px;font-weight:500;color:var(--accent-warm);font-size:12px">🗓 ${t('statMeetingsTotal')} (${projMeetings.length})</div>
+            <table class="rt" style="margin-top:6px;background:#fff">
+              <thead><tr>
+                <th>${t('colAgenda')}</th>
+                <th>${t('colStakeholder')}</th>
+                <th>${t('colStatus')}</th>
+                <th>${t('colDate')}</th>
+              </tr></thead>
+              <tbody>
+                ${[...projMeetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => `<tr>
+                  <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
+                  <td>${escapeHtml(partner ? partner.name : '—')}</td>
+                  <td>${statusPill(m)}</td>
+                  <td>${fmtDate(m.dueDate)}${m.meetingTime ? ` · ${fmtTime(m.meetingTime)}` : ''}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>` : ''}
           </div>
         `;
       }).join('')
@@ -8823,46 +9260,1162 @@ async function resetData() {
   navigate('dashboard');
 }
 
-/* ========== INIT ========== */
+/* ============================================================ */
+/* === NEW: Project Timeline (Gantt) feature — isolated JS  === */
+/* Self-contained. Does not touch any existing function, state, */
+/* localStorage key, or translation table. All identifiers      */
+/* prefixed with tl/_tl to avoid collisions.                    */
+/* ============================================================ */
+(function tlModule() {
+  // ----- Self-contained bilingual labels (does NOT modify existing T.ar / T.en) -----
+  const _tlStrings = {
+    ar: {
+      sectionTitle: '📊 المخطط الزمني للمشروع',
+      toggleShow: '📊 عرض المخطط الزمني',
+      toggleHide: '📊 إخفاء المخطط الزمني',
+      scaleLabel: 'المقياس:',
+      scaleDaily: 'يومي',
+      scaleWeekly: 'أسبوعي',
+      scaleMonthly: 'شهري',
+      exportSVG: '⬇ تصدير SVG',
+      exportPDF: '🖨 تصدير PDF',
+      fullscreen: '⛶ ملء الشاشة',
+      exitFullscreen: '⤢ إنهاء ملء الشاشة',
+      noTasks: 'لا توجد مهام لعرضها في المخطط الزمني',
+      today: 'اليوم',
+      internalTeam: 'الفريق الداخلي',
+      noPartner: 'بدون شريك',
+      legendStatus: 'الحالة',
+      legendPartners: 'الشركاء / الفرق',
+      statusCompleted: 'مكتمل',
+      statusDelayed: 'متأخر',
+      statusOnTrack: 'في الموعد',
+      statusMilestone: 'معلم',
+      legendCritical: 'المسار الحرج',
+      tooltipDates: 'من {0} إلى {1}',
+      tooltipDelay: 'تأخير: {0} يوم',
+      tooltipMilestone: 'معلم',
+      printTitle: 'المخطط الزمني — {0}'
+    },
+    en: {
+      sectionTitle: '📊 Project Timeline',
+      toggleShow: '📊 Show Timeline',
+      toggleHide: '📊 Hide Timeline',
+      scaleLabel: 'Scale:',
+      scaleDaily: 'Daily',
+      scaleWeekly: 'Weekly',
+      scaleMonthly: 'Monthly',
+      exportSVG: '⬇ Export SVG',
+      exportPDF: '🖨 Export PDF',
+      fullscreen: '⛶ Full screen',
+      exitFullscreen: '⤢ Exit full screen',
+      noTasks: 'No tasks to display in timeline',
+      today: 'Today',
+      internalTeam: 'Internal team',
+      noPartner: 'No partner',
+      legendStatus: 'Status',
+      legendPartners: 'Partners / Teams',
+      statusCompleted: 'Completed',
+      statusDelayed: 'Delayed',
+      statusOnTrack: 'On track',
+      statusMilestone: 'Milestone',
+      legendCritical: 'Critical path',
+      tooltipDates: 'From {0} to {1}',
+      tooltipDelay: 'Delay: {0} days',
+      tooltipMilestone: 'Milestone',
+      printTitle: 'Timeline — {0}'
+    }
+  };
+  function tlT(key, ...args) {
+    const lang = (typeof currentLang !== 'undefined' && _tlStrings[currentLang]) ? currentLang : 'en';
+    let s = (_tlStrings[lang] && _tlStrings[lang][key]) || _tlStrings.en[key] || key;
+    if (args.length) s = s.replace(/\{(\d+)\}/g, (_, i) => args[i] !== undefined ? args[i] : '');
+    return s;
+  }
+  // Expose tlT so the inline projectDetail template can use it
+  window.tlT = tlT;
+
+  // ----- Cache (per-project rendered SVG) -----
+  // Key = projectId; Value = { scale, lang, html, fp }
+  const _tlCache = {};
+  // Per-project today-line X position (for auto-scroll-to-today on mount)
+  const _tlTodayX = {};
+
+  // ----- Palette for PARTNERS / TEAMS -----
+  // Deliberately chosen to be visually distinct from the STATUS colors
+  // (status = navy #1a3a52, red #b04540, crit #7a2d2a, green #4a7c59, purple #8b5cf6).
+  // No greenish hues here, so a partner stripe is never confused with the
+  // "Completed" green status fill.
+  const _tlPartnerPalette = [
+    '#2563eb', // blue
+    '#ea7317', // orange
+    '#c026d3', // magenta
+    '#4338ca', // indigo
+    '#0e7490', // dark cyan (blue-leaning, not green)
+    '#a16207', // amber-brown
+    '#be123c', // rose
+    '#7c3aed'  // violet
+  ];
+  const _TL_INTERNAL_COLOR = '#eab308'; // gold — clearly distinct from navy On-track and all other hues
+  const _TL_NO_PARTNER_COLOR = '#94a3b8'; // cool grey
+
+  function _tlHashIndex(str, modulo) {
+    if (!str) return 0;
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return Math.abs(h) % modulo;
+  }
+
+  // Summarize a long title: keep whole words up to maxLen, append an ellipsis.
+  // Works for both Latin and Arabic text (splits on whitespace).
+  function _tlSummarize(text, maxLen) {
+    text = (text || '').trim();
+    if (text.length <= maxLen) return text;
+    const words = text.split(/\s+/);
+    let out = '';
+    for (const w of words) {
+      const candidate = out ? out + ' ' + w : w;
+      if (candidate.length > maxLen) break;
+      out = candidate;
+    }
+    if (!out) out = text.slice(0, maxLen); // single very long word
+    return out.replace(/[\s.,;:،]+$/, '') + '…';
+  }
+
+  // Assign partner colors by STABLE ORDER within the project (not by hash) so
+  // two different partners can never collide on the same swatch. The map is
+  // rebuilt per render via _tlAssignPartnerColors(); _tlPartnerColorMap holds it.
+  let _tlPartnerColorMap = {};
+  function _tlAssignPartnerColors(tasks) {
+    _tlPartnerColorMap = {};
+    let next = 0;
+    // Deterministic order: by first appearance among sorted task ids
+    const keys = [];
+    tasks.forEach(t => {
+      const k = _tlStakeholderKey(t);
+      if (k === '__internal__' || k === '__none__') return;
+      if (!keys.includes(k)) keys.push(k);
+    });
+    // Sort keys for stable assignment across re-renders
+    keys.sort();
+    keys.forEach(k => {
+      _tlPartnerColorMap[k] = _tlPartnerPalette[next % _tlPartnerPalette.length];
+      next++;
+    });
+  }
+
+  // Resolve the true stakeholder of a task. Mirrors the app's own
+  // getTaskStakeholderPartnerId(): internal-owned → '__internal__',
+  // partner-owned → that partner's id (by team membership),
+  // otherwise → the project's primary partner id (or '__none__').
+  function _tlStakeholderKey(task) {
+    if (task.ownerKind === 'internal') return '__internal__';
+    if (typeof getTaskStakeholderPartnerId === 'function') {
+      const id = getTaskStakeholderPartnerId(task);
+      return id || '__none__';
+    }
+    // Fallback if helper unavailable
+    if (task.partnerId) return task.partnerId;
+    return '__none__';
+  }
+
+  // Human-readable stakeholder label for legend + tooltip.
+  function _tlStakeholderLabel(task) {
+    const key = _tlStakeholderKey(task);
+    if (key === '__internal__') return tlT('internalTeam');
+    if (key === '__none__') return tlT('noPartner');
+    const partner = (typeof getPartner === 'function') ? getPartner(key) : null;
+    return partner ? partner.name : tlT('noPartner');
+  }
+
+  // Determine the "stripe" color for a task based on its stakeholder.
+  // Uses the per-render color map so Internal / Waad / Vlora each get a
+  // distinct color that never overlaps the status palette.
+  function _tlStripeColor(task) {
+    const key = _tlStakeholderKey(task);
+    if (key === '__internal__') return _TL_INTERNAL_COLOR;
+    if (key === '__none__') return _TL_NO_PARTNER_COLOR;
+    if (_tlPartnerColorMap[key]) return _tlPartnerColorMap[key];
+    // Fallback (shouldn't happen if _tlAssignPartnerColors ran)
+    return _tlPartnerPalette[_tlHashIndex(key, _tlPartnerPalette.length)];
+  }
+
+  // Fill color for the bar based on status.
+  function _tlFillColor(task) {
+    if (typeof isCompleted === 'function' && isCompleted(task)) return '#4a7c59'; // green
+    if (typeof isMissed === 'function' && isMissed(task))      return '#7a2d2a'; // crit
+    // Open
+    if (typeof getDelayDays === 'function' && getDelayDays(task) > 0) {
+      // Use the dynamic risk threshold (mirrors isCriticalRisk).
+      if (typeof isCriticalRisk === 'function' && isCriticalRisk(task)) return '#7a2d2a'; // critical
+      return '#b04540'; // red — delayed but not critical
+    }
+    return '#1a3a52'; // accent (on-track)
+  }
+
+  // Status key (for legend mapping + tooltip label)
+  function _tlStatusKey(task) {
+    if (isCompleted(task)) return 'completed';
+    if (isMissed(task)) return 'delayed';
+    if (getDelayDays(task) > 0) return 'delayed';
+    return 'onTrack';
+  }
+
+  // ----- Date helpers -----
+  function _tlParseISO(s) {
+    if (!s) return null;
+    // Treat as midnight local; avoids TZ shifts that would jitter the bars.
+    const d = new Date(s + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function _tlISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function _tlAddDays(d, n) {
+    const r = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    return r;
+  }
+  function _tlDayDiff(a, b) {
+    // Whole-day diff (b - a), ignoring DST. a, b are Date at midnight local.
+    return Math.round((b - a) / 86400000);
+  }
+  function _tlFmtShort(d) {
+    // Localized "MMM dd" — uses current lang locale; falls back to en-US.
+    const locale = (typeof currentLang !== 'undefined' && currentLang === 'ar') ? 'ar' : 'en-US';
+    try {
+      return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return _tlISO(d);
+    }
+  }
+  function _tlFmtMonth(d) {
+    const locale = (typeof currentLang !== 'undefined' && currentLang === 'ar') ? 'ar' : 'en-US';
+    try {
+      return d.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
+    } catch (e) {
+      return _tlISO(d).slice(0, 7);
+    }
+  }
+
+  // Pick a task's effective start date. If missing, derive as dueDate-7d.
+  function _tlEffectiveStart(task) {
+    const s = _tlParseISO(task.startDate);
+    if (s) return s;
+    const d = _tlParseISO(task.dueDate);
+    if (d) return _tlAddDays(d, -7);
+    return null;
+  }
+  function _tlEffectiveEnd(task) {
+    return _tlParseISO(task.dueDate);
+  }
+
+  // Escape for SVG text (single quotes inside attributes safe; <>&)
+  function _tlEscSvg(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Track which projects currently have the timeline expanded, so that after
+  // an edit triggers a full re-render of projectDetail we can transparently
+  // restore the open timeline with fresh data.
+  const _tlOpenState = {};
+
+  // ----- Public toggler — wired to the toggle button in projectDetail -----
+  window.toggleProjectTimeline = function(projectId) {
+    const host = document.getElementById('tl-host-' + projectId);
+    const btn  = document.getElementById('tl-toggle-btn-' + projectId);
+    if (!host) return;
+    const isHidden = host.style.display === 'none' || host.style.display === '';
+    if (isHidden) {
+      _tlEnsureRendered(projectId);
+      host.style.display = 'block';
+      if (btn) btn.textContent = tlT('toggleHide');
+      _tlOpenState[projectId] = true;
+    } else {
+      host.style.display = 'none';
+      if (btn) btn.textContent = tlT('toggleShow');
+      _tlOpenState[projectId] = false;
+    }
+  };
+
+  // Called by views.projectDetail on (re)mount. If the timeline was open before
+  // a re-render (e.g. after editing a task's dates), restore it with fresh data
+  // so changes reflect instantly. No-op if it wasn't open.
+  window.tlRefreshIfOpen = function(projectId) {
+    if (!_tlOpenState[projectId]) return;
+    // Defer to next tick so the host element exists in the DOM
+    setTimeout(() => {
+      const host = document.getElementById('tl-host-' + projectId);
+      const btn  = document.getElementById('tl-toggle-btn-' + projectId);
+      if (!host) return;
+      _tlEnsureRendered(projectId);   // fingerprint will pick up any data change
+      host.style.display = 'block';
+      if (btn) btn.textContent = tlT('toggleHide');
+    }, 0);
+  };
+
+  // Build a lightweight fingerprint of the project's task data so the cache
+  // automatically invalidates whenever any relevant field changes (dates,
+  // title, status, owner, dependencies, milestone flag). This guarantees the
+  // timeline reflects edits instantly without touching existing save/render code.
+  function _tlDataFingerprint(projectId) {
+    const acts = (typeof getProjectActions === 'function') ? getProjectActions(projectId) : [];
+    const tasks = acts.filter(a => !isMeeting(a));
+    const parts = tasks.map(a => [
+      a.id,
+      a.startDate || '',
+      a.dueDate || '',
+      a.status || '',
+      a.completedDate || '',
+      a.ownerKind || '',
+      a.ownerId || '',
+      a.isMilestone ? 1 : 0,
+      (Array.isArray(a.dependsOnIds) ? a.dependsOnIds.join('|') : ''),
+      // title can be a {ar,en} object or string — stringify defensively
+      (typeof a.title === 'object' ? JSON.stringify(a.title) : (a.title || ''))
+    ].join(':'));
+    parts.sort();
+    return parts.join('~') + '#' + tasks.length;
+  }
+
+  function _tlEnsureRendered(projectId, forceScale) {
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    const cached = _tlCache[projectId];
+    const lang = (typeof currentLang !== 'undefined') ? currentLang : 'en';
+    const scale = forceScale || (cached && cached.scale) || 'weekly';
+    const fp = _tlDataFingerprint(projectId);
+    // Reuse cache only if scale, language AND the underlying data are unchanged
+    if (cached && cached.scale === scale && cached.lang === lang && cached.fp === fp) {
+      host.innerHTML = cached.html;
+      _tlScrollToToday(projectId, host);
+      return;
+    }
+    const html = _tlBuildHTML(projectId, scale);
+    _tlCache[projectId] = { scale, lang, html, fp };
+    host.innerHTML = html;
+    _tlScrollToToday(projectId, host);
+  }
+
+  // Scroll the timeline container so today's line is comfortably visible
+  // (centered when possible). Respects RTL by measuring from the correct edge.
+  function _tlScrollToToday(projectId, host) {
+    const info = _tlTodayX[projectId];
+    if (!info || info.x == null) return;
+    const container = host.querySelector('.tl-container');
+    if (!container) return;
+    // Defer until layout is known
+    setTimeout(() => {
+      const visW = container.clientWidth || 600;
+      // Center today in the viewport, clamped to valid scroll range.
+      let target = info.x - visW / 2;
+      const maxScroll = (info.totalW || container.scrollWidth) - visW;
+      if (target < 0) target = 0;
+      if (maxScroll > 0 && target > maxScroll) target = maxScroll;
+      // The container is forced LTR internally (time flows left→right) so
+      // scrollLeft is a normal positive offset in both UI directions.
+      container.scrollLeft = target;
+    }, 0);
+  }
+
+  // ----- Public scale switcher (called from scale buttons) -----
+  window.tlSwitchScale = function(projectId, scale) {
+    _tlEnsureRendered(projectId, scale);
+  };
+
+  // ----- Build the entire timeline UI HTML for a project -----
+  function _tlBuildHTML(projectId, scale) {
+    // Collect tasks (incl. milestones), excluding meetings.
+    const allActions = (typeof getProjectActions === 'function') ? getProjectActions(projectId) : [];
+    const tasks = allActions.filter(a => !isMeeting(a));
+    const proj = (typeof getProject === 'function') ? getProject(projectId) : null;
+    const projName = proj && proj.name ? proj.name : '';
+
+    // Assign distinct partner/team colors for this project (stable order, no status overlap).
+    _tlAssignPartnerColors(tasks);
+
+    // Toolbar (always present)
+    const toolbar = _tlBuildToolbar(projectId, scale);
+
+    if (tasks.length === 0) {
+      return `<div class="tl-wrap">${toolbar}<div class="tl-empty">${_tlEscSvg(tlT('noTasks'))}</div></div>`;
+    }
+
+    // Compute date range
+    let minD = null, maxD = null;
+    tasks.forEach(task => {
+      const s = _tlEffectiveStart(task);
+      const e = _tlEffectiveEnd(task) || s;
+      if (s && (!minD || s < minD)) minD = s;
+      if (e && (!maxD || e > maxD)) maxD = e;
+    });
+    if (!minD || !maxD) {
+      return `<div class="tl-wrap">${toolbar}<div class="tl-empty">${_tlEscSvg(tlT('noTasks'))}</div></div>`;
+    }
+    // Scale → px/day (needed before we compute padding)
+    const pxPerDay = scale === 'daily' ? 32 : scale === 'monthly' ? 4 : 12;
+
+    // Add padding on both sides. The amount is scale-aware so the today flag,
+    // milestone diamonds, and axis labels always have room and never get clipped.
+    if (scale === 'monthly') {
+      // Snap to whole months: start at the 1st of minD's month, end at the
+      // last day of maxD's month + one extra month of breathing room. This keeps
+      // month labels aligned and prevents the final milestone from spilling off.
+      minD = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0); // +2 months end-of-month
+    } else if (scale === 'weekly') {
+      minD = _tlAddDays(minD, -7);
+      maxD = _tlAddDays(maxD, 10);
+    } else { // daily
+      minD = _tlAddDays(minD, -2);
+      maxD = _tlAddDays(maxD, 4);
+    }
+    const totalDays = Math.max(1, _tlDayDiff(minD, maxD) + 1);
+
+    const labelW = 240;
+    const titleH = 40;          // title band at the very top (project name + date)
+    const headerH = 44;         // time-axis header
+    const rowH = 30;
+    const rowPad = 2;
+    // Reserve a small right margin inside the chart so the last bar/milestone/
+    // today-flag never touches the SVG edge.
+    const RIGHT_MARGIN = 24;
+    const chartW = totalDays * pxPerDay + RIGHT_MARGIN;
+    const totalW = labelW + chartW;
+    const chartH = tasks.length * rowH + rowPad * 2;
+
+    // ----- Compute legend rows (status + distinct stakeholders) FIRST so we can
+    // reserve vertical space for an embedded legend at the bottom of the SVG. -----
+    // Does any task depend on another task that is also in this project? If so a
+    // critical path will be highlighted, so the legend should explain it.
+    const _hasInProjectDeps = (function() {
+      const ids = new Set(tasks.map(t => t.id));
+      return tasks.some(t => Array.isArray(t.dependsOnIds) && t.dependsOnIds.some(d => ids.has(d)));
+    })();
+    const legendData = _tlComputeLegend(tasks, _hasInProjectDeps);
+    // Layout the legend in columns within totalW; estimate the height needed.
+    const legendPadTop = 14;
+    const legendTitleH = 18;
+    const legendItemH = 20;
+    const statusRows = legendData.status.length;
+    const partnerRows = legendData.partners.length;
+    const legendBodyH = Math.max(statusRows, partnerRows) * legendItemH;
+    const legendH = legendPadTop + legendTitleH + legendBodyH + 12;
+
+    // Total SVG height = title + axis header + chart + legend
+    const chartTop = titleH + headerH;
+    const totalH = titleH + headerH + chartH + legendH;
+    const legendTop = titleH + headerH + chartH;
+
+    // ----- RTL support -----
+    // When the UI is Arabic, the whole timeline flips horizontally: label panel
+    // moves to the right, time flows right→left, today flag & legend right-align.
+    // We keep the math LTR and mirror x-coordinates through MX(). Text anchors
+    // are flipped so labels stay upright and readable.
+    const rtl = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+    const MX = (x) => rtl ? (totalW - x) : x;            // mirror an x position
+    const flipAnchor = (a) => !rtl ? a : (a === 'start' ? 'end' : a === 'end' ? 'start' : a);
+    // A mirrored rect needs its left edge recomputed: MX(x) gives the mirrored
+    // position of x; for a rect of width w spanning [x, x+w], the mirrored left
+    // edge is MX(x+w) = totalW-(x+w). Helper returns the mirrored x for a rect.
+    const MRect = (x, w) => rtl ? (totalW - x - w) : x;
+
+    // Sort tasks by effective start ascending (then due ascending).
+    // Milestones are points in time, so they sort by their due date.
+    const _sortKey = (x) => {
+      const mile = (typeof isMilestone === 'function') && isMilestone(x);
+      if (mile) return _tlEffectiveEnd(x) || _tlEffectiveStart(x);
+      return _tlEffectiveStart(x);
+    };
+    const sortedTasks = [...tasks].sort((a, b) => {
+      const sa = _sortKey(a), sb = _sortKey(b);
+      if (sa && sb && sa - sb !== 0) return sa - sb;
+      const da = _tlEffectiveEnd(a), db = _tlEffectiveEnd(b);
+      if (da && db) return da - db;
+      return 0;
+    });
+
+    // Build a lookup of task → row index for arrows
+    const rowOf = {};
+    sortedTasks.forEach((t, i) => { rowOf[t.id] = i; });
+
+    // ----- SVG defs (arrowhead markers: normal + critical) -----
+    let defs = `
+      <defs>
+        <marker id="tl-arrow-${projectId}" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+        </marker>
+        <marker id="tl-arrow-crit-${projectId}" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7.5" markerHeight="7.5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#b04540"/>
+        </marker>
+      </defs>`;
+
+    // ----- Critical path (CPM) -----
+    // Find the longest dependency chain by duration. Edges run predecessor→successor
+    // (a task's dependsOnIds list its predecessors). We compute, for each task, the
+    // longest cumulative duration ending at it, then walk back from the task with the
+    // greatest total to mark every edge on that chain as "critical".
+    const _critEdges = new Set();   // keys "predId>succId"
+    const _critNodes = new Set();   // task ids on the critical path
+    (function computeCriticalPath() {
+      const byId = {};
+      sortedTasks.forEach(t => { byId[t.id] = t; });
+      const durOf = (t) => {
+        const s = _tlEffectiveStart(t), e = _tlEffectiveEnd(t) || s;
+        if (!s || !e) return 1;
+        return Math.max(1, _tlDayDiff(s, e) + 1);
+      };
+      // Memoized longest-path-ending-at(taskId) over in-project predecessors.
+      const memoLen = {};   // taskId → cumulative duration
+      const memoPrev = {};  // taskId → predecessor id on the best chain (or null)
+      const visiting = {};
+      function longestTo(id) {
+        if (memoLen[id] !== undefined) return memoLen[id];
+        if (visiting[id]) return 0; // guard against cycles
+        visiting[id] = true;
+        const t = byId[id];
+        const deps = (t && Array.isArray(t.dependsOnIds)) ? t.dependsOnIds : [];
+        let best = 0, bestPrev = null;
+        deps.forEach(pid => {
+          if (!byId[pid]) return; // predecessor not in this project
+          const cand = longestTo(pid);
+          if (cand > best) { best = cand; bestPrev = pid; }
+        });
+        visiting[id] = false;
+        memoPrev[id] = bestPrev;
+        memoLen[id] = best + durOf(t);
+        return memoLen[id];
+      }
+      let endId = null, endLen = -1;
+      sortedTasks.forEach(t => {
+        const L = longestTo(t.id);
+        if (L > endLen) { endLen = L; endId = t.id; }
+      });
+      // A meaningful critical path needs at least one edge.
+      let cur = endId, hops = 0;
+      while (cur != null) {
+        _critNodes.add(cur);
+        const prev = memoPrev[cur];
+        if (prev != null) { _critEdges.add(prev + '>' + cur); hops++; }
+        cur = prev;
+      }
+      if (hops === 0) { _critNodes.clear(); } // no dependencies → nothing to highlight
+    })();
+
+    // ----- Title band (project name + generated date) -----
+    const genDate = _tlISO(new Date());
+    const titleNameX = rtl ? (totalW - 14) : 14;
+    const titleDateX = rtl ? 12 : (totalW - 12);
+    let titleBand =
+      `<rect x="0" y="0" width="${totalW}" height="${titleH}" fill="#1a3a52"/>` +
+      `<text x="${titleNameX}" y="${titleH/2 + 5}" font-size="15" font-weight="700" fill="#ffffff" text-anchor="${rtl ? 'end' : 'start'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(tlT('printTitle', projName))}</text>` +
+      `<text x="${titleDateX}" y="${titleH/2 + 4}" font-size="10" fill="#c9d3df" text-anchor="${rtl ? 'start' : 'end'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(genDate)}</text>`;
+
+    // Header: time axis labels + vertical grid lines
+    let header = '';
+    let grid = '';
+    const xForDate = (d) => labelW + _tlDayDiff(minD, d) * pxPerDay;
+
+    if (scale === 'daily') {
+      const stepLabel = pxPerDay >= 28 ? 1 : 2;
+      for (let i = 0; i <= totalDays; i++) {
+        const d = _tlAddDays(minD, i);
+        const x = MX(labelW + i * pxPerDay);
+        const isWeekStart = d.getDay() === 0;
+        grid += `<line x1="${x}" y1="${chartTop}" x2="${x}" y2="${legendTop}" stroke="${isWeekStart ? '#d4d0c4' : '#eee9da'}" stroke-width="1"/>`;
+        if (i % stepLabel === 0 && i < totalDays) {
+          header += `<text x="${MX(labelW + i * pxPerDay) + (rtl ? -2 : 2)}" y="${chartTop - 8}" font-size="10" fill="#5a6478" text-anchor="${rtl ? 'end' : 'start'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(_tlFmtShort(d))}</text>`;
+        }
+      }
+    } else if (scale === 'weekly') {
+      let cursor = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate() - minD.getDay());
+      while (cursor <= maxD) {
+        if (cursor >= minD) {
+          const x = MX(xForDate(cursor));
+          grid += `<line x1="${x}" y1="${chartTop}" x2="${x}" y2="${legendTop}" stroke="#d4d0c4" stroke-width="1"/>`;
+          header += `<text x="${x + (rtl ? -4 : 4)}" y="${chartTop - 8}" font-size="10" fill="#5a6478" text-anchor="${rtl ? 'end' : 'start'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(_tlFmtShort(cursor))}</text>`;
+        }
+        cursor = _tlAddDays(cursor, 7);
+      }
+    } else { // monthly
+      let cursor = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      while (cursor <= maxD) {
+        if (cursor >= minD) {
+          const x = MX(xForDate(cursor));
+          grid += `<line x1="${x}" y1="${chartTop}" x2="${x}" y2="${legendTop}" stroke="#d4d0c4" stroke-width="1"/>`;
+          header += `<text x="${x + (rtl ? -4 : 4)}" y="${chartTop - 8}" font-size="10" fill="#5a6478" text-anchor="${rtl ? 'end' : 'start'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(_tlFmtMonth(cursor))}</text>`;
+        }
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      }
+    }
+
+    // Label panel background + separators (panel flips to the right in RTL)
+    const panelX = rtl ? (totalW - labelW) : 0;
+    const panelLineX = rtl ? (totalW - labelW) : labelW;
+    const panelBg =
+      `<rect x="${panelX}" y="${chartTop}" width="${labelW}" height="${chartH}" fill="#faf8f3"/>` +
+      `<line x1="${panelLineX}" y1="${chartTop}" x2="${panelLineX}" y2="${legendTop}" stroke="#c8c2b0" stroke-width="1"/>` +
+      `<line x1="0" y1="${chartTop}" x2="${totalW}" y2="${chartTop}" stroke="#c8c2b0" stroke-width="1"/>`;
+
+    // Rows: bars + labels + tooltips
+    const STRIPE_W = 8; // thicker, clearly visible partner stripe
+    let rows = '';
+    sortedTasks.forEach((task, i) => {
+      const rowY = chartTop + i * rowH;
+      if (i % 2 === 1) {
+        // Banding covers the chart area (the side opposite the label panel)
+        const bandX = rtl ? 0 : labelW;
+        rows += `<rect x="${bandX}" y="${rowY}" width="${chartW}" height="${rowH}" fill="#fcfaf5"/>`;
+      }
+
+      const s = _tlEffectiveStart(task);
+      const e = _tlEffectiveEnd(task) || s;
+      if (!s) return;
+
+      const x1 = xForDate(s);
+      const x2 = xForDate(_tlAddDays(e, 1));
+      const baseX = Math.min(x1, x2);
+      const barW = Math.max(3, Math.abs(x2 - x1));
+      const barX = MRect(baseX, barW);   // mirrored left edge in RTL
+      const barY = rowY + 5;
+      const barH = rowH - 10;
+
+      const stripeColor = _tlStripeColor(task);
+      const fill = _tlFillColor(task);
+      const isMile = (typeof isMilestone === 'function') && isMilestone(task);
+      const stakeholderLabel = _tlStakeholderLabel(task);
+      const delay = (typeof getDelayDays === 'function') ? getDelayDays(task) : 0;
+      const startStr = s ? _tlISO(s) : '—';
+      const endStr   = e ? _tlISO(e) : '—';
+
+      const titleForTip = (typeof task.title === 'object'
+        ? (task.title[currentLang] || task.title.ar || task.title.en || '')
+        : (task.title || ''));
+      const tipLines = [
+        titleForTip,
+        tlT('tooltipDates', startStr, endStr),
+        (isOpen(task) && delay > 0) ? tlT('tooltipDelay', delay) : '',
+        stakeholderLabel,
+        isMile ? tlT('tooltipMilestone') : ''
+      ].filter(Boolean).join('\n');
+
+      // Label panel text — summarized at a word boundary when too long.
+      const labelText = titleForTip;
+      const labelTrunc = _tlSummarize(labelText, 34);
+      // In RTL the label panel sits on the right; text right-aligns to panel inner edge.
+      const labelAnchorX = rtl ? (totalW - 10) : 10;
+      const labelTextAnchor = rtl ? 'end' : 'start';
+      const milePrefix = isMile ? '🎯 ' : '';
+      rows += `<text x="${labelAnchorX}" y="${rowY + rowH/2 + 4}" font-size="11" fill="#1a1f2e" text-anchor="${labelTextAnchor}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(milePrefix + labelTrunc)}<title>${_tlEscSvg(labelText)}</title></text>`;
+      // Stakeholder color chip near the outer edge of the label panel
+      const chipX = rtl ? (totalW - 16) : (labelW - 16);
+      rows += `<rect x="${chipX}" y="${rowY + rowH/2 - 6}" width="8" height="12" fill="${stripeColor}" rx="1"><title>${_tlEscSvg(stakeholderLabel)}</title></rect>`;
+
+      const onCrit = _critNodes.has(task.id);
+
+      if (isMile) {
+        // A milestone is a point in time — anchor the diamond at its due date.
+        const mDate = _tlEffectiveEnd(task) || _tlEffectiveStart(task) || s;
+        const cx = MX(xForDate(mDate));
+        const cy = rowY + rowH / 2;
+        const r = Math.min(barH / 2 + 1, 8);
+        rows += `<g><title>${_tlEscSvg(tipLines)}</title>`;
+        // Critical-path halo behind the diamond
+        if (onCrit) rows += `<polygon points="${cx},${cy-r-3} ${cx+r+3},${cy} ${cx},${cy+r+3} ${cx-r-3},${cy}" fill="none" stroke="#b04540" stroke-width="2"/>`;
+        rows += `<polygon points="${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}" fill="#8b5cf6" stroke="${stripeColor}" stroke-width="2.5"/>`;
+        rows += `</g>`;
+      } else {
+        rows += `<g><title>${_tlEscSvg(tipLines)}</title>`;
+        // Status fill
+        rows += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" fill="${fill}" rx="3" ry="3"/>`;
+        // Partner stripe on the START edge of the bar (right edge in RTL, left in LTR)
+        const stripeW = Math.min(STRIPE_W, barW);
+        const stripeX = rtl ? (barX + barW - stripeW) : barX;
+        rows += `<rect x="${stripeX}" y="${barY}" width="${stripeW}" height="${barH}" fill="${stripeColor}"/>`;
+        // Thin rounded cap over the stripe for a clean edge
+        const capX = rtl ? (barX + barW - 3) : barX;
+        rows += `<rect x="${capX}" y="${barY}" width="3" height="${barH}" fill="${stripeColor}" rx="2" ry="2"/>`;
+        // Critical-path outline around the whole bar
+        if (onCrit) rows += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" fill="none" stroke="#b04540" stroke-width="2" rx="3" ry="3"/>`;
+        rows += `</g>`;
+      }
+    });
+
+    // Dependency arrows (FS): predecessor start-side → successor end-side.
+    // dependsOnIds on the SUCCESSOR list its predecessors.
+    let arrows = '';
+    sortedTasks.forEach((task) => {
+      const deps = Array.isArray(task.dependsOnIds) ? task.dependsOnIds : [];
+      if (deps.length === 0) return;
+      const succRow = rowOf[task.id];
+      if (succRow == null) return;
+      const succIsMile = (typeof isMilestone === 'function') && isMilestone(task);
+      // Anchor the arrow exactly where the successor is DRAWN:
+      //  - milestone: the diamond sits at (effEnd || effStart); aim at its left vertex
+      //  - task bar: aim at the bar's start (left) edge
+      let succLeftRaw;
+      if (succIsMile) {
+        const mEnd = _tlEffectiveEnd(task) || _tlEffectiveStart(task);
+        if (!mEnd) return;
+        succLeftRaw = xForDate(mEnd) - 9; // diamond left vertex (radius ~8)
+      } else {
+        const succStart = _tlEffectiveStart(task);
+        if (!succStart) return;
+        succLeftRaw = xForDate(succStart);
+      }
+      const succY = chartTop + succRow * rowH + rowH / 2;
+      deps.forEach(depId => {
+        const predRow = rowOf[depId];
+        if (predRow == null) return; // predecessor not in THIS project — skip
+        const pred = sortedTasks[predRow];
+        const predEnd = _tlEffectiveEnd(pred) || _tlEffectiveStart(pred);
+        if (!predEnd) return;
+        const predRightRaw = xForDate(_tlAddDays(predEnd, 1));
+        const predY = chartTop + predRow * rowH + rowH / 2;
+
+        // Finish-to-Start connector. Built entirely in LTR space (x increases to
+        // the right), then every x mirrored via MX() for RTL. The arrowhead ALWAYS
+        // enters the successor's start edge travelling left→right, so it always
+        // points into the bar — never backwards.
+        const ELBOW = 14;                 // how far the line steps before turning
+        const tipX  = succLeftRaw;        // arrowhead tip = successor start edge
+        const approachX = tipX - ELBOW;   // last vertical sits one elbow left of the bar
+        let pts;  // sequence of [x,y] points in LTR space
+        if (predRightRaw <= approachX) {
+          // Normal case: predecessor finishes left of the approach column.
+          //   finish → right to approach column → vertical to succ row → into tip
+          pts = [
+            [predRightRaw, predY],
+            [approachX, predY],
+            [approachX, succY],
+            [tipX, succY]
+          ];
+        } else {
+          // Predecessor finishes to the RIGHT of the successor's approach column
+          // (bars overlap, or dependency runs counter to time). Route cleanly:
+          //   finish → small stub right → vertical to a mid channel between rows
+          //   → left to the approach column → vertical to succ row → into tip
+          const stubX = predRightRaw + ELBOW;
+          const midY  = (predRow < succRow)
+            ? (chartTop + succRow * rowH)            // channel just above successor row
+            : (chartTop + succRow * rowH + rowH);    // channel just below successor row
+          pts = [
+            [predRightRaw, predY],
+            [stubX, predY],
+            [stubX, midY],
+            [approachX, midY],
+            [approachX, succY],
+            [tipX, succY]
+          ];
+        }
+        // Emit path with mirrored x-coordinates.
+        let d = '';
+        pts.forEach((pt, idx) => { d += (idx === 0 ? 'M ' : 'L ') + MX(pt[0]) + ' ' + pt[1] + ' '; });
+        const isCrit = _critEdges.has(depId + '>' + task.id);
+        if (isCrit) {
+          arrows += `<path d="${d.trim()}" fill="none" stroke="#b04540" stroke-width="2.4" marker-end="url(#tl-arrow-crit-${projectId})" opacity="0.95"/>`;
+        } else {
+          arrows += `<path d="${d.trim()}" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#tl-arrow-${projectId})" opacity="0.85"/>`;
+        }
+      });
+    });
+
+    // Today line — prominent: a soft highlight band for today's column plus a
+    // bold dashed line and a labelled flag so "today" stands out at any scale.
+    let todayLine = '';
+    let todayScrollX = null;
+    const today = new Date();
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (todayMid >= minD && todayMid <= maxD) {
+      const colXraw = xForDate(todayMid);
+      const txRaw = colXraw + pxPerDay / 2;
+      const tx = MX(txRaw);
+      todayScrollX = tx; // mirrored position used for auto-scroll
+      // Highlight band over today's day column (subtle warm tint)
+      const bandX = MRect(colXraw, Math.max(pxPerDay, 2));
+      todayLine += `<rect x="${bandX}" y="${chartTop}" width="${Math.max(pxPerDay, 2)}" height="${legendTop - chartTop}" fill="#b04540" opacity="0.06"/>`;
+      // Bold dashed vertical line
+      todayLine += `<line x1="${tx}" y1="${chartTop}" x2="${tx}" y2="${legendTop}" stroke="#b04540" stroke-width="2" stroke-dasharray="5,3"/>`;
+      // Flag label at the top of the line
+      const flagW = (currentLang === 'ar') ? 54 : 46;
+      todayLine += `<rect x="${tx - flagW/2}" y="${chartTop - 16}" width="${flagW}" height="15" rx="3" fill="#b04540"/>`;
+      todayLine += `<text x="${tx}" y="${chartTop - 5}" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(tlT('today'))}</text>`;
+    }
+
+    // Stash today's (mirrored) X so the container can auto-scroll to center it.
+    _tlTodayX[projectId] = { x: todayScrollX, totalW: totalW, labelW: labelW };
+
+    // ----- Embedded legend (drawn inside the SVG so exports are self-contained) -----
+    const legendSvg = _tlBuildLegendSvg(legendData, legendTop, totalW, {
+      padTop: legendPadTop, titleH: legendTitleH, itemH: legendItemH
+    });
+
+    // Compose SVG. White rect behind everything is omitted to keep background
+    // transparent for SVG export; the on-screen container provides white via CSS.
+    const svg =
+      `<svg class="tl-svg" xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">` +
+      defs +
+      titleBand +
+      panelBg +
+      grid +
+      header +
+      rows +
+      arrows +
+      todayLine +
+      legendSvg +
+      `</svg>`;
+
+    // The legend now lives inside the SVG, so the HTML wrapper just holds the toolbar + scrollable SVG.
+    return `<div class="tl-wrap">${toolbar}<div class="tl-container">${svg}</div></div>`;
+  }
+
+  // Compute legend data: status entries (always 4) + distinct stakeholders present.
+  function _tlComputeLegend(tasks, hasCriticalPath) {
+    const status = [
+      { color: '#1a3a52', label: tlT('statusOnTrack') },
+      { color: '#b04540', label: tlT('statusDelayed') },
+      { color: '#4a7c59', label: tlT('statusCompleted') },
+      { color: '#8b5cf6', label: tlT('statusMilestone'), diamond: true }
+    ];
+    if (hasCriticalPath) {
+      status.push({ color: '#b04540', label: tlT('legendCritical'), critLine: true });
+    }
+    const seen = new Set();
+    const partners = [];
+    tasks.forEach(task => {
+      const key = _tlStakeholderKey(task);
+      if (seen.has(key)) return;
+      seen.add(key);
+      partners.push({ color: _tlStripeColor(task), label: _tlStakeholderLabel(task) });
+    });
+    return { status, partners };
+  }
+
+  // Render the legend as SVG (two columns: Status | Partners/Teams).
+  function _tlBuildLegendSvg(legendData, top, totalW, dims) {
+    const { padTop, titleH, itemH } = dims;
+    const rtl = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+    const maxRows = Math.max(legendData.status.length, legendData.partners.length);
+    const bgH = padTop + titleH + maxRows * itemH + 12;
+    // Column anchor positions. In RTL, columns are laid out from the right.
+    const swatchW = 16, gap = 22;
+    const col1Anchor = rtl ? (totalW - 14) : 14;                    // Status column
+    const col2Anchor = rtl ? Math.floor(totalW * 0.58) : Math.max(220, Math.floor(totalW * 0.42)); // Partners column
+    const textAnchor = rtl ? 'end' : 'start';
+    let out = '';
+    // Separator line + background band
+    out += `<line x1="0" y1="${top}" x2="${totalW}" y2="${top}" stroke="#c8c2b0" stroke-width="1"/>`;
+    out += `<rect x="0" y="${top}" width="${totalW}" height="${bgH}" fill="#faf8f3"/>`;
+    // Column titles
+    const titleY = top + padTop + 10;
+    out += `<text x="${col1Anchor}" y="${titleY}" font-size="10" font-weight="700" fill="#1a1f2e" letter-spacing="0.5" text-anchor="${textAnchor}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(tlT('legendStatus').toUpperCase())}</text>`;
+    out += `<text x="${col2Anchor}" y="${titleY}" font-size="10" font-weight="700" fill="#1a1f2e" letter-spacing="0.5" text-anchor="${textAnchor}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(tlT('legendPartners').toUpperCase())}</text>`;
+    // Helper to place a swatch + label respecting direction
+    const emitItem = (anchorX, y, it) => {
+      let s = '';
+      if (rtl) {
+        // swatch sits to the right of the anchor edge; text right-aligns inside
+        const swX = anchorX - swatchW;
+        s += _tlLegendSwatchSvg(swX, y, it.color, it.diamond, it.critLine);
+        s += `<text x="${swX - 6}" y="${y + 4}" font-size="11" fill="#5a6478" text-anchor="end" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(it.label)}</text>`;
+      } else {
+        s += _tlLegendSwatchSvg(anchorX, y, it.color, it.diamond, it.critLine);
+        s += `<text x="${anchorX + gap}" y="${y + 4}" font-size="11" fill="#5a6478" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(it.label)}</text>`;
+      }
+      return s;
+    };
+    legendData.status.forEach((it, i) => {
+      const y = titleY + titleH + i * itemH;
+      out += emitItem(col1Anchor, y, it);
+    });
+    legendData.partners.forEach((it, i) => {
+      const y = titleY + titleH + i * itemH;
+      out += emitItem(col2Anchor, y, it);
+    });
+    return out;
+  }
+  function _tlLegendSwatchSvg(x, y, color, diamond, critLine) {
+    if (critLine) {
+      // a short thick red line with a small arrowhead
+      return `<line x1="${x}" y1="${y}" x2="${x+13}" y2="${y}" stroke="${color}" stroke-width="2.4"/>` +
+             `<polygon points="${x+13},${y-3} ${x+16},${y} ${x+13},${y+3}" fill="${color}"/>`;
+    }
+    if (diamond) {
+      const cx = x + 7, cy = y, r = 6;
+      return `<polygon points="${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}" fill="${color}"/>`;
+    }
+    return `<rect x="${x}" y="${y - 6}" width="16" height="12" rx="2" fill="${color}" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>`;
+  }
+
+  function _tlBuildToolbar(projectId, scale) {
+    const sBtn = (k, lbl) => `<button class="tl-scale-btn ${scale === k ? 'active' : ''}" onclick="tlSwitchScale('${projectId}','${k}')">${_tlEscSvg(lbl)}</button>`;
+    return `
+      <div class="tl-toolbar">
+        <span class="tl-label">${_tlEscSvg(tlT('scaleLabel'))}</span>
+        <div class="tl-scale-group">
+          ${sBtn('daily', tlT('scaleDaily'))}
+          ${sBtn('weekly', tlT('scaleWeekly'))}
+          ${sBtn('monthly', tlT('scaleMonthly'))}
+        </div>
+        <span class="tl-spacer"></span>
+        <button class="tl-export-btn" onclick="toggleTimelineFullscreen('${projectId}')">${_tlEscSvg(tlT('fullscreen'))}</button>
+        <button class="tl-export-btn" onclick="exportTimelineAsSVG('${projectId}')">${_tlEscSvg(tlT('exportSVG'))}</button>
+        <button class="tl-export-btn" onclick="exportTimelineAsPDF('${projectId}')">${_tlEscSvg(tlT('exportPDF'))}</button>
+      </div>`;
+  }
+
+  // ----- Full-screen view -----
+  // Expands the timeline host to cover the viewport for better clarity.
+  // Uses the native Fullscreen API when available, with a CSS-overlay fallback.
+  // Re-renders on enter/exit so the chart re-fits and auto-scrolls to today.
+  window.toggleTimelineFullscreen = function(projectId) {
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    const isFs = host.classList.contains('tl-host-fullscreen');
+    if (isFs) {
+      _tlExitFullscreen(host, projectId);
+    } else {
+      _tlEnterFullscreen(host, projectId);
+    }
+  };
+
+  function _tlEnterFullscreen(host, projectId) {
+    host.classList.add('tl-host-fullscreen');
+    document.body.classList.add('tl-fs-active');
+    // Make sure it's visible (it might be toggled open already, but be safe).
+    host.style.display = 'block';
+    _tlOpenState[projectId] = true;
+    // Update the toolbar button label after (re)render.
+    _tlEnsureRendered(projectId);
+    _tlUpdateFsButton(projectId, true);
+    // Try the native Fullscreen API for a true OS-level full screen.
+    try {
+      if (host.requestFullscreen) {
+        host.requestFullscreen().catch(() => {});
+      } else if (host.webkitRequestFullscreen) {
+        host.webkitRequestFullscreen();
+      }
+    } catch (e) {}
+    // ESC handling for the CSS-overlay fallback (native FS handles ESC itself).
+    _tlFsEscHandler = (ev) => { if (ev.key === 'Escape') _tlExitFullscreen(host, projectId); };
+    document.addEventListener('keydown', _tlFsEscHandler);
+    // Keep button label in sync if the user exits native FS via ESC/browser UI.
+    _tlFsChangeHandler = () => {
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!fsEl && host.classList.contains('tl-host-fullscreen')) {
+        // Native FS ended but our overlay class is still on → fully exit.
+        _tlExitFullscreen(host, projectId);
+      }
+    };
+    document.addEventListener('fullscreenchange', _tlFsChangeHandler);
+    document.addEventListener('webkitfullscreenchange', _tlFsChangeHandler);
+  }
+
+  function _tlExitFullscreen(host, projectId) {
+    host.classList.remove('tl-host-fullscreen');
+    document.body.classList.remove('tl-fs-active');
+    if (_tlFsEscHandler) { document.removeEventListener('keydown', _tlFsEscHandler); _tlFsEscHandler = null; }
+    if (_tlFsChangeHandler) {
+      document.removeEventListener('fullscreenchange', _tlFsChangeHandler);
+      document.removeEventListener('webkitfullscreenchange', _tlFsChangeHandler);
+      _tlFsChangeHandler = null;
+    }
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    } catch (e) {}
+    _tlEnsureRendered(projectId);   // re-fit back to inline size
+    _tlUpdateFsButton(projectId, false);
+  }
+
+  // Swap the fullscreen button label between "Full screen" / "Exit full screen".
+  function _tlUpdateFsButton(projectId, isFs) {
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    const btns = host.querySelectorAll('.tl-export-btn');
+    btns.forEach(b => {
+      const txt = b.textContent || '';
+      if (txt.indexOf('⛶') >= 0 || txt.indexOf('⤢') >= 0) {
+        b.textContent = isFs ? tlT('exitFullscreen') : tlT('fullscreen');
+      }
+    });
+  }
+  let _tlFsEscHandler = null;
+  let _tlFsChangeHandler = null;
+
+  // ----- Standalone SVG export (transparent background) -----
+  window.exportTimelineAsSVG = function(projectId) {
+    // Ensure rendered with the current scale
+    _tlEnsureRendered(projectId);
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    const svgEl = host.querySelector('svg.tl-svg');
+    if (!svgEl) return;
+    // Clone and inline a tiny stylesheet so the SVG renders standalone with all fonts/colors baked in
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    const serialized = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', serialized], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const proj = (typeof getProject === 'function') ? getProject(projectId) : null;
+    const safe = (proj && proj.name ? proj.name : 'project').replace(/[^A-Za-z0-9_\u0600-\u06FF-]+/g, '_').slice(0, 60);
+    link.href = url;
+    link.download = `timeline-${safe}-${_tlISO(new Date())}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  // ----- PDF export via a dedicated print window (reliable, isolated) -----
+  // Rather than trying to hide the whole app via CSS ancestry (fragile because
+  // the timeline host is deeply nested), we open a clean window containing only
+  // the timeline SVG and invoke the browser's print dialog there. "Save as PDF"
+  // in that dialog produces the PDF. This does not touch the main document.
+  window.exportTimelineAsPDF = function(projectId) {
+    _tlEnsureRendered(projectId);
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    const svgEl = host.querySelector('svg.tl-svg');
+    if (!svgEl) return;
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    const svgMarkup = new XMLSerializer().serializeToString(clone);
+    const proj = (typeof getProject === 'function') ? getProject(projectId) : null;
+    const projName = proj && proj.name ? proj.name : 'Project';
+    const rtl = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      // Pop-up blocked → fall back to same-window print of just the SVG.
+      _tlPrintInline(host);
+      return;
+    }
+    w.document.open();
+    w.document.write(
+      '<!DOCTYPE html><html dir="' + (rtl ? 'rtl' : 'ltr') + '"><head><meta charset="utf-8">' +
+      '<title>' + _tlEscSvg(tlT('printTitle', projName)) + '</title>' +
+      '<style>' +
+      '@page { size: landscape; margin: 12mm; }' +
+      'html,body { margin:0; padding:0; background:#fff; }' +
+      '.wrap { padding: 8px; }' +
+      'svg { width: 100%; height: auto; }' +
+      '@media print { .noprint { display:none !important; } }' +
+      '.noprint { text-align:center; padding:10px; font-family:system-ui,Arial,sans-serif; }' +
+      '.noprint button { font-size:14px; padding:8px 18px; cursor:pointer; border:1px solid #1a3a52; background:#1a3a52; color:#fff; border-radius:6px; }' +
+      '</style></head><body>' +
+      '<div class="noprint"><button onclick="window.print()">' + (rtl ? 'طباعة / حفظ PDF' : 'Print / Save as PDF') + '</button></div>' +
+      '<div class="wrap">' + svgMarkup + '</div>' +
+      '</body></html>'
+    );
+    w.document.close();
+    // Give the new window a moment to lay out the SVG, then open print dialog.
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 350);
+  };
+
+  // Fallback: print just the timeline within the current document (used only
+  // if the print window was blocked). Uses the tl-printing body class.
+  function _tlPrintInline(host) {
+    const wasHidden = host.style.display === 'none' || host.style.display === '';
+    if (wasHidden) host.style.display = 'block';
+    document.body.classList.add('tl-printing');
+    const cleanup = () => {
+      document.body.classList.remove('tl-printing');
+      if (wasHidden) host.style.display = 'none';
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(() => window.print(), 50);
+  }
+})();
+/* === END NEW Timeline JS === */
+
+
+
 (async function init() {
   applyLangToDocument();
-  // Load from Supabase (primary) with localStorage fallback. Awaited before any rendering.
-  await loadState();
-  // First run (no data in the cloud and no local cache) → seed sample data, then push to cloud.
-  if (!state.partners || state.partners.length === 0) {
-    loadSampleData();
-    // apply startDate migration to seed tasks
-    state.actions.forEach(a => {
-      if (a.type !== 'meeting' && !a.startDate) {
-        const proj = state.projects.find(pr => pr.id === a.projectId);
-        if (proj && proj.startDate) a.startDate = proj.startDate;
-        else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
-        else a.startDate = todayDate();
+
+  // Helper: never let an awaited cloud call hang the whole app.
+  const withTimeout = (promise, ms, label) => Promise.race([
+    Promise.resolve(promise).catch(e => { console.error(label + ' failed:', e); return undefined; }),
+    new Promise(resolve => setTimeout(() => { console.warn(label + ' timed out — using local data'); resolve(undefined); }, ms))
+  ]);
+
+  // Synchronously seed/normalize sample data when there's nothing loaded yet.
+  const seedIfEmpty = () => {
+    if (state.partners && state.partners.length) return false;
+    try {
+      loadSampleData();
+      state.actions.forEach(a => {
+        if (a.type !== 'meeting' && !a.startDate) {
+          const proj = state.projects.find(pr => pr.id === a.projectId);
+          if (proj && proj.startDate) a.startDate = proj.startDate;
+          else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
+          else a.startDate = todayDate();
+        }
+      });
+      state.projects.forEach(pr => {
+        if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
+        if (!pr.engagementModel) pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
+        if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
+          pr.revenueCertainty = ['joint-venture','own-strategic','own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
+        }
+      });
+      migrateProjectsToContributions();
+      return true;
+    } catch (e) { console.error('Seed failed:', e); return false; }
+  };
+
+  // 1) Try a FAST local load first so the UI can paint immediately.
+  try { loadStateFromLocalStorage(); } catch (e) {}
+  ['partners','team','projects','actions','reports'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
+  const seededNow = seedIfEmpty();
+
+  // 2) Paint the UI right away — never leave the page blank.
+  try { state.currentView = 'dashboard'; } catch (e) {}
+  try { migrateBilingualContent(); } catch (e) {}
+  try { renderSidebar(); } catch (e) { console.error('renderSidebar failed:', e); }
+  try { render(); } catch (e) { console.error('render failed:', e); }
+
+  // 3) In the background, reconcile with the cloud (bounded), then re-render if
+  //    the cloud returned newer data. Never blocks or blanks the UI.
+  (async () => {
+    try {
+      const hadCloud = await withTimeout(loadState(), 8000, 'loadState');
+      // If cloud had nothing and we just seeded locally, push the seed up.
+      if (state.partners && state.partners.length === 0) {
+        if (seedIfEmpty()) await withTimeout(saveState(), 8000, 'saveState');
+      } else if (seededNow && hadCloud) {
+        // Cloud actually had data; our seed was premature — cloud already applied.
       }
-    });
-    // normalize seed projects (engagement model, revenue certainty, SAR currency)
-    state.projects.forEach(pr => {
-      if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
-      if (!pr.engagementModel) {
-        pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
-      }
-      if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
-        pr.revenueCertainty = ['joint-venture', 'own-strategic', 'own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
-      }
-    });
-    migrateProjectsToContributions();
-    await saveState(); // seed the cloud database (and local cache)
-  }
-  state.currentView = 'dashboard';
-  migrateBilingualContent(); // backfill dual-language title/name slots
-  await loadConfig(); // apply shared importance-configuration (Supabase, with localStorage cache)
-  renderSidebar();
-  render();
-  // Heal any broken/missing auto-translations for the current language on load (best-effort, online).
-  applyContentLanguage(currentLang);
-  // Schedule daily notification check (also runs immediately)
-  sendDailyNotification(false);
-  setInterval(() => sendDailyNotification(false), 60 * 60 * 1000); // re-check hourly while tab open
+      try { migrateBilingualContent(); } catch (e) {}
+      await withTimeout(loadConfig(), 8000, 'loadConfig');
+      // Re-render with reconciled data.
+      try { renderSidebar(); } catch (e) {}
+      try { render(); } catch (e) {}
+      try { applyContentLanguage(currentLang); } catch (e) {}
+    } catch (e) {
+      console.error('Background cloud sync failed (UI already shown):', e);
+    }
+  })();
+
+  // Daily notifications (best-effort).
+  try {
+    sendDailyNotification(false);
+    setInterval(() => sendDailyNotification(false), 60 * 60 * 1000);
+  } catch (e) {}
 })();
 
 // Fast cross-device sync: re-pull cloud data when the tab regains focus / becomes visible,
