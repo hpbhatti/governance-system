@@ -1306,7 +1306,7 @@ function invalidateCache() {
 // Project values from Supabase → Settings → API.
 // NOTE: the JS client needs the BASE project URL only — NOT the REST endpoint (no "/rest/v1/").
 const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
+const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd'.trim();
 // Expected schema (run once in the Supabase SQL editor):
 //   create table partners      (id text primary key, data jsonb);
 //   create table internal_team (id text primary key, data jsonb);
