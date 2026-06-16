@@ -1270,38 +1270,40 @@
 /* ========== STATE & STORAGE ========== */
 const STORE_KEY = 'governance_data_v1';
 
-/* ========== CLIENT-SIDE CACHE (TTL) ==========
-   Egress optimisation: the cloud tables are only re-fetched when the locally
-   cached copy is older than CACHE_TTL_MS, or when a fetch is explicitly forced
-   (e.g. right after the user saves a change). This eliminates the redundant
-   full-table downloads that previously happened on every page load and on every
-   tab focus / visibility change. The cached payload itself lives in STORE_KEY
-   (written by saveStateToLocalStorage); here we only track WHEN it was fetched. */
-const CACHE_META_KEY = 'governance_cache_meta_v1';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+/* ========== PER-TABLE SYNC METADATA (egress-minimising cache) ==========
+   We track a per-table version stamp instead of one global TTL. The cloud keeps
+   ONE tiny row (config / id='sync_meta') mapping each table -> last_updated (ms).
+   A sync first fetches just those stamps, then downloads ONLY the tables whose
+   stamp changed. Unchanged tables reuse the local cache => zero egress. Writes
+   upsert ONLY the tables flagged dirty. */
+const SYNC_META_ID = 'sync_meta';            // row id inside the existing `config` table
+const SYNC_LOCAL_KEY = 'governance_sync_v2'; // local mirror of stamps / hashes / offline queue
 
-// Timestamp (ms) of the last successful cloud fetch, 0 if never / unknown.
-function getCacheTimestamp() {
-  try {
-    const raw = localStorage.getItem(CACHE_META_KEY);
-    if (!raw) return 0;
-    const meta = JSON.parse(raw);
-    return (meta && typeof meta.lastFetched === 'number') ? meta.lastFetched : 0;
-  } catch (e) { return 0; }
+function _defaultSyncMeta(){ return { everSynced:false, tableTs:{}, cloudTs:{}, syncedHash:{}, dirty:[], pendingDeletes:{} }; }
+let syncMeta = (function(){ try { const raw = localStorage.getItem(SYNC_LOCAL_KEY); if (raw){ return Object.assign(_defaultSyncMeta(), JSON.parse(raw)); } } catch(e){} return _defaultSyncMeta(); })();
+let dirtyTables = new Set(Array.isArray(syncMeta.dirty) ? syncMeta.dirty : []);
+let pendingDeletes = syncMeta.pendingDeletes || {};
+function persistSyncMeta(){ syncMeta.dirty = Array.from(dirtyTables); syncMeta.pendingDeletes = pendingDeletes; try { localStorage.setItem(SYNC_LOCAL_KEY, JSON.stringify(syncMeta)); } catch(e){} }
+// Tiny stable content hash (djb2-xor) used to detect which tables changed locally.
+function quickHash(str){ let h = 5381; for (let i=0;i<str.length;i++){ h = ((h<<5)+h) ^ str.charCodeAt(i); } return (h>>>0).toString(36) + ':' + str.length; }
+function tableKeyOf(tableName){ const t = SUPABASE_TABLES.find(x=>x.table===tableName); return t ? t.key : tableName; }
+// Flag every table whose content differs from the last successfully-synced snapshot.
+function recomputeDirty(){
+  SUPABASE_TABLES.forEach(t => { const h = quickHash(JSON.stringify(state[t.key] || [])); if (syncMeta.syncedHash[t.table] !== h) dirtyTables.add(t.table); });
+  persistSyncMeta();
 }
-// Stamp the cache as fetched "now" (called after a successful load or save).
-function setCacheTimestamp(ts) {
-  try { localStorage.setItem(CACHE_META_KEY, JSON.stringify({ lastFetched: ts == null ? Date.now() : ts })); } catch (e) {}
-}
-// Is the local cache still fresh (younger than the TTL)?
-function isCacheFresh() {
-  const ts = getCacheTimestamp();
-  return ts > 0 && (Date.now() - ts) < CACHE_TTL_MS;
-}
-// Invalidate the cache so the next load re-fetches from the cloud.
-function invalidateCache() {
-  try { localStorage.removeItem(CACHE_META_KEY); } catch (e) {}
-}
+function hasPendingDeletes(){ return Object.keys(pendingDeletes).some(k => (pendingDeletes[k]||[]).length); }
+// Force a clean full re-pull on the next sync (used by "clear all data").
+function invalidateCache(){ syncMeta.everSynced=false; syncMeta.tableTs={}; syncMeta.syncedHash={}; dirtyTables.clear(); pendingDeletes={}; persistSyncMeta(); }
+
+/* ---- Online/offline status + exponential backoff retry (1s,2s,4s,8s,16s,30s) ---- */
+let _syncOnline = true, _retryTimer = null, _retryStep = 0;
+const _BACKOFF_MS = [1000,2000,4000,8000,16000,30000];
+function setSyncOnline(v){ if (_syncOnline !== v){ _syncOnline = v; try { updateSyncIndicator(); } catch(e){} } if (v){ _retryStep = 0; if (_retryTimer){ clearTimeout(_retryTimer); _retryTimer = null; } } }
+function scheduleRetry(fn){ const delay = _BACKOFF_MS[Math.min(_retryStep, _BACKOFF_MS.length-1)]; _retryStep++; if (_retryTimer) clearTimeout(_retryTimer); _retryTimer = setTimeout(() => { _retryTimer = null; fn(); }, delay); }
+/* ---- debounced background write ---- */
+let _writeTimer = null;
+function scheduleSync(){ if (_writeTimer) clearTimeout(_writeTimer); _writeTimer = setTimeout(() => { _writeTimer = null; flushWrites(); }, 350); }
 
 /* Per-request network timeout. A hanging Supabase request (e.g. a paused free-tier
    project, or a flaky connection) used to be left open indefinitely while only the
@@ -1971,6 +1973,7 @@ const T = {
     colMeetingDateScheduled: 'تاريخ الجدولة',
     // Notifications
     enableNotifications: '🔔 تفعيل التنبيهات',
+    syncNowBtn: '🔄 مزامنة الآن', syncOfflineBtn: '🔄 إعادة المحاولة', syncOnline: 'متزامن مع السحابة', syncOffline: 'غير متصل — التغييرات محفوظة محليًا وستُزامَن', syncingNow: 'جارٍ المزامنة…',
     notificationsEnabled: '✓ التنبيهات مفعلة',
     notificationsDenied: '🔕 التنبيهات معطلة',
     notifTitle: 'تذكير: مهام معلقة',
@@ -2596,6 +2599,7 @@ const T = {
     colMeetingDateScheduled: 'Date Scheduled',
     // Notifications
     enableNotifications: '🔔 Enable Notifications',
+    syncNowBtn: '🔄 Sync Now', syncOfflineBtn: '🔄 Retry Sync', syncOnline: 'Synced with cloud', syncOffline: 'Offline — changes saved locally & will sync', syncingNow: 'Syncing…',
     notificationsEnabled: '✓ Notifications Enabled',
     notificationsDenied: '🔕 Notifications Blocked',
     notifTitle: 'Reminder: Pending Tasks',
@@ -2850,6 +2854,10 @@ function renderSidebar() {
         t('enableNotifications')
       }</button>
       ${currentLang === 'en' ? `<button class="sb-btn" onclick="translateAllUserContent(false)">${t('translateContent')}</button>` : ''}
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="sb-btn" id="sync-now-btn" style="flex:1;margin:0" onclick="syncNow()">${t('syncNowBtn')}</button>
+        <span id="sync-indicator" style="font-size:13px" title=""></span>
+      </div>
       <button class="sb-btn" id="export-data-btn">${t('backupBtn')}</button>
       <button class="sb-btn" id="import-data-btn">${t('importBtn')}</button>
       <input type="file" id="import-file" accept=".json" class="hidden">
@@ -2869,6 +2877,16 @@ function renderSidebar() {
   document.getElementById('import-data-btn').onclick = () => document.getElementById('import-file').click();
   document.getElementById('import-file').onchange = (e) => { if (e.target.files[0]) importData(e.target.files[0]); };
   document.getElementById('reset-btn').onclick = resetData;
+  try { updateSyncIndicator(); } catch (e) {}
+}
+
+// Reflect online/offline sync status in the sidebar (indicator dot + Sync Now label).
+function updateSyncIndicator() {
+  const online = (typeof _syncOnline === 'undefined') ? true : _syncOnline;
+  const el = document.getElementById('sync-indicator');
+  if (el) { el.textContent = online ? '🟢' : '🔴'; el.title = online ? t('syncOnline') : t('syncOffline'); }
+  const btn = document.getElementById('sync-now-btn');
+  if (btn) btn.textContent = online ? t('syncNowBtn') : t('syncOfflineBtn');
 }
 
 let state = {
@@ -2904,58 +2922,70 @@ function describeSupabaseError(e) {
 async function loadState(force) {
   if (!supabaseClient) return loadStateFromLocalStorage();
 
-  // TTL CACHE: if the local cache is still fresh and this isn't a forced refresh,
-  // serve the cached data and skip the network entirely (the big egress saving).
-  if (!force && isCacheFresh()) {
-    const had = loadStateFromLocalStorage();
-    if (had) return true;
-    // Cache metadata said "fresh" but the payload was missing/empty → fall through
-    // and fetch from the cloud to repair the cache.
+  // 1) Fetch ONLY the tiny per-table stamps (one small row).
+  let cloudTs = {};
+  try {
+    const { data, error } = await withRequestTimeout(supabaseClient.from('config').select('settings').eq('id', SYNC_META_ID).maybeSingle());
+    if (error) throw error;
+    cloudTs = (data && data.settings && typeof data.settings === 'object') ? data.settings : {};
+  } catch (e) {
+    console.error('Supabase stamp fetch failed — using local cache:', describeSupabaseError(e));
+    setSyncOnline(false);
+    return loadStateFromLocalStorage();
+  }
+  syncMeta.cloudTs = cloudTs;
+
+  // 2) Decide which tables actually need downloading. Never overwrite a table that
+  //    has unsynced local edits (dirty) — it will be uploaded instead.
+  let toFetch;
+  if (force || !syncMeta.everSynced) {
+    toFetch = SUPABASE_TABLES.filter(t => !dirtyTables.has(t.table)); // first sync / forced = full
+  } else {
+    toFetch = SUPABASE_TABLES.filter(t => !dirtyTables.has(t.table) && (cloudTs[t.table]||0) !== (syncMeta.tableTs[t.table]||0));
   }
 
-  // Read the existing cache once, as a baseline for any table that fails to load.
+  // 3) Nothing changed → ZERO table egress; cached copy already in memory.
+  if (toFetch.length === 0) { setSyncOnline(true); persistSyncMeta(); return true; }
+
+  // Baseline cache for any table that errors mid-fetch.
   let cache = {};
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) {}
 
-  const results = await Promise.all(SUPABASE_TABLES.map(async t => {
+  const results = await Promise.all(toFetch.map(async t => {
     try {
-      // Explicit column selection: the per-row payload lives in the `data` jsonb
-      // column, so we fetch only `id, data` (never select('*'), which could pull
-      // any extra/added columns we don't use). Wrapped in a per-request timeout so
-      // a hanging request aborts cleanly instead of stalling the whole load.
       const { data, error } = await withRequestTimeout(supabaseClient.from(t.table).select('id, data'));
       if (error) return { t, error };
       return { t, rows: data || [] };
-    } catch (e) {
-      return { t, error: e };
-    }
+    } catch (e) { return { t, error: e }; }
   }));
 
   const ok = results.filter(r => !r.error);
   const failed = results.filter(r => r.error);
 
-  // Total failure → behave as offline and use the cache.
   if (ok.length === 0) {
     console.error('Supabase load failed — falling back to localStorage cache:', describeSupabaseError(failed[0] && failed[0].error));
-    invalidateCache(); // not in sync with the cloud → don't let the TTL suppress the next retry
+    setSyncOnline(false);
     return loadStateFromLocalStorage();
   }
 
-  // Cloud wins for every table that loaded; cached copy kept for any that errored.
-  SUPABASE_TABLES.forEach(t => {
-    const r = results.find(x => x.t.table === t.table);
-    if (r && !r.error) state[t.key] = (r.rows || []).map(row => row.data).filter(Boolean);
-    else state[t.key] = Array.isArray(cache[t.key]) ? cache[t.key] : [];
+  // Cloud wins for each table that loaded; record its stamp + content hash.
+  ok.forEach(r => {
+    state[r.t.key] = (r.rows || []).map(row => row.data).filter(Boolean);
+    syncMeta.tableTs[r.t.table] = cloudTs[r.t.table] || 0;
+    syncMeta.syncedHash[r.t.table] = quickHash(JSON.stringify(state[r.t.key] || []));
+    dirtyTables.delete(r.t.table);
   });
+  // Make sure no table key is left undefined (use cache for anything not in memory).
+  SUPABASE_TABLES.forEach(t => { if (!Array.isArray(state[t.key])) state[t.key] = Array.isArray(cache[t.key]) ? cache[t.key] : []; });
+
   state.lastReportNumber = computeLastReportNumber(state.reports);
-  state.translationCache = cache.translationCache || {}; // local-only cache
+  if (!state.translationCache) state.translationCache = cache.translationCache || {};
   applyDataMigrations();
   saveStateToLocalStorage(); // refresh the offline cache with the freshly merged cloud data
 
-  // Only stamp the cache as fully fetched when every table loaded successfully;
-  // if some failed we keep the cache "stale" so the next load retries them.
-  if (failed.length === 0) setCacheTimestamp(Date.now());
-
+  if (failed.length === 0) syncMeta.everSynced = true;
+  persistSyncMeta();
+  setSyncOnline(true);
   failed.forEach(r => console.error('Supabase load: table "' + r.t.table + '" failed — kept cached copy:', describeSupabaseError(r.error)));
   return true;
 }
@@ -3107,53 +3137,82 @@ function saveStateToLocalStorage() {
   } catch (e) { console.error('Save error:', e); }
 }
 
-// PRIMARY saver: cache locally immediately, then upsert all tables to Supabase in the
-// background. Never blocks the UI; warns via toast if the cloud sync fails.
+// PRIMARY saver: write the local cache immediately (instant + offline-safe), then
+// flag only the changed table(s) dirty and schedule a debounced background upload.
 async function saveState() {
-  saveStateToLocalStorage(); // synchronous local cache first
+  saveStateToLocalStorage(); // synchronous local cache first (Quick Load source of truth)
   if (!supabaseClient) return;
+  recomputeDirty();          // mark ONLY the tables that actually changed
+  scheduleSync();            // background, debounced — uploads just the dirty tables
+}
+
+// Background writer: upserts ONLY dirty tables + applies queued deletes, then bumps
+// the per-table cloud stamps. On failure everything stays queued and retries with
+// exponential backoff. This is the single write path (Minimum Egress).
+async function flushWrites() {
+  if (!supabaseClient) return;
+  if (dirtyTables.size === 0 && !hasPendingDeletes()) { setSyncOnline(true); return; }
+  const dirtyList = Array.from(dirtyTables);
+  const delTables = Object.keys(pendingDeletes).filter(tb => (pendingDeletes[tb]||[]).length);
   try {
-    const results = await Promise.all(SUPABASE_TABLES.map(t => {
-      const rows = (state[t.key] || []).map(o => ({ id: o.id, data: o }));
-      if (!rows.length) return Promise.resolve({ error: null });
-      return supabaseClient.from(t.table).upsert(rows, { onConflict: 'id' });
-    }));
-    const errored = results.find(r => r && r.error);
-    if (errored) throw errored.error;
-    // Local cache and cloud are now identical → mark the cache fresh so the next
-    // load (and any focus/visibility refresh within the TTL) skips a re-fetch.
-    setCacheTimestamp(Date.now());
+    const jobs = [];
+    dirtyList.forEach(table => {
+      const rows = (state[tableKeyOf(table)] || []).map(o => ({ id: o.id, data: o }));
+      if (rows.length) jobs.push(withRequestTimeout(supabaseClient.from(table).upsert(rows, { onConflict: 'id' })));
+    });
+    delTables.forEach(table => {
+      const ids = (pendingDeletes[table]||[]).filter(Boolean);
+      if (ids.length === 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().eq('id', ids[0])));
+      else if (ids.length > 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().in('id', ids)));
+    });
+    if (jobs.length) {
+      const results = await Promise.all(jobs);
+      const errored = results.find(r => r && r.error);
+      if (errored) throw errored.error;
+    }
+    // Bump stamps for every table we changed so other devices re-pull just those.
+    const changed = Array.from(new Set([...dirtyList, ...delTables]));
+    if (changed.length) await bumpCloudTimestamps(changed);
+    // Record the new synced snapshot and clear the queues.
+    dirtyList.forEach(table => { syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || [])); dirtyTables.delete(table); });
+    pendingDeletes = {};
+    syncMeta.everSynced = true; // a successful upload + stamp read means we're in sync → next load can go incremental
+    persistSyncMeta();
+    setSyncOnline(true);
   } catch (e) {
-    console.error('Supabase save failed — changes kept in local cache:', describeSupabaseError(e));
-    // The cloud may be out of sync with our local copy → force a re-fetch next time.
-    invalidateCache();
+    console.error('Supabase write failed — queued for retry:', describeSupabaseError(e));
+    setSyncOnline(false);
+    persistSyncMeta();              // keep dirty tables + pending deletes for the retry
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
+    scheduleRetry(flushWrites);     // exponential backoff
   }
 }
 
-// Delete specific rows from Supabase. `removed` = { tableName: [ids...] }. Runs in the
-// background and warns via toast on failure. Uses .eq for a single id, .in for many.
+// Read-merge-write the single sync_meta stamp row so concurrent table updates from
+// other devices are not clobbered. Updates our local mirror so we don't re-pull our
+// own change.
+async function bumpCloudTimestamps(tables) {
+  const now = Date.now();
+  let cloud = {};
+  try { const { data } = await withRequestTimeout(supabaseClient.from('config').select('settings').eq('id', SYNC_META_ID).maybeSingle()); if (data && data.settings) cloud = data.settings; } catch (e) {}
+  tables.forEach(tb => { cloud[tb] = now; });
+  const { error } = await withRequestTimeout(supabaseClient.from('config').upsert({ id: SYNC_META_ID, settings: cloud }));
+  if (error) throw error;
+  syncMeta.cloudTs = cloud;
+  tables.forEach(tb => { syncMeta.tableTs[tb] = cloud[tb]; });
+  persistSyncMeta();
+}
+
+// Queue row deletions for the background writer. Folded into flushWrites so deletes
+// and dirty upserts go up together (and survive offline). `removed` = { table: [ids] }.
 async function syncCloudDeletes(removed) {
   if (!supabaseClient) return;
-  try {
-    const jobs = [];
-    Object.keys(removed || {}).forEach(table => {
-      const ids = (removed[table] || []).filter(Boolean);
-      if (ids.length === 1) jobs.push(supabaseClient.from(table).delete().eq('id', ids[0]));
-      else if (ids.length > 1) jobs.push(supabaseClient.from(table).delete().in('id', ids));
-    });
-    if (!jobs.length) return;
-    const results = await Promise.all(jobs);
-    const errored = results.find(r => r && r.error);
-    if (errored) throw errored.error;
-    // Cloud delete succeeded → local cache (already updated by the caller) matches
-    // the cloud, so keep the cache fresh and avoid an unnecessary re-fetch.
-    setCacheTimestamp(Date.now());
-  } catch (e) {
-    console.error('Supabase delete failed — change kept in local cache:', describeSupabaseError(e));
-    invalidateCache(); // force a re-sync on the next load
-    if (typeof toast === 'function') toast(t('offlineSaveWarning'));
-  }
+  Object.keys(removed || {}).forEach(table => {
+    const ids = (removed[table] || []).filter(Boolean);
+    if (ids.length) pendingDeletes[table] = (pendingDeletes[table] || []).concat(ids);
+  });
+  persistSyncMeta();
+  scheduleSync();
 }
 
 // Return the ids present in beforeArr but missing from afterArr (i.e. the removed records).
@@ -4419,6 +4478,16 @@ function openModal(title, bodyHtml, footHtml) {
   document.getElementById('modal').classList.add('active');
 }
 function closeModal() { document.getElementById('modal').classList.remove('active'); }
+// Inline form validation message (replaces blocking alert() for field errors).
+function formError(msg) {
+  const body = document.getElementById('modal-body');
+  if (!body) { if (msg && typeof toast === 'function') toast(msg); return; }
+  let el = document.getElementById('form-error');
+  if (!el) { el = document.createElement('div'); el.id = 'form-error'; el.style.cssText = 'background:#fbeae9;color:#9b2c2c;border:1px solid #f0c0bd;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;line-height:1.45'; body.insertBefore(el, body.firstChild); }
+  el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none';
+  if (msg) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function clearFormError() { const el = document.getElementById('form-error'); if (el) el.style.display = 'none'; }
 document.getElementById('modal-close').onclick = closeModal;
 document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
 
@@ -4551,7 +4620,7 @@ function showTeamMemberForm(memberId) {
 
 function saveTeamMember(id) {
   const name = document.getElementById('f-member-name').value.trim();
-  if (!name) { alert(t('alertMemberNameRequired')); return; }
+  if (!name) { formError(t('alertMemberNameRequired')); return; }
   const data = {
     name,
     email: document.getElementById('f-member-email').value.trim(),
@@ -6891,7 +6960,7 @@ function renderPartnerTeamRows() {
 
 function savePartner(id) {
   const name = document.getElementById('f-name').value.trim();
-  if (!name) { alert(t('alertNameRequired')); return; }
+  if (!name) { formError(t('alertNameRequired')); return; }
   let type = document.getElementById('f-type').value;
   let customType = '';
   const STANDARD_TYPES = ['development','supervision','ownership','vendor'];
@@ -7072,11 +7141,17 @@ async function deletePartner(id) {
   const projCount = getPartnerProjects(id).length;
   const actCount = getPartnerActions(id).length;
   if (!confirm(t('confirmDeletePartner', p.name, projCount, actCount))) return;
+  const memberIds = (p && Array.isArray(p.team)) ? p.team.map(m => m.id) : [];
   const beforeActions = state.actions.slice();
   const beforeProjects = state.projects.slice();
   state.actions = state.actions.filter(a => a.partnerId !== id);
   state.projects = state.projects.filter(p => p.partnerId !== id);
   state.partners = state.partners.filter(p => p.id !== id);
+  // Data integrity: any remaining task owned by a member of the deleted partner's
+  // team loses its owner reference (so it never points at a deleted person).
+  if (memberIds.length) {
+    state.actions.forEach(a => { if (a.ownerKind === 'partner' && memberIds.includes(a.ownerId)) { a.ownerId = ''; a.ownerKind = ''; } });
+  }
   saveState();
   toast(t('toastDeleted'));
   render();
@@ -7224,11 +7299,11 @@ function renderProjectMilestoneRows() {
 
 function saveProject(id) {
   const name = document.getElementById('f-name').value.trim();
-  if (!name) { alert(t('alertProjectNameRequired')); return; }
+  if (!name) { formError(t('alertProjectNameRequired')); return; }
 
   const isInternal = !!document.getElementById('f-internal-project')?.checked;
   const partnerIds = isInternal ? [] : Array.from(document.querySelectorAll('#f-partners-container .partner-cb:checked')).map(cb => cb.value);
-  if (!isInternal && partnerIds.length === 0) { alert(t('alertSelectPartner')); return; }
+  if (!isInternal && partnerIds.length === 0) { formError(t('alertSelectPartner')); return; }
 
   // Ownership
   let ownershipType, ownershipStake = 0, ownershipCertainty = 1.0;
@@ -7481,7 +7556,7 @@ function saveLink(projectId) {
   const name = document.getElementById('link-name-' + projectId)?.value.trim();
   const url = document.getElementById('link-url-' + projectId)?.value.trim();
   const desc = document.getElementById('link-desc-' + projectId)?.value.trim();
-  if (!name || !url) { alert(t('alertRequiredFields')); return; }
+  if (!name || !url) { formError(t('alertRequiredFields')); return; }
   const project = getProject(projectId);
   if (!project) return;
   if (!Array.isArray(project.attachments)) project.attachments = [];
@@ -7850,7 +7925,7 @@ window.toggleMeetingTaskLink = function(meetingId, taskId, checked) {
 
 function saveAction(id) {
   const title = document.getElementById('f-title').value.trim();
-  if (!title) { alert(t('alertActionTitleRequired')); return; }
+  if (!title) { formError(t('alertActionTitleRequired')); return; }
   const projSel = document.getElementById('f-project');
   const projectId = projSel.value;
   const partnerId = projSel.options[projSel.selectedIndex].dataset.partner;
@@ -7860,7 +7935,7 @@ function saveAction(id) {
   const type = rawType === 'milestone' ? 'task' : rawType;
   const isMilestoneSel = rawType === 'milestone';
   const dueDate = document.getElementById('f-due').value;
-  if (!dueDate) { alert(t('alertDateRequired')); return; }
+  if (!dueDate) { formError(t('alertDateRequired')); return; }
   const data = {
     title,
     type,
@@ -7900,8 +7975,8 @@ function saveAction(id) {
     const recurrence = recurrenceEl ? recurrenceEl.value : 'none';
     if (recurrence !== 'none') {
       const endDate = document.getElementById('f-recurrence-end').value;
-      if (!endDate) { alert(t('alertEndDateRequired')); return; }
-      if (endDate < dueDate) { alert(t('alertEndAfterStart')); return; }
+      if (!endDate) { formError(t('alertEndDateRequired')); return; }
+      if (endDate < dueDate) { formError(t('alertEndAfterStart')); return; }
       const seriesId = 'sr_' + uid();
       let currentDate = dueDate;
       let count = 0;
@@ -8067,7 +8142,7 @@ function promptPostpone(id) {
 function confirmPostpone(id) {
   const a = state.actions.find(x => x.id === id);
   const newDate = document.getElementById('f-newdate').value;
-  if (!newDate) { alert(t('alertDateRequired')); return; }
+  if (!newDate) { formError(t('alertDateRequired')); return; }
   a.status = 'postponed';
   a.dueDate = newDate;
   a.meetingTime = document.getElementById('f-newtime').value || a.meetingTime;
@@ -9340,6 +9415,7 @@ async function resetData() {
       );
       const errored = results.find(r => r && r.error);
       if (errored) throw errored.error;
+      try { await bumpCloudTimestamps(SUPABASE_TABLES.map(t => t.table)); } catch (e2) {}
     } catch (e) {
       console.error('Supabase clear-all failed:', describeSupabaseError(e));
       if (typeof toast === 'function') toast(t('offlineSaveWarning'));
@@ -10517,38 +10593,40 @@ async function resetData() {
   } catch (e) {}
 })();
 
-// Fast cross-device sync: re-pull cloud data when the tab regains focus / becomes visible,
-// so changes made elsewhere (e.g. a meeting scheduled on another device) appear within
-// seconds instead of waiting. Skipped while a modal/form is open so it never disrupts edits.
-let _lastCloudRefresh = Date.now();
-let _cloudFailUntil = 0; // cooldown timestamp after a failed sync (avoid hammering a down backend)
+// Fast cross-device sync (Quick Sync): when the tab regains focus / becomes visible,
+// run the tiny stamp check and download only the table(s) that changed elsewhere, then
+// push anything pending. Skipped while a modal/form is open so edits aren't disrupted.
+let _lastCloudRefresh = 0;
+let _cloudFailUntil = 0; // short cooldown after a failed sync
 async function refreshFromCloud(force) {
   if (!supabaseClient) return;
   const modal = document.getElementById('modal');
-  if (modal && modal.classList.contains('active')) return; // don't interrupt an open form
-  // TTL GUARD: unless the caller explicitly forces it, skip the network entirely
-  // while the local cache is still fresh. This stops the app from re-downloading
-  // every table on each tab focus / visibility change (the main egress drain).
-  if (!force && isCacheFresh()) return;
+  if (!force && modal && modal.classList.contains('active')) return; // don't interrupt an open form
   const now = Date.now();
-  // Backoff: after a failed sync, don't retry on every focus/visibility for a while
-  // (manual/forced refresh always allowed).
   if (!force && now < _cloudFailUntil) return;
-  if (!force && now - _lastCloudRefresh < 4000) return;     // throttle bursts
+  if (!force && now - _lastCloudRefresh < 3000) return;   // throttle bursts
   _lastCloudRefresh = now;
   try {
-    const okLoad = await loadState(force);   // force bypasses the TTL inside loadState too
-    // If the cloud is unreachable the cache stays un-stamped; start a 30s cooldown
-    // so background refreshes don't repeatedly hang against a down/paused backend.
-    if (!isCacheFresh()) _cloudFailUntil = Date.now() + 30000;
-    else _cloudFailUntil = 0;
+    await loadState(force);   // tiny stamp check → pulls only changed tables
+    flushWrites();            // also push anything still queued
+    _cloudFailUntil = 0;
+    setSyncOnline(true);
     render(state.detailParam);
-  } catch (e) { _cloudFailUntil = Date.now() + 30000; /* keep showing current data on failure */ }
+  } catch (e) {
+    setSyncOnline(false);
+    _cloudFailUntil = Date.now() + 15000;
+  }
 }
-// Re-pull cloud data when the tab regains focus / becomes visible, but ONLY if the
-// local cache has gone stale (older than the TTL). Fresh cache → no network call.
+// Manual "Sync Now" (sidebar button): force a stamp check + flush, regardless of throttle.
+async function syncNow() {
+  if (typeof toast === 'function') toast(t('syncingNow'));
+  try { await flushWrites(); } catch (e) {}
+  await refreshFromCloud(true);
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false); });
 window.addEventListener('focus', () => refreshFromCloud(false));
+window.addEventListener('online', () => { setSyncOnline(true); flushWrites(); refreshFromCloud(true); });
+window.addEventListener('offline', () => setSyncOnline(false));
 
 /* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
 function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
