@@ -1,0 +1,2788 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎯 Business Opportunities – SOE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  ============================================================================
+  BUSINESS OPPORTUNITIES – SOE
+  Standalone page that shares the SAME Supabase project as the governance system.
+  Built on top of pipeline.html. It READS/WRITES the `leads` table, READS the
+  existing `partners` table, READS/WRITES a new `products` table, and on
+  "Convert" INSERTS into the existing `partners` / `projects` tables using the
+  identical { id, data } JSONB shape the governance app uses.
+
+  ---------------------------------------------------------------------------
+  RUN THESE ONCE in the Supabase SQL editor.
+  `partners` already exists — do NOT recreate it. Only `leads` and `products`
+  are new:
+
+      -- Leads (opportunities)
+      create table if not exists leads (
+        id   text primary key,
+        data jsonb not null
+      );
+      alter table leads disable row level security;
+
+      -- Products catalogue (configurable from the gear icon)
+      create table if not exists products (
+        id   text primary key,
+        data jsonb not null
+      );
+      alter table products disable row level security;
+
+  product.data shape: { id, name, type, description }
+    - type matches a lead type: own-product | partner-product | open-source | consulting | other
+  ============================================================================
+-->
+<style>
+  /* ---- Design tokens: identical to the governance / pipeline system ---- */
+  :root {
+    --bg: #f5f3ee;
+    --bg-card: #ffffff;
+    --ink: #1a1f2e;
+    --ink-muted: #5a6478;
+    --ink-faint: #8a92a3;
+    --line: #e4e0d6;
+    --line-strong: #c8c2b0;
+    --accent: #1a3a52;
+    --accent-warm: #b8884a;
+    --gold: #c9a96e;
+    --green: #4a7c59;
+    --amber: #c47e2a;
+    --red: #b04540;
+    --crit: #7a2d2a;
+    --green-bg: #e8f0e8;
+    --amber-bg: #faf0e0;
+    --red-bg: #f5e0de;
+    --crit-bg: #ead8d6;
+    --shadow: 0 1px 2px rgba(26, 31, 46, 0.04), 0 4px 12px rgba(26, 31, 46, 0.06);
+    --shadow-lg: 0 8px 28px rgba(26, 31, 46, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'IBM Plex Sans Arabic', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(184, 136, 74, 0.04) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(26, 58, 82, 0.03) 0%, transparent 40%);
+  }
+
+  h1, h2, h3, h4 { font-family: 'Reem Kufi', serif; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ---- Page header ---- */
+  .pl-topbar {
+    background: var(--accent);
+    color: #f5f3ee;
+    padding: 16px 44px;
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: var(--shadow);
+  }
+  .pl-brand { display: flex; align-items: center; gap: 12px; }
+  .pl-brand-mark {
+    width: 42px; height: 42px; border-radius: 8px;
+    background: rgba(201,169,110,0.18); color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Reem Kufi', serif; font-size: 15px; font-weight: 700;
+    overflow: hidden;
+  }
+  .pl-brand-mark img { width: 100%; height: 100%; object-fit: contain; }
+  .pl-soe-logo { height: 40px; width: auto; display: block; }
+  .pl-brand-divider { width: 1px; height: 34px; background: rgba(245,243,238,0.18); }
+  .pl-bd-square {
+    width: 40px; height: 40px; flex: none;
+    border: 1.5px solid rgba(201,169,110,0.6); border-radius: 4px;
+    color: var(--gold); display: flex; align-items: center; justify-content: center;
+    font-family: 'Reem Kufi', serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .pl-brand-title { font-family: 'Reem Kufi', serif; font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .pl-brand-sub { font-size: 11px; color: rgba(245,243,238,0.55); }
+  .pl-topbar-spacer { flex: 1; }
+  .pl-back {
+    color: rgba(245,243,238,0.75); text-decoration: none; font-size: 13px;
+    border: 1px solid rgba(245,243,238,0.18); border-radius: 6px;
+    padding: 7px 14px; transition: all 0.15s;
+  }
+  .pl-back:hover { background: rgba(245,243,238,0.08); color: #f5f3ee; }
+  .pl-lang-toggle {
+    display: flex; background: rgba(245,243,238,0.06);
+    border: 1px solid rgba(245,243,238,0.1); border-radius: 6px; padding: 3px;
+  }
+  .pl-lang-toggle button {
+    background: none; border: none; color: rgba(245,243,238,0.6);
+    padding: 6px 12px; font-family: inherit; font-size: 12px; cursor: pointer;
+    border-radius: 4px; transition: all 0.15s;
+  }
+  .pl-lang-toggle button:hover { color: rgba(245,243,238,0.9); }
+  .pl-lang-toggle button.active { background: rgba(201,169,110,0.18); color: var(--gold); font-weight: 500; }
+
+  .main { padding: 36px 44px; max-width: 1500px; margin: 0 auto; }
+
+  .page-head {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--line); gap: 16px; flex-wrap: wrap;
+  }
+  .page-title { font-size: 26px; font-weight: 600; }
+  .page-sub { font-size: 13px; color: var(--ink-muted); margin-top: 4px; }
+  .page-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .pl-gear {
+    background: var(--bg-card); border: 1px solid var(--line-strong); color: var(--ink-muted);
+    width: 38px; height: 38px; border-radius: 6px; cursor: pointer; font-size: 16px;
+    display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .pl-gear:hover { border-color: var(--accent); color: var(--accent); background: #faf8f3; }
+
+  /* Stats / focus cards */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
+  .stat {
+    background: var(--bg-card); border: 1px solid var(--line);
+    padding: 20px; border-radius: 6px; position: relative; overflow: hidden;
+  }
+  .stat::before {
+    content: ''; position: absolute; top: 0; inset-inline-end: 0; width: 3px; height: 100%;
+    background: var(--accent);
+  }
+  .stat.warn::before { background: var(--amber); }
+  .stat.danger::before { background: var(--red); }
+  .stat.good::before { background: var(--green); }
+  .stat-label { font-size: 12px; color: var(--ink-muted); letter-spacing: 0.04em; }
+  .stat-value { font-size: 32px; font-weight: 600; font-family: 'Reem Kufi', serif; margin-top: 6px; color: var(--accent); }
+  .stat.warn .stat-value { color: var(--amber); }
+  .stat.danger .stat-value { color: var(--red); }
+  .stat.good .stat-value { color: var(--green); }
+  .stat-meta { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
+
+  /* ---- Focus widget (NEW: sits ABOVE the stats) ---- */
+  .pl-focus { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; margin-bottom: 20px; }
+  .pl-focus-card {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 6px; padding: 18px 20px; position: relative; overflow: hidden;
+  }
+  .pl-focus-card::before {
+    content: ''; position: absolute; top: 0; inset-inline-end: 0; width: 3px; height: 100%;
+    background: var(--gold);
+  }
+  .pl-focus-card.hot::before { background: var(--red); }
+  .pl-focus-card.stale::before { background: var(--ink-faint); }
+  .pl-focus-card.actions::before { background: var(--accent-warm); }
+  .pl-focus-label { font-size: 12px; color: var(--ink-muted); letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px; }
+  .pl-focus-value { font-size: 30px; font-weight: 600; font-family: 'Reem Kufi', serif; margin-top: 6px; color: var(--accent); }
+  .pl-focus-card.hot .pl-focus-value { color: var(--red); }
+  .pl-focus-card.stale .pl-focus-value { color: var(--ink-muted); }
+  .pl-focus-meta { font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
+  /* Drill-down: clickable Hot / Stale cards */
+  .pl-focus-card.clickable { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
+  .pl-focus-card.clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .pl-focus-card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pl-focus-card.hot.active { background: var(--red-bg); box-shadow: 0 0 0 2px var(--red) inset; }
+  .pl-focus-card.stale.active { background: var(--bg); box-shadow: 0 0 0 2px var(--ink-faint) inset; }
+  .pl-focus-hint { font-size: 11px; color: var(--ink-faint); margin-top: 4px; font-style: italic; opacity: 0.85; }
+  /* Active drill-down chip above table */
+  .pl-focus-chip-wrap { margin: 0 0 12px 0; display: flex; }
+  .pl-focus-chip { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; border: 1px solid var(--line-strong); background: var(--bg-card); color: var(--ink); }
+  .pl-focus-chip.hot { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  .pl-focus-chip.stale { background: var(--bg); border-color: var(--ink-faint); color: var(--ink-muted); }
+  .pl-focus-chip-clear { cursor: pointer; background: transparent; border: none; font-size: 16px; line-height: 1; padding: 0 2px; color: inherit; opacity: 0.7; }
+  .pl-focus-chip-clear:hover { opacity: 1; }
+  .pl-sug-list { margin-top: 12px; max-height: 196px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .pl-sug-item {
+    background: #faf8f3; border: 1px solid var(--line);
+    border-inline-start: 3px solid var(--accent-warm);
+    border-radius: 5px; padding: 9px 12px;
+  }
+  .pl-sug-company { font-weight: 600; font-size: 13px; color: var(--accent); cursor: pointer; }
+  .pl-sug-company:hover { text-decoration: underline; }
+  .pl-sug-stage { font-size: 11px; color: var(--ink-faint); margin: 2px 0 4px; }
+  .pl-sug-action { font-size: 12.5px; color: var(--ink); line-height: 1.45; }
+  .pl-sug-empty { margin-top: 14px; font-size: 14px; color: var(--green); font-weight: 500; }
+
+  /* Buttons */
+  .btn {
+    background: var(--accent); color: #f5f3ee; border: none;
+    padding: 9px 18px; border-radius: 5px; font-family: inherit;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s;
+  }
+  .btn:hover { background: #243d52; transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
+  .btn.ghost:hover { background: var(--bg-card); border-color: var(--accent); color: var(--accent); }
+  .btn.gold { background: var(--gold); color: var(--accent); }
+  .btn.gold:hover { background: var(--accent-warm); color: #fff; }
+  .btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  /* Table */
+  .table-wrap { background: var(--bg-card); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: #faf8f3; text-align: start; padding: 12px 14px; font-weight: 500;
+    color: var(--ink-muted); font-size: 12px; letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  th .sort-ind { font-size: 10px; opacity: 0.7; }
+  td { padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #faf8f3; }
+  td .name { font-weight: 500; color: var(--ink); }
+  td .sub { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+
+  /* Badges */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 11px;
+    font-size: 11px; font-weight: 500; border: 1px solid;
+  }
+  .badge.green { background: var(--green-bg); color: var(--green); border-color: rgba(74, 124, 89, 0.3); }
+  .badge.amber { background: var(--amber-bg); color: var(--amber); border-color: rgba(196, 126, 42, 0.3); }
+  .badge.red { background: var(--red-bg); color: var(--red); border-color: rgba(176, 69, 64, 0.3); }
+  .badge.crit { background: var(--crit-bg); color: var(--crit); border-color: rgba(122, 45, 42, 0.3); }
+  .badge.neutral { background: #eee9dd; color: var(--ink-muted); border-color: var(--line); }
+  .badge.dev { background: #e6ecf2; color: var(--accent); border-color: rgba(26, 58, 82, 0.2); }
+  .badge.sup { background: #f0e8d6; color: var(--accent-warm); border-color: rgba(184, 136, 74, 0.3); }
+  .badge.owned { background: #dbe8de; color: #3d6b4a; border-color: rgba(61, 107, 74, 0.25); }
+  .badge.vendor { background: #efe2f0; color: #7a3d82; border-color: rgba(122, 61, 130, 0.25); }
+  .badge.custom-type { background: #e8e6e0; color: #555a66; border-color: rgba(85, 90, 102, 0.25); }
+  .badge.blue { background: #e1ebf2; color: #2c5e7d; border-color: rgba(44, 94, 125, 0.25); }
+  .badge.slate { background: #e8e6e0; color: #555a66; border-color: rgba(85, 90, 102, 0.25); }
+  .badge.dark { background: #ead8d6; color: var(--crit); border-color: rgba(122, 45, 42, 0.3); }
+  .badge-stack { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+
+  /* Score bars */
+  .pl-score { display: flex; align-items: center; gap: 8px; }
+  .pl-score-bar { width: 64px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .pl-score-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .pl-score-fill.high { background: var(--green); }
+  .pl-score-fill.mid { background: var(--gold); }
+  .pl-score-fill.low { background: var(--red); }
+  .pl-score-num { font-size: 12px; color: var(--ink-muted); font-weight: 500; min-width: 20px; }
+  /* Actionability row highlighting — distinct hues (overdue > critical > stale) */
+  tr.row-stale td { background-color: #fdf3d3; }      /* yellow  = stale */
+  tr.row-critical td { background-color: #ffe1c4; }   /* orange  = critical */
+  tr.row-overdue td { background-color: #ffd1d1; }    /* red     = overdue */
+  tr.row-stale td:first-child { border-inline-start: 4px solid #e0a92b; }
+  tr.row-critical td:first-child { border-inline-start: 4px solid #d9772b; }
+  tr.row-overdue td:first-child { border-inline-start: 4px solid #c0392b; }
+  tr.row-stale:hover td, tr.row-critical:hover td, tr.row-overdue:hover td { filter: brightness(0.98); }
+  .pl-actiondue-overdue { color: var(--red); font-weight: 700; }
+  .stat.clickable { cursor: pointer; transition: background .15s, border-color .15s, transform .05s; }
+  .stat.clickable:hover { background: #faf8f3; }
+  .stat.clickable:active { transform: translateY(1px); }
+  .stat.clickable.active { background: #faf0e0; border-color: var(--amber); }
+  .stat .pl-focus-hint { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+  .pl-vel { font-size: 12px; font-weight: 700; margin-inline-start: 5px; cursor: help; }
+  .pl-vel.up { color: var(--green); }
+  .pl-vel.down { color: var(--red); }
+  .pl-vel.flat { color: var(--ink-faint); }
+  /* Win/Loss analysis */
+  .wl-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 18px; }
+  .wl-card { border: 1px solid var(--line); border-radius: 6px; padding: 14px; text-align: center; background: #fff; }
+  .wl-card .v { font-family: 'Reem Kufi', serif; font-size: 24px; font-weight: 600; color: var(--accent); }
+  .wl-card.won .v { color: var(--green); }
+  .wl-card.lost .v { color: var(--red); }
+  .wl-card .l { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+  .wl-sec-title { font-size: 13px; font-weight: 600; color: var(--accent); margin: 18px 0 8px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .wl-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .wl-row:last-child { border-bottom: none; }
+  .wl-row .lbl { flex: 1; }
+  .wl-row .bar { width: 90px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; flex: none; }
+  .wl-row .bar > span { display: block; height: 100%; border-radius: 3px; }
+  .wl-row.won .bar > span { background: var(--green); }
+  .wl-row.lost .bar > span { background: var(--red); }
+  .wl-row .cnt { min-width: 66px; text-align: end; color: var(--ink-muted); font-size: 12px; flex: none; }
+  .wl-filter { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .wl-filter .fld label { display:block; font-size: 11px; color: var(--ink-muted); margin-bottom: 4px; }
+  .wl-filter .fld input { padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 5px; font-family: inherit; font-size: 13px; }
+  .wl-empty { color: var(--ink-faint); font-size: 13px; padding: 8px 0; }
+  /* Colour legend above the table */
+  .pl-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--ink-muted); }
+  .pl-legend .lg-title { font-weight: 600; color: var(--ink); }
+  .pl-legend .lg-item { display: inline-flex; align-items: center; gap: 6px; }
+  .pl-legend .lg-sw { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(26,31,46,0.12); display: inline-block; }
+  /* Today indicator pill in the top bar */
+  .pl-today { font-size: 12px; color: rgba(245,243,238,0.82); background: rgba(245,243,238,0.07); border: 1px solid rgba(245,243,238,0.14); border-radius: 6px; padding: 7px 12px; white-space: nowrap; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(26, 31, 46, 0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; backdrop-filter: blur(3px);
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-card); border-radius: 8px; width: 100%;
+    max-width: 600px; max-height: 90vh; overflow-y: auto;
+    box-shadow: var(--shadow-lg); border: 1px solid var(--line);
+  }
+  .modal-head {
+    padding: 20px 24px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-title { font-size: 17px; font-weight: 600; }
+  .modal-close {
+    background: none; border: none; font-size: 22px; cursor: pointer;
+    color: var(--ink-faint); width: 28px; height: 28px; border-radius: 4px;
+  }
+  .modal-close:hover { background: var(--line); color: var(--ink); }
+  .modal-body { padding: 24px; }
+  .modal-foot {
+    padding: 16px 24px; border-top: 1px solid var(--line);
+    display: flex; justify-content: flex-start; gap: 10px; background: #faf8f3;
+  }
+
+  /* Form */
+  .form-row { margin-bottom: 16px; }
+  .form-row label {
+    display: block; font-size: 12px; font-weight: 500;
+    color: var(--ink-muted); margin-bottom: 6px; letter-spacing: 0.02em;
+  }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--line-strong);
+    border-radius: 5px; font-family: inherit; font-size: 14px;
+    color: var(--ink); background: #fafaf7; transition: all 0.15s;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: var(--accent); background: #fff;
+    box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.08);
+  }
+  .form-row textarea { min-height: 64px; resize: vertical; }
+  .form-row.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-row.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .form-section-title {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 22px 0 12px; padding-top: 14px; border-top: 1px dashed var(--line);
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-muted); margin-top: 6px; }
+  .checkbox-row input { width: auto; }
+
+  /* Attachment rows */
+  .pl-attach-row {
+    display: grid; grid-template-columns: 1fr 1.4fr 1.4fr auto; gap: 8px;
+    align-items: center; margin-bottom: 8px;
+  }
+  .pl-attach-row input { font-size: 13px; padding: 7px 10px; }
+  .pl-attach-row .pl-mini-del {
+    background: none; border: 1px solid var(--line); color: var(--ink-faint);
+    width: 32px; height: 32px; border-radius: 5px; cursor: pointer; font-size: 16px;
+  }
+  .pl-kc-row { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr 0.9fr 1.3fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .pl-kc-row input, .pl-kc-row select { font-size: 13px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 5px; font-family: inherit; background: #fafaf7; }
+  .pl-warm-badge { cursor: help; }
+  .pl-mini-del:hover { border-color: var(--red); color: var(--red); }
+
+  /* Config list (products) */
+  .pl-cfg-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .pl-cfg-item {
+    display: flex; align-items: center; gap: 10px; justify-content: space-between;
+    background: #faf8f3; border: 1px solid var(--line); border-radius: 5px; padding: 9px 12px;
+  }
+  .pl-cfg-item .name { font-weight: 500; font-size: 13px; }
+  .pl-cfg-item .sub { font-size: 11px; color: var(--ink-faint); }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-select {
+    padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 5px;
+    font-family: inherit; font-size: 13px; background: var(--bg-card); color: var(--ink);
+  }
+  .filter-select:focus { outline: none; border-color: var(--accent); }
+  .search-input {
+    flex: 1; min-width: 200px; max-width: 300px; padding: 7px 12px;
+    border: 1px solid var(--line-strong); border-radius: 5px;
+    font-family: inherit; font-size: 13px; background: var(--bg-card);
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .filters-label { font-size: 12px; color: var(--ink-faint); margin-inline-end: 4px; }
+
+  /* Empty state */
+  .empty { padding: 48px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; }
+  .empty-icon { font-size: 32px; opacity: 0.4; margin-bottom: 10px; }
+
+  /* Compact table actions */
+  .row-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .row-btn {
+    background: none; border: 1px solid var(--line); padding: 5px 10px;
+    border-radius: 4px; font-family: inherit; font-size: 11px;
+    cursor: pointer; color: var(--ink-muted); transition: all 0.15s;
+  }
+  .row-btn:hover { border-color: var(--accent); color: var(--accent); background: #faf8f3; }
+  .row-btn.danger:hover { border-color: var(--red); color: var(--red); }
+  .row-btn.gold { border-color: rgba(184,136,74,0.4); color: var(--accent-warm); }
+  .row-btn.gold:hover { background: #faf0e0; border-color: var(--accent-warm); color: var(--accent-warm); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 24px; background: var(--accent);
+    color: #f5f3ee; padding: 12px 20px; border-radius: 6px; font-size: 13px;
+    box-shadow: var(--shadow-lg); transform: translateY(120%);
+    transition: transform 0.3s; z-index: 200;
+  }
+  .toast.show { transform: translateY(0); }
+  .toast.error { background: var(--red); }
+
+  .hidden { display: none !important; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+
+  @media (max-width: 1000px) {
+    .pl-focus { grid-template-columns: 1fr 1fr; }
+    .pl-focus-card.actions { grid-column: 1 / -1; }
+  }
+  /* Tablet / mid widths: let the wide table scroll horizontally */
+  @media (max-width: 900px) and (min-width: 761px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .table-wrap table { min-width: 1000px; }
+  }
+  @media (max-width: 900px) {
+    .pl-topbar { padding: 14px 16px; }
+    .main { padding: 20px 16px; }
+  }
+
+  /* ===== Mobile (<=760px): stacked cards instead of a wide table ===== */
+  @media (max-width: 760px) {
+    .main { padding: 16px 12px; }
+    .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pl-focus { grid-template-columns: 1fr; }
+    .stat { padding: 14px 16px; }
+    .stat-value { font-size: 26px; }
+
+    /* Topbar wraps; brand stays, controls drop below if needed */
+    .pl-topbar { flex-wrap: wrap; gap: 10px 12px; padding: 12px 14px; }
+    .pl-soe-logo { height: 34px; }
+    .pl-brand-divider { display: none; }
+    .pl-brand-title { font-size: 16px; }
+    .pl-back { padding: 8px 12px; }
+
+    /* Header + toolbar stack; primary buttons grow, gears stay square */
+    .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+    .page-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+    .page-actions .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+    .pl-gear { flex: none; width: 44px; height: 44px; }
+
+    /* Filters stack full width */
+    .filters { flex-direction: column; align-items: stretch; gap: 6px; }
+    .filters-label { margin: 4px 0 0; }
+    .filter-select, .search-input { width: 100%; max-width: none; min-height: 44px; }
+
+    /* Table -> cards */
+    .table-wrap { overflow-x: visible; background: transparent; border: none; box-shadow: none; }
+    table { min-width: 0 !important; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tr { background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden; }
+    tr:hover td { background: inherit; }
+    td { display: flex; justify-content: space-between; align-items: center; gap: 14px; text-align: end; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    td:last-child { border-bottom: none; }
+    td:before { content: attr(data-label); font-size: 11px; font-weight: 600; color: var(--ink-muted); letter-spacing: 0.03em; text-align: start; flex: 0 0 auto; max-width: 45%; }
+    /* Company cell becomes the card title (no label, full width) */
+    td.cell-company { display: block; text-align: start; background: #faf8f3; padding: 12px 14px; }
+    td.cell-company:before { display: none; }
+    td.cell-company .name { font-size: 16px; }
+    /* Actions row full width, buttons sized for touch */
+    td.cell-actions { display: block; }
+    td.cell-actions:before { display: block; margin-bottom: 6px; }
+    .row-actions { justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
+    .row-actions .row-btn { flex: 1 1 auto; min-height: 40px; text-align: center; justify-content: center; }
+    .pl-score-bar { width: 90px; }
+
+    /* Modals: breathing room + single-column form rows */
+    .modal-overlay { padding: 10px; }
+    .modal { max-width: 100%; }
+    .modal-body { padding: 18px 16px; }
+    .form-row.row-2, .form-row.row-3 { grid-template-columns: 1fr; }
+    .pl-attach-row { grid-template-columns: 1fr; gap: 6px; }
+    .pl-attach-row .pl-mini-del { width: 100%; height: 38px; }
+    .pl-kc-row { grid-template-columns: 1fr 1fr; }
+    tr.row-stale { border-inline-start: 4px solid #e0a92b; }
+    tr.row-critical { border-inline-start: 4px solid #d9772b; }
+    tr.row-overdue { border-inline-start: 4px solid #c0392b; }
+    .pl-today { width: 100%; text-align: center; }
+    .wl-cards { grid-template-columns: 1fr; }
+    .wl-filter .fld, .wl-filter .fld input { width: 100%; }
+    .modal-foot { flex-wrap: wrap; }
+    .modal-foot .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+    .form-row input, .form-row select, .form-row textarea { font-size: 16px; }  /* avoid iOS zoom-on-focus */
+  }
+
+  @media (max-width: 380px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="pl-topbar">
+  <div class="pl-brand">
+    <img class="pl-soe-logo" id="pl-soe-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGYAAAAsCAYAAACXHM1oAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAPJElEQVR42u1be1hU1dr/vWvPjatcRVBUVMRAu+hnpqcSzPLzlFnW4JMdzSzB7mW346O52eZJv87Nrh7wSystc6ZTVpamFuiXZhczPQKJoOEF5M4AMwMzs/f7/TGDUqKgAl4e1/OsZ689l7Xf9V5/633XJlxuXdqGDRumv/u2a++J9PPMrXHrFrsaGyMjjKo5ff67w1+RpyyHRnjixfdmiMus6tr200873XOUpe+WllT+/OwLS1c4qiudVXV10elPjOtb72zo2WCvdwLAZcF0cdM0kMVslox+JB6797+DAyMNmpulD3vp/Ja7YNxq8pfqLgvmPLVUq1V1qOSpKVdVCJOusrZ+Q1BQgORx2zY53OQPALrLbOraRgQGgAPFjc+s2rTJkRYx+r19Jag9Vuf6FujWECTVHAEAamseWZbpXIlRFEU723XIMigvz0ydwaTExETOyFC4mVkXvFAtFrPEFot0vghggLJlWUdEXfM8ZmGxmKVzm8PLt+xsWccsC2am03aLRfKNhe/3gpkpO1vWnWQxsiyLBQsWaMzNChQeNGXSiDDRZA9SyeURfm5GEwAjgCbfT4y+a8t731jT6am+TjjWbd52qL0LlGVZtLAwMt96XUxAAKI0dusEUYdptsY60ovA+m//U1KWl5dX7RMQgQiEM7Mgi8UspaZa1Q61jlYmF4vnTJs0qKfhngA/3ShJr4/SSyCGdlydQThBOp1Q8+P3zWPWYNQH4Of9tmnpLyxbmS3LuhRF8bS1wN69h4QqDw1/sEeEuMdo0A02Gfz0kE7+G/lo4eYxACYfSewd43ffHTdJCKgeoNHdVFvfSFtzD9qWz/uf9z9p1v52ujcSRKwxY9CgQeFP3HftjVHhgaOEx5PY6GoKJQgNjHaYvQZAYr2kGuyq2Pl/+RVP61oyJP3+2xPHDg3LHBLX/Xqj0Q+HSivhcDaW2VwaQ4gzlDixIDAZGxrqPM6jACgZOGWssZi9NDw5a/yYm4f2yxrcP6R/vd2Dw+W22lpHfbWAaGrfItvrLjUQUWCwn1/U1QOCb+8X4397n5fvX/vG2989IERe9e8st1V3KwisMeP1+alPD4wNfaZPbGQPkwFocrrgUsnLBWjtosYDgp9Bwi/F9cODPLbFZDGbpVSrVZWfmHTjDVdFr42PCwvdW1RZtP+I/Y38fVXrMld/fhQ4q+DYbFuNbf2/mYbnZ00YM2Zk3Bf9Y4KNuwuObt2TX/FP69cHtubl5TUA8HR0LAWgnzIpJeq6pKjJCXEhzybFxURs3Xnk+8Xv7hize/edTiKFW6OdAQIzKDbWtGJ2ygejBve6vdGhovCo7ZuyKvu6soqyIqeLbIKFT5GawW/zElre6wB4IPlJLoOkk6pK7YdeXb15P4gIT04bl7Tx7Udq9m+cw8sXzVzTe8j1oR0HD8nru08TNGVZFlNvGh6+9o20Iwc2Pc/LFk1b2tLNElGn9JZt6uQ7Bn629MH8I1/N46UZ92Y2e5JTgSMAunf+Ov2T4myZP1/2SOnC5yfd1ZFao2Nm6dqrY98c1DcsZMO3v1rT5qycTARkZqbpS0qiVUVRzingstdhn3KOnBxZUhTFs+yl+x8emhjT85vdh3Jmznn3IWamjIxknaJsUU+Akc5AZIA1w6xPVawFQTTu7rBA/x1XxIfPfHzGra+lplr3/t6lWSwWkZqaqi55Yeqfb7gq9va9haUlH3x+YOzKtZvzmWWRkwGRgxwk5XU/c6LNQG5uIiuKomHBc3dM+vnTZ3h91qxfBwwYEMzMZDabuwoqk09zjR/9a+bBnz+ew3Puv2M0EUGWR3fp5vfHzDQ9ALyx8L43D+XM57cW3fsSADTDVy9ihCAAEyaMiFr/1qO1uz562v3crLHjAMAimw0dSY/oHxsyI8hgQEGx/dXCwsK6nIwMyWrtWOh3GmhMzIzpE68bGBmo732kvObgohVrd2iaRoqyRe1KwRwIrdGYmarrtfcb6p1qsL/hRgBITs44TkcyZMEAUobGT7yiT3C3wkO2L1/+1+Yvs7NlXapidXWoYCICA0YfKW/w/JhbuQ4A5QBaVzEjKS+PACA+rmdIr6hQoap8zLsLyqCzBBxn3XJzE5mI2F7feExlSP4mQ28AEEIcpyM5I4kBICbUcLOHwYfKbB8zMyGn4+kREUGmwAano3zl2vWHAPC5xpQzcqlWqwYAxWWV+Tvya7MPlzf+GwCQ0fXZBkVRmBm0c/++0p8KbOtLqrX3AUCbP7/FPiGXASDIT9/L1uCkisrqPUTEb+bldTjPdHq9xIBaB8DlQ1Bdl/vxWUXW6i2VWau3jDn++dnn1s4JB3jD3R77pk17/ng6Wgx6naq5AY/L4+4sYoSz0UMgXTgQ6d+VQjlpE8+yYFm+IMoQbdKigQCCpnGnJfOEzeYsCw32C581dVi8D5GJ86OtinaeLKUVqNgGLaQCYLih7zQaRFld3cbo8EBxTVLk3UTEY8eGXi6eXQBN7CqoyiqtdKgJsaGP3jNp9KD09Cx3tixfLqCd56b7R9aGb5L6hy8fP2LgzLuSE1YXFBfcnKIoldnZsq6iIo9zcxPbFXgupoJTRyTZiAkmPUmyPFpXXV0vyfLoc4w3yVrLDIOOWRapN697Ntjff+SIqyOvnituy94x/PDMlBRlx5nBTUAQ4av583U5gKZcIPGik0IiNKGhtKKhdtXyHR50SIJ1y28tJiMDsG7eafMEucZLPOLTEYm9r4kMMX0zODF6TUm585Nfiyv22xv9qhjlp0zTSCKUi/YV2b/5ubCiud7SGcWjC0YsLEGSGAnxUZOUp8YXCYKOwGeliBqp7CeZRLXNvXdR5oa85loQ+VIjQlEULTw8PGjxs+P/Et8zbGbfnmEmj9uDapsdTpdTAwtBILDPW3m35gQCIDSCS/XY7R4pr7ym8YuN3+avXLN2exEzN+fC+NIQiCyIFO2LrIe3948yjXTpjDBJGhhnn1rUNEZQgAE79pbWPv/Pr3vs31/oIvIVBhRF0WQZQlGq6mf+edXj06ff+FryoH4TI8L8bxCS6K+61QhvpoZOdrbMIDAMel1w3x7+w4cMDBneL8Z/9g1XDXyZiBb6yrVEuHTijyANbpWQd/DYVmLNxsJAdNabQGajSYdqR2NOYWGh67f12BasbqUGQQD82+gBo0YlxMiP33LbB6+kvfe99Snev/F5fuevD6wCINg7J10KFgMAm99K3/bdh0/yLSMHD+o0VPb7Z6emWlVZlkUyIJKTklhMTlWZ4Whrou3b99m3b99XAmCdPPvONSMTo94ZPTT63qyFZhelWmdcWjGHIFjD0KSYgC+fmi9Zc3Mlc1LS2a/NDFitVpwpf6g9vfn4DvvqF+lTJvzh61WP1e759Gle/NzkSc2A4FKwmE1vpW/70TKbZ0+96RoA6Iz6VXt2+dyeTuS1NkpRPBbZbMh8/7NtO/ccnednNKJfr24LAOjNZot2qVgMg+HuxCd0SvolVbG6LRaz9OzLH735y8HKwgG9uiXNnTlxOBGxxXxxW02XAYzOsvrIyEQCoJXWuj4LD/Hnfn1DrgeAyIcT6TQu84La3F+KgkFOTg4AoLrW9h+Px0PdgnRxbTCCiS4YofDp917cGqK9OASTlOQ9JeJ0OqpcHg1utxYDAMkVSXyKOBbIfMEIxQ84vms8SV2IBIPp4hRMZG45AaDgwMAok15ASFwMADmRucdXJPuKUbOnT4xdm/VobtbiGX87j+iNmAGzeWw3y+sP7Vrx8oPvAQC38rYDa5BICBiFkS86wSA5GQA4IiTwGiGIax1agdfHtbAq32GM0HApLqmvf+/oMOMoL/xM7HLbkWWZiMAJ0ZHdE2L9ErqHStcCgFiw4ASStCYRANQ4m6r9A02IiDD0YwYlJpbTxSIYSs6BhmHD9N1D/CaUVdbT3sLabQDQ8uBCbqJXAHvzDh87cqxelVjEAdH+gMJdH3xzhCzLwmRCPz+9QbU3OA96c1knDmM0W3uFzb09yCDQOyrkNiJwslcJL3zBZGam6UhRtL+NH/hwfFz3XkUldT+8tvzTPcyyaHlmTVEUjZlpzfofiirr3flxvUJ6KI9cO54InJmW1qXFugkxU0hRFK1HqGGG0WSQqhzal14Qc4JHOTneo135uYX/Lj5cq/bpFWKeYU5JGJOieDr6gKJo4V/PucuyLCyy2ZCenuWekXrr4KHx4QvqG5woLHPMA6BarXknWUFORoYEQD1W7n7DYGAMviLsRQD+6VlZ7szMNL0sy6IjaDtVt5jN0o8/pun/Kz3d/dysW8cNjQ+/c9+vNc6cPeWrWwqjWZEsFrP0+upvf8ktqVnep0dI4C3X917B6GNSlC2e7GxZZzabpXOlqdO8xYPT/pD0ReZjBYeyZc58KXVFGwGdWJbFgAEDjGuWzPzpcPYcfvcfD34+cuTI7l1pMX9+6K5bNi5/qLJw4wv86gt/muel+eS36pi99E6ceFXIh6+nF/6aPZdXv3bf15PvuHJgZyQxKS3NHOzx9NUQDoT7PqzCiXFrrcp3DWhsJP+mY9TgbIi6Mj5iQnxs8NyEuKDQr344sOOVVZbHmGUBOmVFkzMAKioqatq178q7AwJNX40d2vOPEUHih8Pj45fsO9Kwfk9NXSlqAJ1O12GgwOPxEDPrrh8UMqRvT7+p/fuEzIjtEYbN3x368PEXVy30Jl1TtZOhMliWQZ98srs2KiDyTpPAutFD+qR0DzD9cNN1Q5YVl9jXFvziyKvRNPWM6a0GEAZs2LChjgCI1UvSvkzoEzTC0ejxaIAEZqDlbu/39615RBbQVE9wz+5BaGhwYPfB8pVPL1v/SHVBdb3G3GY9prlY9+ifbo4bPbzv/w6M6zbG32REaUUDPKpWzdyxaTYGQZCQQvz13UJDTDhc3tCYX1i1JH3+qnnMrLVV4Gumd9ydw6Knjr767/HRQfdEhQWjwuaA3aHaPKypBPWUU7S2DdLAbNTr6Gh50y4CQG///YE1fbv7jbHbm4QGSDhepTxRsYSvWtnaY0iomgYdGfU6m91h35d/xPnm3EWWtQRAa/9rc795/3LhM6nTBvYOmhISqEsiSL1Eh6YFGICAy+0BC86vqHZt21VYu3RJ1sc/nUnVtSW9c5+4NTkxttv08NDAYaxKVxiNkLy6dGp8xc0M9V0ZDJNBj+Jy5/f/D/nhjevYnQqrAAAAAElFTkSuQmCC" alt="SOE">
+    <div class="pl-brand-divider"></div>
+    <div class="pl-bd-square">BD</div>
+    <div>
+      <div class="pl-brand-title" id="pl-brand-title">Opportunities</div>
+      <div class="pl-brand-sub" id="pl-brand-sub">SOE Business Development</div>
+    </div>
+  </div>
+  <div class="pl-topbar-spacer"></div>
+  <div class="pl-today" id="pl-today"></div>
+  <a class="pl-back" id="pl-back-link" href="index.html">↩ <span id="pl-back-text">الحوكمة</span></a>
+  <div class="pl-lang-toggle">
+    <button id="pl-lang-ar" onclick="plSetLang('ar')">عربي</button>
+    <button id="pl-lang-en" onclick="plSetLang('en')">English</button>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-head">
+    <div>
+      <div class="page-title" id="pl-page-title">🎯 الفرص التجارية – SOE</div>
+      <div class="page-sub" id="pl-page-sub">تتبّع الفرص من أول تواصل حتى الإغلاق</div>
+    </div>
+    <div class="page-actions">
+      <button class="pl-gear" id="pl-gear-prob" title="" onclick="plOpenProbConfig()">⚙️</button>
+      <button class="pl-gear" id="pl-gear-prod" title="" onclick="plOpenProductConfig()">🧩</button>
+      <button class="pl-gear" id="pl-gear-score" title="" onclick="plOpenScoreConfig()">📊</button>
+      <button class="pl-gear" id="pl-data-btn" title="" onclick="plOpenDataModal()">🗄️</button>
+      <button class="pl-gear" id="pl-thr-btn" title="" onclick="plOpenThresholds()">⏱️</button>
+      <button class="btn ghost" id="pl-export-btn" onclick="plExportCSV()">⬇ <span id="pl-export-text">تصدير CSV</span></button>
+      <button class="btn ghost" id="pl-winloss-btn" onclick="plOpenWinLoss()">📊 <span id="pl-winloss-text">تحليل الفوز/الخسارة</span></button>
+      <button class="btn ghost" id="pl-offline-btn" onclick="plExportOfflinePack()">📱 <span id="pl-offline-text">حقيبة العمل دون اتصال</span></button>
+      <button class="btn ghost" id="pl-report-btn" onclick="plOpenReportConfig()">📄 <span id="pl-report-text">تقرير تنفيذي</span></button>
+      <button class="btn" id="pl-add-btn" onclick="plOpenLeadForm()">+ <span id="pl-add-text">إضافة فرصة</span></button>
+    </div>
+  </div>
+
+  <!-- Focus widget: ABOVE the stats -->
+  <div class="pl-focus" id="pl-focus"></div>
+
+  <!-- Original stats (kept, below the focus widget) -->
+  <div class="stats" id="pl-stats"></div>
+
+  <div class="filters" id="pl-filters"></div>
+
+  <div class="pl-focus-chip-wrap" id="pl-focus-chip-wrap" style="display:none;"></div>
+
+  <div class="pl-legend" id="pl-legend"></div>
+  <div class="table-wrap" id="pl-table-wrap"></div>
+</main>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 class="modal-title" id="modal-title">—</h3>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================================
+   SUPABASE — replace these placeholders with your project's values.
+   Must match the governance system so all pages share one database.
+   ============================================================================ */
+const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
+
+const SUPABASE_ENABLED =
+  SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+  SUPABASE_ANON_KEY !== 'YOUR_ANON_KEY' &&
+  typeof window !== 'undefined' && window.supabase &&
+  typeof window.supabase.createClient === 'function';
+
+const supabaseClient = SUPABASE_ENABLED
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+const LANG_KEY = 'governance_lang';            // shared with the governance app
+const CACHE_KEY = 'opportunities_cache_v1';    // local cache (own key)
+const PROB_CONFIG_KEY = 'opportunities_prob_config_v1';
+const SCORE_CONFIG_KEY = 'opportunities_score_config_v1';
+const THRESHOLDS_KEY = 'opportunities_thresholds_v1';
+
+/* ============================================================================
+   TRANSLATIONS — same t('key') pattern.
+   ============================================================================ */
+const T = {
+  ar: {
+    brandTitle: 'الفرص', brandSub: 'تطوير أعمال SOE',
+    pageTitle: '🎯 الفرص التجارية – SOE', pageSub: 'تتبّع الفرص من أول تواصل حتى الإغلاق',
+    backToGovernance: 'الحوكمة', addLead: 'إضافة فرصة', exportCSV: 'تصدير CSV',
+    gearProbTitle: 'إعداد الاحتمالية', gearProdTitle: 'إدارة المنتجات', gearScoreTitle: 'إعداد معادلة النقاط',
+    scoreTitle: 'معادلة احتساب النقاط', scoreHint: 'النقاط = (الاحتمالية × المعامل) + مكافأة المرحلة + مكافأة القيمة العالية، ثم تُقصَر بين 0 و100.',
+    scoreProbWeight: 'معامل الاحتمالية (×)', scoreStageBonus: 'مكافأة مرحلة {0}', scoreHighValueThreshold: 'حد القيمة العالية (ريال)', scoreHighValueBonus: 'مكافأة القيمة العالية (نقاط)',
+    resetDefaults: 'استعادة الافتراضي', toastScoreSaved: 'تم حفظ معادلة النقاط',
+    // focus widget
+    focusHot: 'فرص ساخنة 🔥', focusHotMeta: 'احتمالية ≥ 60% وقيمة > 100,000 ريال',
+    focusStale: '🕒 فرص خاملة', focusStaleMeta: 'لم تُحدَّث منذ أكثر من {0} يوم عمل',
+    focusActions: '💡 اقتراحات العمل', focusActionsMeta: 'فرص عالقة أكثر من {0} أيام عمل',
+    focusClickHint: 'اضغط للتصفية',
+    chipAgingActive: 'فرص متقادمة فقط',
+    chipHotActive: '🔥 عرض الفرص الساخنة فقط',
+    chipStaleActive: '🕒 عرض الفرص الخاملة فقط',
+    clearFilter: 'إزالة',
+    todayLabel: 'اليوم', legendTitle: 'دليل الألوان', legendOverdue: 'إجراء متأخر', legendCritical: 'حرِج (>{0} يوم عمل في النظام)', legendStale: 'خامل (>{0} يوم في النظام أو >{1} في المرحلة)',
+    gearThrTitle: 'حدود التنبيه', thrTitle: 'حدود التنبيه (أيام عمل)', thrHint: 'تُحتسب جميع الأيام كأيام عمل سعودية (الأحد–الخميس). الجمعة والسبت عطلة نهاية الأسبوع.',
+    thrAgingWarn: 'متقادم — تحذير (يوم عمل)', thrAgingCrit: 'متقادم — حرِج (يوم عمل)', thrStaleDays: 'خامل — بلا تحديث (يوم عمل)', thrStageStale: 'عالق في المرحلة (يوم عمل)', thrStuckBiz: 'عالق — للاقتراحات (يوم عمل)', toastThrSaved: 'تم حفظ حدود التنبيه',
+    sugStageDays: '{0} · عالقة منذ {1} يوم عمل', noStuck: '✅ لا توجد فرص عالقة — كل شيء يسير جيدًا!',
+    // stats
+    statTotal: '📊 إجمالي الفرص', statAvgWin: '🏆 متوسط زمن الفوز', statAvgLoss: '❌ متوسط زمن الخسارة', statAging: 'فرص متقادمة (>{0} يوم عمل)',
+    days: 'يوم', noData: '—',
+    // table
+    thCompany: 'الشركة', thContact: 'جهة الاتصال', thSource: 'المصدر', thType: 'النوع', thProduct: 'المنتج', thStage: 'المرحلة',
+    thProbability: 'الاحتمالية', thValue: 'القيمة المتوقعة', thCloseDate: 'تاريخ الإغلاق', thFlags: 'مؤشرات', thScore: 'النقاط', thPriority: 'الأولوية', thActions: 'إجراءات',
+    // filters
+    filterStage: 'المرحلة', filterSource: 'المصدر', filterType: 'النوع', allStages: 'كل المراحل', allSources: 'كل المصادر', allTypes: 'كل الأنواع', searchPh: 'ابحث بالشركة أو جهة الاتصال…',
+    // stages
+    stage_Prospect: 'مبدئي', stage_Qualified: 'مؤهّل', stage_Proposal: 'عرض', stage_Negotiation: 'تفاوض', 'stage_Closed Won': 'إغلاق ناجح', 'stage_Closed Lost': 'إغلاق خاسر',
+    // sources
+    src_Inbound: 'وارد', src_Outbound: 'صادر', src_Referral: 'إحالة', 'src_Previous Client': 'عميل سابق', src_Other: 'أخرى',
+    // types
+    'type_own-product': 'منتج خاص', 'type_partner-product': 'منتج شريك', 'type_open-source': 'مفتوح المصدر', type_consulting: 'استشارات', type_other: 'أخرى',
+    // flags
+    flagAging30: '⚠️ متقادم (>{0} يوم)', flagAging60: '🔴 متقادم (>{0} يوم)', flagStale: '🕒 خامل (>{0} يوم)', flagClosedDays: 'أُغلق خلال {0} يوم',
+    // form
+    formAddTitle: 'إضافة فرصة', formEditTitle: 'تعديل الفرصة',
+    secContact: 'جهة الاتصال', secOpportunity: 'تفاصيل الفرصة', secAttachments: 'المرفقات (روابط)',
+    secKeyContacts: 'جهات الاتصال الرئيسية', kcName: 'الاسم', kcRole: 'المنصب', kcInfluence: 'التأثير', kcRelationship: 'العلاقة', kcIntroPath: 'مسار التقديم', kcAdd: '+ إضافة جهة اتصال',
+    kcHigh: 'عالي', kcMedium: 'متوسط', kcLow: 'منخفض', kcWarm: 'دافئة', kcNeutral: 'محايدة', kcCold: 'باردة',
+    kcWarmContactHint: 'جهة اتصال دافئة: {0} ({1}) – {2}. استخدم هذا التقديم لفك تعثّر الصفقة.', kcWarmAvailable: 'تتوفّر جهة اتصال دافئة',
+    velFaster: 'أسرع من المعتاد (عادةً {0} يوم عمل)', velSlower: 'أبطأ من المعتاد (عادةً {0} يوم عمل)', velAvg: 'قريب من المتوسط ({0} يوم عمل)', daysShort: 'ي',
+    remindLater: 'ذكّرني لاحقًا', remindInDays: 'ذكّرني بعد (أيام)', reminderSet: 'تم ضبط تذكير في {0}', pendingReview: 'بانتظار المراجعة', reminderOverdue: 'تذكير المراجعة متأخر – راجِع هذه الفرصة.',
+    clearReminder: 'مسح التذكير', reminderTitle: 'ضبط تذكير مراجعة', reminderReasonLabel: 'السبب (اختياري)', reminderLine: 'تذكير: {0} – راجِع الآن (ضُبط في {1}).',
+    fCompany: 'اسم الشركة', fContact: 'اسم جهة الاتصال', fDesignation: 'المسمّى الوظيفي', fEmail: 'البريد الإلكتروني', fPhone: 'الهاتف',
+    fSource: 'المصدر', fSourceCustom: 'حدّد المصدر', fType: 'نوع الفرصة', fProduct: 'المنتج', fPartner: 'الشريك المرتبط',
+    fStage: 'المرحلة', fProbability: 'الاحتمالية (%)', fManual: 'تجاوز يدوي للاحتمالية', fValue: 'القيمة المتوقعة (ريال)', fCloseDate: 'تاريخ الإغلاق المتوقع', fNotes: 'ملاحظات',
+    fNextAction: 'الإجراء التالي', fDeadline: 'الموعد النهائي', thDaysInSystem: 'أيام في النظام', thActionDue: '⏰ الإجراء / الاستحقاق',
+    alertStageNeedsAction: 'عند تغيير المرحلة يجب تعبئة «الإجراء التالي» و«الموعد النهائي» معًا قبل الحفظ.',
+    selectPartner: '— اختر شريكًا —', selectProduct: '— بدون منتج —',
+    attachName: 'الاسم', attachUrl: 'الرابط', attachDesc: 'الوصف', addAttachment: '+ إضافة مرفق',
+    save: 'حفظ', cancel: 'إلغاء', convertBtn: 'تحويل', editBtn: 'تعديل', deleteBtn: 'حذف',
+    // probability config
+    probTitle: 'الاحتمالية الافتراضية لكل مرحلة', probHint: 'تُطبَّق تلقائيًا عند تغيير المرحلة، ما لم يُفعَّل التجاوز اليدوي.',
+    // product config
+    prodTitle: 'إدارة المنتجات', prodName: 'اسم المنتج', prodType: 'النوع', prodDesc: 'الوصف', addProduct: '+ إضافة منتج', noProducts: 'لا توجد منتجات بعد.', editProduct: 'تعديل', saveProduct: 'حفظ المنتج',
+    stageTipSection: 'نصائح تسريع المرحلة', stageTipProspect: 'نصيحة لمرحلة المبدئي', stageTipQualified: 'نصيحة لمرحلة المؤهّل', stageTipProposal: 'نصيحة لمرحلة العرض', stageTipNegotiation: 'نصيحة لمرحلة التفاوض', tipAvailable: 'نصيحة تسريع متاحة',
+    // delete / convert
+    delTitle: 'حذف الفرصة', delMsg: 'هل أنت متأكد من حذف «{0}»؟ لا يمكن التراجع.', confirmDelete: 'نعم، احذف',
+    convTitle: 'تحويل إلى شريك (عميل)', convMsg: 'سيتم تحويل «{0}» إلى عميل/شريك في نظام الحوكمة، وتُعلَّم الفرصة كـ «إغلاق ناجح». يمكنك إنشاء المشروع يدويًا من صفحة الشريك في الحوكمة.', confirmConvert: 'تأكيد التحويل', clientLabel: 'عميل',
+    // toasts
+    toastAdded: 'تمت إضافة الفرصة', toastSaved: 'تم حفظ التغييرات', toastDeleted: 'تم حذف الفرصة',
+    toastConverted: 'تم التحويل — افتح صفحة الشريك لإنشاء المشروع', toastError: 'تعذّر الحفظ — تحقّق من الاتصال', toastLoadError: 'تعذّر تحميل البيانات',
+    winLossBtn: 'تحليل الفوز/الخسارة', offlineBtn: 'حقيبة العمل دون اتصال', toastOfflinePack: 'تم إنشاء حقيبة العمل دون اتصال', reasonWonTitle: 'سبب الفوز', reasonLostTitle: 'سبب الخسارة', reasonLabel: 'السبب', reasonSelect: '— اختر السبب —', reasonNotes: 'ملاحظات إضافية', reasonRequired: 'يرجى اختيار سبب قبل المتابعة.', reasonNone: 'لم يُسجَّل سبب',
+    reason_won_pricing: 'الاتفاق على السعر والشروط', reason_won_fit: 'ملاءمة المنتج', reason_won_relationship: 'العلاقة / الثقة', reason_won_technical: 'تفوّق تقني', reason_won_urgent: 'حاجة عاجلة', reason_won_other: 'أخرى', reason_won_converted: 'تحويل إلى مشروع',
+    reason_lost_budget: 'قيود الميزانية', reason_lost_competitor: 'فاز منافس', reason_lost_nodecision: 'لا قرار / متوقف', reason_lost_fit: 'عدم ملاءمة المنتج', reason_lost_timing: 'التوقيت', reason_lost_relationship: 'العلاقة', reason_lost_other: 'أخرى',
+    wlTitle: 'تحليل أسباب الفوز/الخسارة', wlTotalWon: 'إجمالي الفوز', wlTotalLost: 'إجمالي الخسارة', wlWinRate: 'معدل الفوز', wlWonReasons: 'أسباب الفوز', wlLostReasons: 'أسباب الخسارة', wlFrom: 'من', wlTo: 'إلى', wlReset: 'إعادة ضبط', wlClose: 'إغلاق', wlNoData: 'لا توجد صفقات مغلقة في هذه الفترة.', wlNoWon: 'لا توجد صفقات رابحة.', wlNoLost: 'لا توجد صفقات خاسرة.',
+    toastProbSaved: 'تم حفظ إعدادات الاحتمالية', toastProductSaved: 'تم حفظ المنتج', toastProductDeleted: 'تم حذف المنتج', toastExported: 'تم تصدير البيانات',
+    dataBtn: 'إدارة البيانات', dataTitle: 'إدارة البيانات', backupJSON: 'نسخة احتياطية (JSON)', importData: 'استيراد البيانات', clearAll: 'حذف كل البيانات',
+    dataHint: 'النسخة الاحتياطية تشمل الفرص والمنتجات والإعدادات. الاستيراد يستبدل البيانات الحالية. لا يتأثر الشركاء أو نظام الحوكمة.',
+    clearTitle: 'حذف كل البيانات', clearMsg: 'سيتم حذف جميع الفرص والمنتجات في هذه الوحدة نهائيًا. لا يتأثر الشركاء أو نظام الحوكمة، ولا يمكن التراجع عن هذا الإجراء.', confirmClear: 'نعم، احذف الكل',
+    importConfirm: 'سيتم استبدال البيانات الحالية بالبيانات المستوردة. هل تريد المتابعة؟', importError: 'ملف غير صالح أو لا يحتوي على بيانات.',
+    toastBackup: 'تم تنزيل النسخة الاحتياطية', toastImported: 'تم استيراد البيانات', toastCleared: 'تم حذف كل البيانات',
+    reportBtn: 'تقرير تنفيذي', reportModalTitle: 'إنشاء تقرير تطوير الأعمال', reportRecipient: 'موجّه إلى', recipientCEO: 'الرئيس التنفيذي (CEO)', recipientVP: 'نائب رئيس تطوير الأعمال', recipientCustom: 'مخصّص',
+    reportPreparedBy: 'إعداد', reportSummaryNote: 'ملخّص تنفيذي (اختياري)', reportIncludeComments: 'تضمين قسم ملاحظات وقرارات الإدارة', reportGenerate: 'إنشاء PDF', reportPopupBlocked: 'يرجى السماح بالنوافذ المنبثقة لإنشاء التقرير.',
+    reportTitle: 'تقرير تطوير الأعمال', reportSubtitle: 'تطوير أعمال SOE', reportDate: 'التاريخ', reportPreparedForLabel: 'موجّه إلى', reportPreparedByLabel: 'إعداد',
+    repSecMetrics: 'المؤشرات الرئيسية', repSecPipeline: 'خط الفرص حسب المرحلة', repSecTop: 'أبرز الفرص', repSecNeeds: 'بنود تحتاج قراركم', repSecComments: 'ملاحظات وتوجيهات الإدارة',
+    repMTotal: 'إجمالي الفرص', repMOpen: 'فرص مفتوحة', repMPipeline: 'قيمة خط الفرص', repMWeighted: 'القيمة المتوقّعة (مرجّحة)', repMWon: 'صفقات رابحة', repMLost: 'صفقات خاسرة', repMWinRate: 'معدل الفوز', repMHot: 'فرص ساخنة', repMStale: 'فرص خاملة', repMAvgWin: 'متوسط زمن الفوز',
+    repColStage: 'المرحلة', repColCount: 'العدد', repColValue: 'القيمة', repColTotal: 'الإجمالي', repColCompany: 'الشركة', repColProb: 'الاحتمالية', repColAction: 'الإجراء التالي', repColPriority: 'الأولوية',
+    repReasonOverdue: 'إجراء متأخر', repReasonStuck: 'عالقة', repReasonHighValue: 'تفاوض عالي القيمة', repYourNote: 'ملاحظتكم:', repNoNeeds: 'لا توجد بنود عاجلة تحتاج قراركم حاليًا.', repConfidential: 'سري — للاستخدام الداخلي', repPrint: 'طباعة / حفظ PDF', repGeneratedAt: 'أُنشئ في', repWeightedNote: 'القيمة المتوقّعة = مجموع (القيمة المتوقعة × الاحتمالية) للفرص المفتوحة — رؤية معدّلة حسب احتمال الإغلاق.', repEditHint: 'اكتب ملاحظتك هنا…', reportAttentionComments: 'ملاحظات للبنود التي تحتاج اهتمام الإدارة (تظهر في التقرير)', repBDNotes: 'ملاحظات من إدارة تطوير الأعمال', repExecRespond: 'تعليقات الإدارة على هذه البنود', repSaveCopy: 'حفظ نسخة قابلة للتعديل',
+    alertCompanyRequired: 'اسم الشركة مطلوب', alertProductNameRequired: 'اسم المنتج مطلوب',
+    emptyTitle: 'لا توجد فرص بعد', emptyHint: 'ابدأ بإضافة أول فرصة.', emptyFiltered: 'لا توجد نتائج مطابقة للمرشّحات.',
+    currencySAR: 'ريال', projectSuffix: 'مشروع', createdFromLead: 'أُنشئ من فرصة', genericSolution: 'الحل المقترح',
+    // suggestion templates
+    sug_prospect_own_high: 'أرسل دراسة حالة ذات صلة واعرض عرضًا توضيحيًا مخصصًا لـ {0}.',
+    sug_prospect_consult_low: 'اعرض مكالمة تقييم قيمة مجانية لمدة 30 دقيقة لتأهيل الاحتياجات.',
+    sug_prospect_partner: 'أشرك الشريك مبكرًا ورتّب مكالمة تعريفية مشتركة.',
+    sug_prospect_high_any: 'نظرًا لحجم الصفقة، صعّدها لكبار المبيعات واحجز جلسة تعريفية تنفيذية.',
+    sug_prospect_own_med: 'شارك ملخصًا مخصصًا واقترح مكالمة استكشافية قصيرة.',
+    sug_qualified_partner_med: 'رتّب مكالمة مشتركة مع الفريق التقني للشريك.',
+    sug_qualified_own_high: 'نظّم ورشة عمل تقنية محددة النطاق لتثبيت المتطلبات.',
+    sug_qualified_consult: 'أرسل مسودة نطاق عمل مخصصة لتأكيد الملاءمة والخطوات التالية.',
+    sug_qualified_low: 'أكّد الميزانية والجدول الزمني قبل بذل مزيد من الجهد.',
+    sug_proposal_own_high: 'قدّم مصفوفة مقارنة مقابل المنافس الرئيسي.',
+    sug_proposal_partner: 'نسّق مع الشريك على الجوانب التجارية وقدّم عرضًا مشتركًا.',
+    sug_proposal_med_any: 'تابع العرض المقدَّم واقترح اجتماع مراجعة هذا الأسبوع.',
+    sug_negotiation_high: 'اعرض خصمًا 5% عند التوقيع هذا الأسبوع، أو أضف ضمانًا ممتدًا.',
+    sug_negotiation_inbound_low: 'اطلب إحالة إلى شركة مماثلة مقابل شروط أكثر مرونة.',
+    sug_negotiation_any: 'حدّد العائق الأخير واحصل على التزام مبدئي بشأن التوقيت.',
+    sug_referral_any: 'استثمر جهة الإحالة — اطلب منها تقديمًا دافئًا لصاحب القرار.',
+    sug_outbound_low: 'غيّر القناة (لينكدإن أو اتصال) وابدأ بعرض قيمة أوضح.',
+    sug_fallback: 'توقّفت هذه الفرصة في مرحلة «{0}». أعد التواصل بخطوة محددة وموعد نهائي.'
+  },
+  en: {
+    brandTitle: 'Opportunities', brandSub: 'SOE Business Development',
+    pageTitle: '🎯 Business Opportunities – SOE', pageSub: 'Track opportunities from first contact to close',
+    backToGovernance: 'Governance', addLead: 'Add Opportunity', exportCSV: 'Export CSV',
+    gearProbTitle: 'Probability settings', gearProdTitle: 'Manage products', gearScoreTitle: 'Score formula settings',
+    scoreTitle: 'Score formula', scoreHint: 'Score = (Probability × weight) + stage bonus + high-value bonus, then clamped 0–100.',
+    scoreProbWeight: 'Probability weight (×)', scoreStageBonus: '{0} stage bonus', scoreHighValueThreshold: 'High-value threshold (SAR)', scoreHighValueBonus: 'High-value bonus (points)',
+    resetDefaults: 'Reset to defaults', toastScoreSaved: 'Score formula saved',
+    focusHot: 'Hot Leads 🔥', focusHotMeta: 'Probability ≥ 60% and value > 100,000 SAR',
+    focusStale: '🕒 Stale Leads', focusStaleMeta: 'Not updated for more than {0} business days',
+    focusActions: '💡 Action Suggestions', focusActionsMeta: 'Leads stuck more than {0} business days',
+    focusClickHint: 'Click to filter',
+    chipAgingActive: 'Showing aging leads only',
+    chipHotActive: '🔥 Showing Hot Leads only',
+    chipStaleActive: '🕒 Showing Stale Leads only',
+    clearFilter: 'Clear',
+    todayLabel: 'Today', legendTitle: 'Colour key', legendOverdue: 'Overdue action', legendCritical: 'Critical (>{0} business days in system)', legendStale: 'Stale (>{0} in system or >{1} in stage)',
+    gearThrTitle: 'Alert thresholds', thrTitle: 'Alert thresholds (business days)', thrHint: 'All day counts use Saudi business days (Sun–Thu). Friday & Saturday are the weekend.',
+    thrAgingWarn: 'Aging — warning (work days)', thrAgingCrit: 'Aging — critical (work days)', thrStaleDays: 'Stale — no update (work days)', thrStageStale: 'Stuck in stage (work days)', thrStuckBiz: 'Stuck — for suggestions (work days)', toastThrSaved: 'Thresholds saved',
+    sugStageDays: '{0} · stuck {1} business days', noStuck: '✅ No stuck leads – all moving well!',
+    statTotal: '📊 Total Leads', statAvgWin: '🏆 Avg. Win Time', statAvgLoss: '❌ Avg. Loss Time', statAging: 'Aging Leads (>{0} bd)',
+    days: 'days', noData: '—',
+    thCompany: 'Company', thContact: 'Contact', thSource: 'Source', thType: 'Type', thProduct: 'Product', thStage: 'Stage',
+    thProbability: 'Probability', thValue: 'Expected Value', thCloseDate: 'Expected Close', thFlags: 'Flags', thScore: 'Score', thPriority: 'Priority', thActions: 'Actions',
+    filterStage: 'Stage', filterSource: 'Source', filterType: 'Type', allStages: 'All stages', allSources: 'All sources', allTypes: 'All types', searchPh: 'Search company or contact…',
+    stage_Prospect: 'Prospect', stage_Qualified: 'Qualified', stage_Proposal: 'Proposal', stage_Negotiation: 'Negotiation', 'stage_Closed Won': 'Closed Won', 'stage_Closed Lost': 'Closed Lost',
+    src_Inbound: 'Inbound', src_Outbound: 'Outbound', src_Referral: 'Referral', 'src_Previous Client': 'Previous Client', src_Other: 'Other',
+    'type_own-product': 'Own product', 'type_partner-product': 'Partner product', 'type_open-source': 'Open source', type_consulting: 'Consulting', type_other: 'Other',
+    flagAging30: '⚠️ Aging (>{0}d)', flagAging60: '🔴 Aging (>{0}d)', flagStale: '🕒 Stale (>{0}d)', flagClosedDays: 'Closed in {0}d',
+    formAddTitle: 'Add Opportunity', formEditTitle: 'Edit Opportunity',
+    secContact: 'Contact', secOpportunity: 'Opportunity details', secAttachments: 'Attachments (links)',
+    secKeyContacts: 'Key Contacts', kcName: 'Name', kcRole: 'Role', kcInfluence: 'Influence', kcRelationship: 'Relationship', kcIntroPath: 'Intro path', kcAdd: '+ Add contact',
+    kcHigh: 'High', kcMedium: 'Medium', kcLow: 'Low', kcWarm: 'Warm', kcNeutral: 'Neutral', kcCold: 'Cold',
+    kcWarmContactHint: 'Warm contact: {0} ({1}) – {2}. Use this intro to unblock the deal.', kcWarmAvailable: 'Warm contact available',
+    velFaster: 'Faster than average (usually {0} days)', velSlower: 'Slower than average (usually {0} days)', velAvg: 'About average ({0} days)', daysShort: 'd',
+    remindLater: 'Remind me later', remindInDays: 'Remind me in (days)', reminderSet: 'Reminder set for {0}', pendingReview: 'Pending review', reminderOverdue: 'Review reminder overdue – check this lead.',
+    clearReminder: 'Clear reminder', reminderTitle: 'Set a review reminder', reminderReasonLabel: 'Reason (optional)', reminderLine: 'Reminder: {0} – review now (set on {1}).',
+    fCompany: 'Company name', fContact: 'Contact name', fDesignation: 'Designation', fEmail: 'Email', fPhone: 'Phone',
+    fSource: 'Source', fSourceCustom: 'Specify source', fType: 'Opportunity type', fProduct: 'Product', fPartner: 'Linked partner',
+    fStage: 'Stage', fProbability: 'Probability (%)', fManual: 'Manual probability override', fValue: 'Expected value (SAR)', fCloseDate: 'Expected close date', fNotes: 'Notes',
+    fNextAction: 'Next action', fDeadline: 'Deadline', thDaysInSystem: 'Days in system', thActionDue: '⏰ Action / Due',
+    alertStageNeedsAction: 'When changing the stage, both "Next action" and "Deadline" are required before saving.',
+    selectPartner: '— Select a partner —', selectProduct: '— No product —',
+    attachName: 'Name', attachUrl: 'URL', attachDesc: 'Description', addAttachment: '+ Add attachment',
+    save: 'Save', cancel: 'Cancel', convertBtn: 'Convert', editBtn: 'Edit', deleteBtn: 'Delete',
+    probTitle: 'Default probability per stage', probHint: 'Applied automatically on stage change, unless manual override is on.',
+    prodTitle: 'Manage products', prodName: 'Product name', prodType: 'Type', prodDesc: 'Description', addProduct: '+ Add product', noProducts: 'No products yet.', editProduct: 'Edit', saveProduct: 'Save product',
+    stageTipSection: 'Stage acceleration tips', stageTipProspect: 'Tip for Prospect stage', stageTipQualified: 'Tip for Qualified stage', stageTipProposal: 'Tip for Proposal stage', stageTipNegotiation: 'Tip for Negotiation stage', tipAvailable: 'Acceleration tip available',
+    delTitle: 'Delete Opportunity', delMsg: 'Are you sure you want to delete "{0}"? This cannot be undone.', confirmDelete: 'Yes, delete',
+    convTitle: 'Convert to Partner (Client)', convMsg: 'This turns "{0}" into a client/partner in the governance system. The opportunity will be marked "Closed Won". You can then create the project manually from the partner page in governance.', confirmConvert: 'Confirm conversion', clientLabel: 'Client',
+    toastAdded: 'Opportunity added', toastSaved: 'Changes saved', toastDeleted: 'Opportunity deleted',
+    toastConverted: 'Converted — open the partner page to create the project', toastError: 'Save failed — check your connection', toastLoadError: 'Could not load data',
+    winLossBtn: 'Win/Loss Analysis', offlineBtn: 'Offline Action Pack', toastOfflinePack: 'Offline Action Pack generated', reasonWonTitle: 'Reason for winning', reasonLostTitle: 'Reason for losing', reasonLabel: 'Reason', reasonSelect: '— Select a reason —', reasonNotes: 'Additional notes', reasonRequired: 'Please select a reason before continuing.', reasonNone: 'No reason recorded',
+    reason_won_pricing: 'Pricing & terms agreed', reason_won_fit: 'Product fit', reason_won_relationship: 'Relationship / trust', reason_won_technical: 'Technical win', reason_won_urgent: 'Urgent need', reason_won_other: 'Other', reason_won_converted: 'Converted to project',
+    reason_lost_budget: 'Budget constraints', reason_lost_competitor: 'Competitor won', reason_lost_nodecision: 'No decision / stuck', reason_lost_fit: 'Product fit', reason_lost_timing: 'Timing', reason_lost_relationship: 'Relationship', reason_lost_other: 'Other',
+    wlTitle: 'Win/Loss Reason Analysis', wlTotalWon: 'Total Won', wlTotalLost: 'Total Lost', wlWinRate: 'Win Rate', wlWonReasons: 'Won reasons', wlLostReasons: 'Lost reasons', wlFrom: 'From', wlTo: 'To', wlReset: 'Reset', wlClose: 'Close', wlNoData: 'No closed deals in this range.', wlNoWon: 'No won deals.', wlNoLost: 'No lost deals.',
+    toastProbSaved: 'Probability settings saved', toastProductSaved: 'Product saved', toastProductDeleted: 'Product deleted', toastExported: 'Data exported',
+    dataBtn: 'Data management', dataTitle: 'Data Management', backupJSON: 'Backup (JSON)', importData: 'Import Data', clearAll: 'Clear All Data',
+    dataHint: 'Backup includes opportunities, products and settings. Import replaces current data. Partners / the governance system are not affected.',
+    clearTitle: 'Clear All Data', clearMsg: 'This permanently deletes all opportunities and products in this module. Partners and the governance system are not affected. This cannot be undone.', confirmClear: 'Yes, clear everything',
+    importConfirm: 'This will replace your current data with the imported data. Continue?', importError: 'Invalid file or no data found.',
+    toastBackup: 'Backup downloaded', toastImported: 'Data imported', toastCleared: 'All data cleared',
+    reportBtn: 'Executive Report', reportModalTitle: 'Generate Business Development Report', reportRecipient: 'Prepared for', recipientCEO: 'Chief Executive Officer (CEO)', recipientVP: 'VP of Business Development', recipientCustom: 'Custom',
+    reportPreparedBy: 'Prepared by', reportSummaryNote: 'Executive summary note (optional)', reportIncludeComments: 'Include executive comments & decisions section', reportGenerate: 'Generate PDF', reportPopupBlocked: 'Please allow pop-ups to generate the report.',
+    reportTitle: 'Business Development Report', reportSubtitle: 'SOE Business Development', reportDate: 'Date', reportPreparedForLabel: 'Prepared for', reportPreparedByLabel: 'Prepared by',
+    repSecMetrics: 'Key Metrics', repSecPipeline: 'Pipeline by Stage', repSecTop: 'Top Opportunities', repSecNeeds: 'Items Requiring Your Input', repSecComments: 'Executive Comments & Directives',
+    repMTotal: 'Total opportunities', repMOpen: 'Open opportunities', repMPipeline: 'Pipeline value', repMWeighted: 'Forecast value', repMWon: 'Closed won', repMLost: 'Closed lost', repMWinRate: 'Win rate', repMHot: 'Hot leads', repMStale: 'Stale leads', repMAvgWin: 'Avg. win time',
+    repColStage: 'Stage', repColCount: 'Count', repColValue: 'Value', repColTotal: 'Total', repColCompany: 'Company', repColProb: 'Probability', repColAction: 'Next action', repColPriority: 'Priority',
+    repReasonOverdue: 'Overdue action', repReasonStuck: 'Stalled', repReasonHighValue: 'High-value negotiation', repYourNote: 'Your note:', repNoNeeds: 'No urgent items require your input at this time.', repConfidential: 'Confidential — Internal use', repPrint: 'Print / Save as PDF', repGeneratedAt: 'Generated', repWeightedNote: 'Forecast value = sum of (expected value × probability) across open opportunities — a likelihood-adjusted view of the pipeline.', repEditHint: 'Type your note here…', reportAttentionComments: 'Comments for items needing attention (appear in the report)', repBDNotes: 'Notes from Business Development', repExecRespond: "Executive's comments on these items", repSaveCopy: 'Save editable copy',
+    alertCompanyRequired: 'Company name is required', alertProductNameRequired: 'Product name is required',
+    emptyTitle: 'No opportunities yet', emptyHint: 'Start by adding your first opportunity.', emptyFiltered: 'No opportunities match the current filters.',
+    currencySAR: 'SAR', projectSuffix: 'Project', createdFromLead: 'Created from opportunity', genericSolution: 'your solution',
+    sug_prospect_own_high: 'Send a relevant case study and offer a personalised demo of {0}.',
+    sug_prospect_consult_low: 'Offer a free 30-minute value-assessment call to qualify their needs.',
+    sug_prospect_partner: 'Loop the partner in early and set up a joint introductory call.',
+    sug_prospect_high_any: 'Given the deal size, escalate to senior sales and book an executive briefing.',
+    sug_prospect_own_med: 'Share a tailored one-pager and propose a short discovery call.',
+    sug_qualified_partner_med: "Arrange a joint call with the partner's technical team.",
+    sug_qualified_own_high: 'Run a scoped technical workshop to lock down requirements.',
+    sug_qualified_consult: 'Send a tailored scope-of-work draft to confirm fit and next steps.',
+    sug_qualified_low: 'Confirm budget and timeline before investing more effort.',
+    sug_proposal_own_high: 'Provide a comparison matrix against the main competitor.',
+    sug_proposal_partner: 'Align with the partner on commercials and submit a joint proposal.',
+    sug_proposal_med_any: 'Follow up on the proposal and propose a review meeting this week.',
+    sug_negotiation_high: 'Offer a 5% discount if signed this week, or add an extended warranty.',
+    sug_negotiation_inbound_low: 'Ask for a referral to a similar company in exchange for flexible terms.',
+    sug_negotiation_any: 'Pin down the final blocker and secure a verbal commitment on timing.',
+    sug_referral_any: 'Leverage the referrer — ask them for a warm intro to the decision-maker.',
+    sug_outbound_low: 'Switch channel (LinkedIn or a call) and lead with a sharper value hook.',
+    sug_fallback: 'This opportunity has stalled in "{0}". Re-engage with a concrete next step and a deadline.'
+  }
+};
+
+let currentLang = (typeof localStorage !== 'undefined' && localStorage.getItem(LANG_KEY)) || 'ar';
+
+function t(key, ...args) {
+  let str = (T[currentLang] && T[currentLang][key]) || (T.ar[key]) || key;
+  if (args.length) str = str.replace(/\{(\d+)\}/g, (_, i) => args[i] !== undefined ? args[i] : '');
+  return str;
+}
+
+/* ============================================================================
+   CONSTANTS
+   ============================================================================ */
+const STAGES = ['Prospect', 'Qualified', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'];
+const CONFIGURABLE_STAGES = ['Prospect', 'Qualified', 'Proposal', 'Negotiation'];
+const SOURCES = ['Inbound', 'Outbound', 'Referral', 'Previous Client', 'Other'];
+const TYPES = ['own-product', 'partner-product', 'open-source', 'consulting', 'other'];
+const CLOSED_STAGES = ['Closed Won', 'Closed Lost'];
+const DEFAULT_PROB = { Prospect: 10, Qualified: 30, Proposal: 60, Negotiation: 80 };
+// Configurable Score formula (gives full control over how Score is weighted).
+// Alert thresholds — all counts are SAUDI BUSINESS DAYS (Sun–Thu).
+const DEFAULT_THRESHOLDS = { agingWarn: 30, agingCrit: 60, staleDays: 30, stageStaleDays: 15, stuckBizDays: 5 };
+// Deal velocity (historical business-days per stage, learned from Closed Won leads)
+const VELOCITY_KEY = 'stage_velocity_cache';
+const VELOCITY_STAGES = ['Prospect', 'Qualified', 'Proposal', 'Negotiation'];
+const DEFAULT_VELOCITY = { Prospect: 10, Qualified: 8, Proposal: 12, Negotiation: 7 };
+const DEFAULT_SCORE = {
+  probabilityWeight: 1,
+  stageBonus: { Prospect: 0, Qualified: 2, Proposal: 5, Negotiation: 10, 'Closed Won': 0, 'Closed Lost': 0 },
+  highValueThreshold: 200000,
+  highValueBonus: 0
+};
+
+/* ============================================================================
+   STATE
+   ============================================================================ */
+const state = {
+  leads: [],
+  partners: [],            // read-only mirror of the governance partners table
+  products: [],            // configurable products catalogue
+  filters: { stage: 'all', source: 'all', type: 'all', search: '' },
+  focusFilter: null, // null | 'hot' | 'stale' — transient drill-down from Focus Widget cards
+  sort: { key: 'createdAt', dir: 'desc' }
+};
+
+let editAttachments = [];      // working copy while a lead form is open
+let editingProductId = null;   // product currently being edited in the product modal
+let editKeyContacts = [];      // working copy of key contacts while a lead form is open
+
+/* ============================================================================
+   HELPERS
+   ============================================================================ */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function nowISO() { return new Date().toISOString(); }
+function todayDate() { return new Date().toISOString().slice(0, 10); }
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function daysBetween(fromISO, toISO) {
+  if (!fromISO || !toISO) return null;
+  const a = new Date(fromISO).getTime(), b = new Date(toISO).getTime();
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.floor((b - a) / 86400000);
+}
+
+/* Business days (Sun–Thu) between two dates; Fri (5) & Sat (6) are weekend. */
+function businessDaysBetween(fromISO, toISO) {
+  if (!fromISO) return 0;
+  const start = new Date(fromISO), end = new Date(toISO || nowISO());
+  if (isNaN(start) || isNaN(end) || end <= start) return 0;
+  let count = 0;
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  cur.setDate(cur.getDate() + 1); // count whole days elapsed after the start day
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  while (cur <= endDay) {
+    const d = cur.getDay();
+    if (d !== 5 && d !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+function isClosed(lead) { return CLOSED_STAGES.includes(lead.stage); }
+function fmtMoney(v) { return (Number(v) || 0).toLocaleString('en-US'); }
+function stageEnteredAt(lead) { return lead.stageEnteredAt || lead.updatedAt || lead.createdAt; }
+function daysInCurrentStage(lead) { return businessDaysBetween(stageEnteredAt(lead), nowISO()); }
+
+let _thrCfg = null;
+function getThresholds(force) {
+  if (_thrCfg && !force) return _thrCfg;
+  let cfg = Object.assign({}, DEFAULT_THRESHOLDS);
+  try { const raw = localStorage.getItem(THRESHOLDS_KEY); if (raw) cfg = Object.assign(cfg, JSON.parse(raw) || {}); } catch (e) {}
+  _thrCfg = cfg; return cfg;
+}
+
+function getProduct(id) { return id ? state.products.find(p => p.id === id) : null; }
+
+function valueTier(v) { v = Number(v) || 0; if (v > 200000) return 'high'; if (v >= 50000) return 'med'; return 'low'; }
+
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.toggle('error', !!isError);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function openModal(title, bodyHtml, footHtml) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-foot').innerHTML = footHtml || '';
+  document.getElementById('modal').classList.add('active');
+}
+function closeModal() { document.getElementById('modal').classList.remove('active'); }
+
+function sourceLabel(lead) {
+  if (lead.leadSource === 'Other') return lead.leadSourceCustom || t('src_Other');
+  return t('src_' + lead.leadSource);
+}
+
+/* Score configuration (localStorage, cached). Lets the user tune the formula. */
+let _scoreCfg = null;
+function getScoreConfig(force) {
+  if (_scoreCfg && !force) return _scoreCfg;
+  let cfg = JSON.parse(JSON.stringify(DEFAULT_SCORE));
+  try {
+    const raw = localStorage.getItem(SCORE_CONFIG_KEY);
+    if (raw) {
+      const c = JSON.parse(raw) || {};
+      cfg = Object.assign(cfg, c);
+      cfg.stageBonus = Object.assign({}, DEFAULT_SCORE.stageBonus, c.stageBonus || {});
+    }
+  } catch (e) {}
+  _scoreCfg = cfg;
+  return cfg;
+}
+
+/* Lead score = (probability × weight) + stage bonus + high-value bonus, clamped 0..100. */
+function leadScore(lead) {
+  const cfg = getScoreConfig();
+  let s = (Number(lead.probability) || 0) * (Number(cfg.probabilityWeight) || 0);
+  s += Number(cfg.stageBonus[lead.stage]) || 0;
+  if ((Number(cfg.highValueBonus) || 0) > 0 && (Number(lead.expectedValue) || 0) > (Number(cfg.highValueThreshold) || 0)) {
+    s += Number(cfg.highValueBonus) || 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+/* Priority = (probability × expected value) / (days in current stage + 1). */
+function priorityScore(lead) {
+  const prob = Number(lead.probability) || 0;
+  const val = Number(lead.expectedValue) || 0;
+  return (prob * val) / (daysInCurrentStage(lead) + 1);
+}
+
+/* Probability configuration (localStorage). */
+function getProbConfig() {
+  try {
+    const raw = localStorage.getItem(PROB_CONFIG_KEY);
+    if (raw) { const c = JSON.parse(raw); return Object.assign({}, DEFAULT_PROB, c); }
+  } catch (e) {}
+  return Object.assign({}, DEFAULT_PROB);
+}
+function probabilityForStage(stage) {
+  if (stage === 'Closed Won') return 100;
+  if (stage === 'Closed Lost') return 0;
+  const c = getProbConfig();
+  return c[stage] != null ? c[stage] : 0;
+}
+
+/* ============================================================================
+   DATA LOADING / SAVING
+   ============================================================================ */
+async function loadData() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const c = JSON.parse(raw) || {};
+      if (Array.isArray(c.leads)) state.leads = c.leads;
+      if (Array.isArray(c.partners)) state.partners = c.partners;
+      if (Array.isArray(c.products)) state.products = c.products;
+    }
+  } catch (e) {}
+
+  if (!supabaseClient) { render(); return; }
+
+  try {
+    const [leadsRes, partnersRes, productsRes] = await Promise.all([
+      supabaseClient.from('leads').select('*'),
+      supabaseClient.from('partners').select('*'),
+      supabaseClient.from('products').select('*')
+    ]);
+    if (!leadsRes.error) state.leads = (leadsRes.data || []).map(r => r.data).filter(Boolean);
+    if (!partnersRes.error) state.partners = (partnersRes.data || []).map(r => r.data).filter(Boolean);
+    if (!productsRes.error) state.products = (productsRes.data || []).map(r => r.data).filter(Boolean);
+    cacheLocal();
+  } catch (e) {
+    console.error('Load failed:', e);
+    toast(t('toastLoadError'), true);
+  }
+  render();
+}
+
+function cacheLocal() {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ leads: state.leads, partners: state.partners, products: state.products })); } catch (e) {}
+}
+
+async function persistRow(table, obj) {
+  cacheLocal();
+  if (!supabaseClient) return true;
+  try {
+    const { error } = await supabaseClient.from(table).upsert({ id: obj.id, data: obj }, { onConflict: 'id' });
+    if (error) throw error;
+    return true;
+  } catch (e) { console.error(table + ' save failed:', e); toast(t('toastError'), true); return false; }
+}
+
+async function removeRow(table, id) {
+  cacheLocal();
+  if (!supabaseClient) return true;
+  try {
+    const { error } = await supabaseClient.from(table).delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (e) { console.error(table + ' delete failed:', e); toast(t('toastError'), true); return false; }
+}
+
+/* ============================================================================
+   LANGUAGE
+   ============================================================================ */
+function plSetLang(lang) {
+  currentLang = lang;
+  try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+  applyLangToDocument();
+  render();
+}
+
+function applyLangToDocument() {
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+  document.title = t('pageTitle');
+  document.getElementById('pl-brand-title').textContent = t('brandTitle');
+  document.getElementById('pl-brand-sub').textContent = t('brandSub');
+  document.getElementById('pl-back-text').textContent = t('backToGovernance');
+  document.getElementById('pl-page-title').textContent = t('pageTitle');
+  document.getElementById('pl-page-sub').textContent = t('pageSub');
+  document.getElementById('pl-add-text').textContent = t('addLead');
+  document.getElementById('pl-export-text').textContent = t('exportCSV');
+  document.getElementById('pl-report-text').textContent = t('reportBtn');
+  document.getElementById('pl-winloss-text').textContent = t('winLossBtn');
+  document.getElementById('pl-offline-text').textContent = t('offlineBtn');
+  document.getElementById('pl-gear-prob').title = t('gearProbTitle');
+  document.getElementById('pl-gear-prod').title = t('gearProdTitle');
+  document.getElementById('pl-gear-score').title = t('gearScoreTitle');
+  document.getElementById('pl-data-btn').title = t('dataBtn');
+  document.getElementById('pl-thr-btn').title = t('gearThrTitle');
+  renderToday();
+  document.getElementById('pl-lang-ar').classList.toggle('active', currentLang === 'ar');
+  document.getElementById('pl-lang-en').classList.toggle('active', currentLang === 'en');
+}
+
+/* ============================================================================
+   FOCUS WIDGET (above stats)
+   ============================================================================ */
+function isHot(l) { return !isClosed(l) && (Number(l.probability) || 0) >= 60 && (Number(l.expectedValue) || 0) > 100000; }
+function isStale(l) { return !isClosed(l) && businessDaysBetween(l.updatedAt, nowISO()) > getThresholds().staleDays; }
+function isAging(l) { return !isClosed(l) && daysInSystem(l) > getThresholds().agingWarn; }
+
+/* Rule engine: combines stage + type + product + value tier + source. */
+function suggestionFor(lead) {
+  const stage = lead.stage, type = lead.leadType, tier = valueTier(lead.expectedValue), src = lead.leadSource;
+  const prod = getProduct(lead.productId);
+  const pname = prod ? prod.name : '';
+
+  if (stage === 'Negotiation') {
+    if (tier === 'high') return { key: 'sug_negotiation_high' };
+    if (src === 'Inbound' && tier === 'low') return { key: 'sug_negotiation_inbound_low' };
+    return { key: 'sug_negotiation_any' };
+  }
+  if (stage === 'Proposal') {
+    if (type === 'own-product' && tier === 'high') return { key: 'sug_proposal_own_high' };
+    if (type === 'partner-product') return { key: 'sug_proposal_partner' };
+    return { key: 'sug_proposal_med_any' };
+  }
+  if (stage === 'Qualified') {
+    if (type === 'partner-product' && tier === 'med') return { key: 'sug_qualified_partner_med' };
+    if (type === 'own-product' && tier === 'high') return { key: 'sug_qualified_own_high' };
+    if (type === 'consulting') return { key: 'sug_qualified_consult' };
+    if (src === 'Referral') return { key: 'sug_referral_any' };
+    if (tier === 'low') return { key: 'sug_qualified_low' };
+    return { key: 'sug_fallback', arg: t('stage_' + stage) };
+  }
+  if (stage === 'Prospect') {
+    if (src === 'Referral') return { key: 'sug_referral_any' };
+    if (type === 'own-product' && tier === 'high') return { key: 'sug_prospect_own_high', arg: pname || t('genericSolution') };
+    if (type === 'consulting' && tier === 'low') return { key: 'sug_prospect_consult_low' };
+    if (type === 'partner-product') return { key: 'sug_prospect_partner' };
+    if (src === 'Outbound' && tier === 'low') return { key: 'sug_outbound_low' };
+    if (tier === 'high') return { key: 'sug_prospect_high_any' };
+    if (type === 'own-product' && tier === 'med') return { key: 'sug_prospect_own_med' };
+    return { key: 'sug_fallback', arg: t('stage_' + stage) };
+  }
+  return { key: 'sug_fallback', arg: t('stage_' + stage) };
+}
+
+function stuckLeads() {
+  return state.leads
+    .filter(l => !isClosed(l))
+    .map(l => ({ lead: l, biz: businessDaysBetween(stageEnteredAt(l), nowISO()) }))
+    .filter(x => x.biz > getThresholds().stuckBizDays)
+    .sort((a, b) => b.biz - a.biz);
+}
+
+function renderFocus() {
+  const hot = state.leads.filter(isHot).length;
+  const stale = state.leads.filter(isStale).length;
+  const stuck = stuckLeads();
+  const stuckIds = new Set(stuck.map(x => x.lead.id));
+  const todayStr = todayDate();
+  // Leads whose review reminder is due (today or earlier) but that aren't already in the stuck list.
+  const remindOnly = state.leads.filter(l => !isClosed(l) && l.reminderDate && l.reminderDate <= todayStr && !stuckIds.has(l.id));
+  const reminderLine = l => `<div class="pl-sug-action" style="color:var(--amber);font-weight:600">⏰ ${escapeHtml(t('reminderLine', l.companyName, l.reminderSetAt || l.reminderDate))}</div>`;
+
+  let listHtml = '';
+  // Due reminders first (proactive nudge), each links to edit the lead.
+  remindOnly.forEach(l => {
+    listHtml += `
+        <div class="pl-sug-item">
+          <div class="pl-sug-company" onclick="plOpenLeadForm('${l.id}')">${escapeHtml(l.companyName)}</div>
+          <div class="pl-sug-stage">${t('stage_' + l.stage)}</div>
+          ${reminderLine(l)}
+        </div>`;
+  });
+  const cap = Math.max(0, 6 - remindOnly.length);
+  stuck.slice(0, cap).forEach(x => {
+    const sg = suggestionFor(x.lead);
+    let action = sg.arg !== undefined ? t(sg.key, sg.arg) : t(sg.key);
+    const stageTip = productStageTip(x.lead);   // product-specific tip overrides generic
+    if (stageTip) action = stageTip;
+    const wc = warmKeyContact(x.lead);
+    const warmLine = wc
+      ? `<div class="pl-sug-action">🤝 ${escapeHtml(t('kcWarmContactHint', wc.name || '—', wc.role || '—', wc.introPath || '—'))}</div>`
+      : '';
+    const remLine = (x.lead.reminderDate && x.lead.reminderDate <= todayStr) ? reminderLine(x.lead) : '';
+    listHtml += `
+        <div class="pl-sug-item">
+          <div class="pl-sug-company" onclick="plOpenLeadForm('${x.lead.id}')">${escapeHtml(x.lead.companyName)}</div>
+          <div class="pl-sug-stage">${t('sugStageDays', t('stage_' + x.lead.stage), x.biz)}</div>
+          ${remLine}
+          <div class="pl-sug-action">💡 ${escapeHtml(action)}</div>
+          ${warmLine}
+        </div>`;
+  });
+  const sugHtml = listHtml ? `<div class="pl-sug-list">${listHtml}</div>` : `<div class="pl-sug-empty">${t('noStuck')}</div>`;
+
+  const activeHot = state.focusFilter === 'hot';
+  const activeStale = state.focusFilter === 'stale';
+  document.getElementById('pl-focus').innerHTML = `
+    <div class="pl-focus-card hot clickable${activeHot ? ' active' : ''}" role="button" tabindex="0"
+         onclick="plToggleFocusFilter('hot')" onkeydown="plFocusCardKey(event,'hot')"
+         aria-pressed="${activeHot}">
+      <div class="pl-focus-label">${t('focusHot')}</div>
+      <div class="pl-focus-value">${hot}</div>
+      <div class="pl-focus-meta">${t('focusHotMeta')}</div>
+      <div class="pl-focus-hint">${t('focusClickHint')}</div>
+    </div>
+    <div class="pl-focus-card stale clickable${activeStale ? ' active' : ''}" role="button" tabindex="0"
+         onclick="plToggleFocusFilter('stale')" onkeydown="plFocusCardKey(event,'stale')"
+         aria-pressed="${activeStale}">
+      <div class="pl-focus-label">${t('focusStale')}</div>
+      <div class="pl-focus-value">${stale}</div>
+      <div class="pl-focus-meta">${t('focusStaleMeta', getThresholds().staleDays)}</div>
+      <div class="pl-focus-hint">${t('focusClickHint')}</div>
+    </div>
+    <div class="pl-focus-card actions">
+      <div class="pl-focus-label">${t('focusActions')}</div>
+      <div class="pl-focus-meta">${t('focusActionsMeta', getThresholds().stuckBizDays)}</div>
+      ${sugHtml}
+    </div>`;
+  renderFocusChip();
+}
+
+function renderFocusChip() {
+  const wrap = document.getElementById('pl-focus-chip-wrap');
+  if (!wrap) return;
+  const f = state.focusFilter;
+  if (!f) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  const label = f === 'hot' ? t('chipHotActive') : (f === 'stale' ? t('chipStaleActive') : t('chipAgingActive'));
+  wrap.style.display = 'flex';
+  wrap.innerHTML = `<span class="pl-focus-chip ${f}">${escapeHtml(label)}<button type="button" class="pl-focus-chip-clear" onclick="plClearFocusFilter()" aria-label="${escapeHtml(t('clearFilter'))}" title="${escapeHtml(t('clearFilter'))}">✕</button></span>`;
+}
+
+function plToggleFocusFilter(kind) {
+  // kind: 'hot' | 'stale' | 'aging'. Mutually exclusive; clicking the active one clears it.
+  state.focusFilter = (state.focusFilter === kind) ? null : kind;
+  renderFocus();
+  renderStats();
+  renderTable();
+}
+function plClearFocusFilter() {
+  state.focusFilter = null;
+  renderFocus();
+  renderStats();
+  renderTable();
+}
+function plFocusCardKey(ev, kind) {
+  if (ev.key === 'Enter' || ev.key === ' ') {
+    ev.preventDefault();
+    plToggleFocusFilter(kind);
+  }
+}
+
+/* ============================================================================
+   STATS (kept from pipeline)
+   ============================================================================ */
+function computeStats() {
+  const leads = state.leads;
+  const winTimes = [], lossTimes = [];
+  let aging = 0;
+  leads.forEach(l => {
+    if (l.stage === 'Closed Won') { const d = daysBetween(l.createdAt, l.closedAt); if (d != null) winTimes.push(d); }
+    else if (l.stage === 'Closed Lost') { const d = daysBetween(l.createdAt, l.closedAt); if (d != null) lossTimes.push(d); }
+    else { if (daysInSystem(l) > getThresholds().agingWarn) aging++; }
+  });
+  const avg = arr => arr.length ? Math.round(arr.reduce((s, x) => s + x, 0) / arr.length) : null;
+  return { total: leads.length, avgWin: avg(winTimes), avgLoss: avg(lossTimes), aging };
+}
+
+function renderStats() {
+  const s = computeStats();
+  const dayStr = v => (v == null ? t('noData') : v + ' ' + t('days'));
+  document.getElementById('pl-stats').innerHTML = `
+    <div class="stat"><div class="stat-label">${t('statTotal')}</div><div class="stat-value">${s.total}</div></div>
+    <div class="stat good"><div class="stat-label">${t('statAvgWin')}</div><div class="stat-value">${dayStr(s.avgWin)}</div></div>
+    <div class="stat"><div class="stat-label">${t('statAvgLoss')}</div><div class="stat-value">${dayStr(s.avgLoss)}</div></div>
+    <div class="stat ${s.aging > 0 ? 'warn' : ''} clickable${state.focusFilter === 'aging' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${state.focusFilter === 'aging'}" onclick="plToggleFocusFilter('aging')" onkeydown="plFocusCardKey(event,'aging')"><div class="stat-label">⏳ ${t('statAging', getThresholds().agingWarn)}</div><div class="stat-value">${s.aging}</div><div class="pl-focus-hint">${t('focusClickHint')}</div></div>`;
+}
+
+/* ============================================================================
+   FILTERS
+   ============================================================================ */
+function distinctSources() {
+  const set = new Set();
+  state.leads.forEach(l => {
+    if (l.leadSource === 'Other' && l.leadSourceCustom) set.add('custom:' + l.leadSourceCustom);
+    else if (l.leadSource) set.add(l.leadSource);
+  });
+  return [...set];
+}
+
+function renderFilters() {
+  const f = state.filters;
+  const stageOpts = ['all', ...STAGES].map(s => `<option value="${escapeHtml(s)}" ${f.stage === s ? 'selected' : ''}>${s === 'all' ? t('allStages') : t('stage_' + s)}</option>`).join('');
+  const srcOpts = ['all', ...distinctSources()].map(s => {
+    let label, val = s;
+    if (s === 'all') label = t('allSources');
+    else if (s.startsWith('custom:')) label = s.slice(7);
+    else label = t('src_' + s);
+    return `<option value="${escapeHtml(val)}" ${f.source === val ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+  const typeOpts = ['all', ...TYPES].map(s => `<option value="${escapeHtml(s)}" ${f.type === s ? 'selected' : ''}>${s === 'all' ? t('allTypes') : t('type_' + s)}</option>`).join('');
+
+  document.getElementById('pl-filters').innerHTML = `
+    <span class="filters-label">${t('filterStage')}</span>
+    <select class="filter-select" onchange="plSetFilter('stage', this.value)">${stageOpts}</select>
+    <span class="filters-label">${t('filterSource')}</span>
+    <select class="filter-select" onchange="plSetFilter('source', this.value)">${srcOpts}</select>
+    <span class="filters-label">${t('filterType')}</span>
+    <select class="filter-select" onchange="plSetFilter('type', this.value)">${typeOpts}</select>
+    <input class="search-input" id="pl-search" type="text" placeholder="${escapeHtml(t('searchPh'))}" value="${escapeHtml(f.search)}" oninput="plSetSearch(this.value)">`;
+}
+
+function plSetFilter(key, value) { state.filters[key] = value; renderStats(); renderFocus(); renderTable(); }
+function plSetSearch(value) {
+  state.filters.search = value;
+  renderTable();
+  const el = document.getElementById('pl-search');
+  if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+}
+function plSort(key) {
+  if (state.sort.key === key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+  else { state.sort.key = key; state.sort.dir = 'asc'; }
+  renderTable();
+}
+
+/* ============================================================================
+   TABLE
+   ============================================================================ */
+function filteredLeads() {
+  const f = state.filters;
+  const focus = state.focusFilter; // 'hot' | 'stale' | null
+  let rows = state.leads.filter(l => {
+    if (f.stage !== 'all' && l.stage !== f.stage) return false;
+    if (f.type !== 'all' && l.leadType !== f.type) return false;
+    if (f.source !== 'all') {
+      if (f.source.startsWith('custom:')) {
+        if (!(l.leadSource === 'Other' && l.leadSourceCustom === f.source.slice(7))) return false;
+      } else if (l.leadSource !== f.source) return false;
+    }
+    if (f.search) {
+      const q = f.search.toLowerCase();
+      const hay = ((l.companyName || '') + ' ' + (l.contactName || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (focus === 'hot' && !isHot(l)) return false;
+    if (focus === 'stale' && !isStale(l)) return false;
+    if (focus === 'aging' && !isAging(l)) return false;
+    return true;
+  });
+
+  const { key, dir } = state.sort;
+  const mul = dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    let va, vb;
+    switch (key) {
+      case 'companyName': va = (a.companyName || '').toLowerCase(); vb = (b.companyName || '').toLowerCase(); break;
+      case 'source': va = sourceLabel(a).toLowerCase(); vb = sourceLabel(b).toLowerCase(); break;
+      case 'type': va = t('type_' + a.leadType).toLowerCase(); vb = t('type_' + b.leadType).toLowerCase(); break;
+      case 'product': { const pa = getProduct(a.productId), pb = getProduct(b.productId); va = (pa ? pa.name : '').toLowerCase(); vb = (pb ? pb.name : '').toLowerCase(); break; }
+      case 'daysInSystem': va = daysInSystem(a); vb = daysInSystem(b); break;
+      case 'stage': va = STAGES.indexOf(a.stage); vb = STAGES.indexOf(b.stage); break;
+      case 'probability': va = Number(a.probability) || 0; vb = Number(b.probability) || 0; break;
+      case 'expectedValue': va = Number(a.expectedValue) || 0; vb = Number(b.expectedValue) || 0; break;
+      case 'expectedCloseDate': va = a.expectedCloseDate || ''; vb = b.expectedCloseDate || ''; break;
+      case 'score': va = leadScore(a); vb = leadScore(b); break;
+      default: va = a.createdAt || ''; vb = b.createdAt || '';
+    }
+    if (va < vb) return -1 * mul;
+    if (va > vb) return 1 * mul;
+    return 0;
+  });
+  return rows;
+}
+
+function stageBadge(stage) {
+  const cls = { 'Prospect': 'neutral', 'Qualified': 'blue', 'Proposal': 'sup', 'Negotiation': 'amber', 'Closed Won': 'green', 'Closed Lost': 'crit' }[stage] || 'neutral';
+  return `<span class="badge ${cls}">${t('stage_' + stage)}</span>`;
+}
+function typeBadge(type) {
+  const cls = { 'own-product': 'owned', 'partner-product': 'dev', 'open-source': 'blue', 'consulting': 'sup', 'other': 'custom-type' }[type] || 'neutral';
+  return `<span class="badge ${cls}">${t('type_' + type)}</span>`;
+}
+function flagsHtml(lead) {
+  const badges = [];
+  if (isClosed(lead)) {
+    const d = daysBetween(lead.createdAt, lead.closedAt);
+    if (d != null) badges.push(`<span class="badge slate">${t('flagClosedDays', d)}</span>`);
+  } else {
+    const thr = getThresholds();
+    const today = todayDate();
+    if (lead.reminderDate) {
+      if (lead.reminderDate <= today) {
+        badges.push(`<span class="badge amber" title="${escapeHtml(t('reminderSet', lead.reminderDate))}">⏰ ${t('pendingReview')}</span>`);
+      } else {
+        const rem = daysBetween(nowISO(), lead.reminderDate);
+        badges.push(`<span class="badge slate" title="${escapeHtml(t('reminderSet', lead.reminderDate))}">🕒 ${rem != null ? rem : 0}${t('daysShort')}</span>`);
+      }
+    }
+    const age = daysInSystem(lead);
+    if (age > thr.agingCrit) badges.push(`<span class="badge red">${t('flagAging60', thr.agingCrit)}</span>`);
+    else if (age > thr.agingWarn) badges.push(`<span class="badge amber">${t('flagAging30', thr.agingWarn)}</span>`);
+    const stale = businessDaysBetween(lead.updatedAt, nowISO());
+    if (stale > thr.staleDays) badges.push(`<span class="badge slate">${t('flagStale', thr.staleDays)}</span>`);
+  }
+  return badges.length ? `<div class="badge-stack">${badges.join('')}</div>` : '<span style="color:var(--ink-faint)">—</span>';
+}
+function scoreHtml(lead) {
+  const s = leadScore(lead);
+  const cls = s >= 65 ? 'high' : (s >= 40 ? 'mid' : 'low');
+  return `<div class="pl-score"><span class="pl-score-num">${s}</span><div class="pl-score-bar"><div class="pl-score-fill ${cls}" style="width:${s}%"></div></div></div>`;
+}
+
+function daysInSystem(lead) { return businessDaysBetween(lead.createdAt, nowISO()); }
+
+/* ---- Deal velocity ---- */
+// Accumulate business days spent in the stage a lead is leaving (stored on the lead's JSONB).
+function recordStageDuration(lead, stage, enteredAtISO) {
+  if (!stage || !VELOCITY_STAGES.includes(stage) || !enteredAtISO) return;
+  const d = businessDaysBetween(enteredAtISO, nowISO());
+  if (d <= 0) return;
+  lead.stageDurations = lead.stageDurations || {};
+  lead.stageDurations[stage] = (lead.stageDurations[stage] || 0) + d;
+}
+// Recalculate per-stage averages from all Closed Won leads and cache to localStorage.
+function recomputeStageVelocity() {
+  const acc = {}, cnt = {};
+  state.leads.filter(l => l.stage === 'Closed Won' && l.stageDurations).forEach(l => {
+    Object.keys(l.stageDurations).forEach(st => {
+      if (!VELOCITY_STAGES.includes(st)) return;
+      acc[st] = (acc[st] || 0) + l.stageDurations[st]; cnt[st] = (cnt[st] || 0) + 1;
+    });
+  });
+  const cache = {};
+  Object.keys(acc).forEach(st => { cache[st] = +(acc[st] / cnt[st]).toFixed(1); });
+  try { localStorage.setItem(VELOCITY_KEY, JSON.stringify(cache)); } catch (e) {}
+  _velCache = null;
+  return cache;
+}
+let _velCache = null;
+function getStageVelocity() {
+  if (_velCache) return _velCache;
+  let stored = {};
+  try { const raw = localStorage.getItem(VELOCITY_KEY); if (raw) stored = JSON.parse(raw) || {}; } catch (e) {}
+  _velCache = { vals: Object.assign({}, DEFAULT_VELOCITY, stored), real: stored };
+  return _velCache;
+}
+// Returns a small ▲/▼/— arrow comparing current days-in-stage to the historical average.
+function velocityArrow(lead) {
+  if (isClosed(lead) || !VELOCITY_STAGES.includes(lead.stage)) return '';
+  const cur = daysInCurrentStage(lead);
+  if (cur < 1) return '';
+  const avg = getStageVelocity().vals[lead.stage];
+  if (avg == null) return '';
+  if (cur < avg) return `<span class="pl-vel up" title="${escapeHtml(t('velFaster', avg))}">▲</span>`;
+  if (cur > avg) return `<span class="pl-vel down" title="${escapeHtml(t('velSlower', avg))}">▼</span>`;
+  return `<span class="pl-vel flat" title="${escapeHtml(t('velAvg', avg))}">—</span>`;
+}
+
+/* Row highlight priority: closed > overdue > critical(>60d) > stale(>30d) > stale stage(>15d). */
+function rowClass(lead) {
+  if (isClosed(lead)) return '';
+  const today = todayDate();
+  if (lead.nextActionDue && lead.nextActionDue < today) return 'row-overdue';
+  const thr = getThresholds();
+  const dis = daysInSystem(lead);
+  if (dis > thr.agingCrit) return 'row-critical';
+  if (dis > thr.agingWarn) return 'row-stale';
+  if (daysInCurrentStage(lead) > thr.stageStaleDays) return 'row-stale';
+  return '';
+}
+
+/* Next action + deadline cell; overdue (and not closed) shows red bold. */
+function actionDueHtml(lead) {
+  if (!lead.nextAction) return '<span style="color:var(--ink-faint)">—</span>';
+  const today = todayDate();
+  const overdue = lead.nextActionDue && !isClosed(lead) && lead.nextActionDue < today;
+  const due = lead.nextActionDue ? escapeHtml(lead.nextActionDue) : '';
+  const txt = escapeHtml(lead.nextAction);
+  if (overdue) return `<div class="pl-actiondue-overdue">⏰ ${txt}${due ? ` · ${due}` : ''}</div>`;
+  return `<div>${txt}${due ? `<div class="sub">${due}</div>` : ''}</div>`;
+}
+
+function renderTable() {
+  const rows = filteredLeads();
+  const wrap = document.getElementById('pl-table-wrap');
+
+  if (!state.leads.length) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">🎯</div><div style="font-weight:600;color:var(--ink-muted)">${t('emptyTitle')}</div><div>${t('emptyHint')}</div></div>`;
+    return;
+  }
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div>${t('emptyFiltered')}</div></div>`;
+    return;
+  }
+
+  const sortInd = key => state.sort.key === key ? `<span class="sort-ind">${state.sort.dir === 'asc' ? '▲' : '▼'}</span>` : '';
+
+  const body = rows.map(l => {
+    const closed = isClosed(l);
+    const partner = l.partnerId ? state.partners.find(p => p.id === l.partnerId) : null;
+    const product = getProduct(l.productId);
+    const contactLines = [];
+    if (l.contactName) contactLines.push(`<div>${escapeHtml(l.contactName)}${l.contactDesignation ? ` <span class="sub" style="display:inline">· ${escapeHtml(l.contactDesignation)}</span>` : ''}</div>`);
+    if (l.contactEmail) contactLines.push(`<div class="sub">${escapeHtml(l.contactEmail)}</div>`);
+    if (l.contactPhone) contactLines.push(`<div class="sub">${escapeHtml(l.contactPhone)}</div>`);
+    const rc = rowClass(l);
+    return `
+      <tr class="${rc}">
+        <td class="cell-company" data-label="${t('thCompany')}">
+          <div class="name">${escapeHtml(l.companyName)}${warmKeyContact(l) ? ` <span class="pl-warm-badge" title="${escapeHtml(t('kcWarmAvailable'))}">🤝</span>` : ''}</div>
+          ${partner ? `<div class="sub">↳ ${escapeHtml(partner.name)}</div>` : ''}
+          ${(l.attachments && l.attachments.length) ? `<div class="sub">📎 ${l.attachments.length}</div>` : ''}
+        </td>
+        <td data-label="${t('thContact')}">${contactLines.length ? contactLines.join('') : '—'}</td>
+        <td data-label="${t('thSource')}">${escapeHtml(sourceLabel(l))}</td>
+        <td data-label="${t('thType')}">${typeBadge(l.leadType)}</td>
+        <td data-label="${t('thProduct')}">${product ? `${escapeHtml(product.name)}${productStageTip(l) ? ` <span class="pl-warm-badge" title="${escapeHtml(t('tipAvailable'))}">📌</span>` : ''}` : '<span style="color:var(--ink-faint)">—</span>'}</td>
+        <td data-label="${t('thStage')}">${stageBadge(l.stage)}</td>
+        <td data-label="${t('thProbability')}">${(Number(l.probability) || 0)}%</td>
+        <td data-label="${t('thValue')}">${l.expectedValue ? fmtMoney(l.expectedValue) + ' ' + t('currencySAR') : '—'}</td>
+        <td data-label="${t('thCloseDate')}">${l.expectedCloseDate ? escapeHtml(l.expectedCloseDate) : '—'}</td>
+        <td data-label="${t('thFlags')}">${flagsHtml(l)}</td>
+        <td data-label="${t('thScore')}">${scoreHtml(l)}</td>
+        <td data-label="${t('thDaysInSystem')}">${daysInSystem(l)} ${t('days')}${velocityArrow(l)}</td>
+        <td data-label="${t('thActionDue')}">${actionDueHtml(l)}</td>
+        <td class="cell-actions" data-label="${t('thActions')}">
+          <div class="row-actions">
+            ${!closed ? `<button class="row-btn gold" onclick="plConvertLead('${l.id}')">${t('convertBtn')}</button>` : ''}
+            ${(!closed && !l.reminderDate && daysInCurrentStage(l) > getThresholds().stuckBizDays) ? `<button class="row-btn" onclick="plRemindLater('${l.id}')">${t('remindLater')}</button>` : ''}
+            ${(!closed && l.reminderDate) ? `<button class="row-btn" onclick="plClearReminder('${l.id}')">${t('clearReminder')}</button>` : ''}
+            <button class="row-btn" onclick="plOpenLeadForm('${l.id}')">${t('editBtn')}</button>
+            <button class="row-btn danger" onclick="plDeleteLead('${l.id}')">${t('deleteBtn')}</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" onclick="plSort('companyName')">${t('thCompany')} ${sortInd('companyName')}</th>
+          <th>${t('thContact')}</th>
+          <th class="sortable" onclick="plSort('source')">${t('thSource')} ${sortInd('source')}</th>
+          <th class="sortable" onclick="plSort('type')">${t('thType')} ${sortInd('type')}</th>
+          <th class="sortable" onclick="plSort('product')">${t('thProduct')} ${sortInd('product')}</th>
+          <th class="sortable" onclick="plSort('stage')">${t('thStage')} ${sortInd('stage')}</th>
+          <th class="sortable" onclick="plSort('probability')">${t('thProbability')} ${sortInd('probability')}</th>
+          <th class="sortable" onclick="plSort('expectedValue')">${t('thValue')} ${sortInd('expectedValue')}</th>
+          <th class="sortable" onclick="plSort('expectedCloseDate')">${t('thCloseDate')} ${sortInd('expectedCloseDate')}</th>
+          <th>${t('thFlags')}</th>
+          <th class="sortable" onclick="plSort('score')">${t('thScore')} ${sortInd('score')}</th>
+          <th class="sortable" onclick="plSort('daysInSystem')">${t('thDaysInSystem')} ${sortInd('daysInSystem')}</th>
+          <th>${t('thActionDue')}</th>
+          <th>${t('thActions')}</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+/* ============================================================================
+   PRODUCT OPTIONS (dropdown filtered by lead type)
+   ============================================================================ */
+function plProductOptionsHtml(forType, selectedId) {
+  const matching = state.products.filter(p => !forType || p.type === forType);
+  return `<option value="">${t('selectProduct')}</option>` +
+    matching.map(p => `<option value="${escapeHtml(p.id)}" ${selectedId === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+}
+
+/* ============================================================================
+   LEAD FORM (add / edit)
+   ============================================================================ */
+function plOpenLeadForm(id) {
+  const editing = id ? state.leads.find(l => l.id === id) : null;
+  const g = (k, d) => editing ? (editing[k] != null ? editing[k] : d) : d;
+
+  editAttachments = editing && Array.isArray(editing.attachments)
+    ? editing.attachments.map(a => ({ name: a.name || '', url: a.url || '', description: a.description || '' }))
+    : [];
+
+  editKeyContacts = editing && Array.isArray(editing.keyContacts)
+    ? editing.keyContacts.map(c => ({ name: c.name || '', role: c.role || '', influence: c.influence || 'Medium', relationship: c.relationship || 'Neutral', introPath: c.introPath || '' }))
+    : [];
+
+  const sourceOpts = SOURCES.map(s => `<option value="${s}" ${g('leadSource', 'Inbound') === s ? 'selected' : ''}>${t('src_' + s)}</option>`).join('');
+  const typeOpts = TYPES.map(s => `<option value="${s}" ${g('leadType', 'own-product') === s ? 'selected' : ''}>${t('type_' + s)}</option>`).join('');
+  const stageOpts = STAGES.map(s => `<option value="${s}" ${g('stage', 'Prospect') === s ? 'selected' : ''}>${t('stage_' + s)}</option>`).join('');
+  const partnerOpts = `<option value="">${t('selectPartner')}</option>` + state.partners.map(p => `<option value="${escapeHtml(p.id)}" ${g('partnerId', '') === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+
+  const curType = g('leadType', 'own-product');
+  const showCustomSrc = g('leadSource', '') === 'Other';
+  const showPartner = curType === 'partner-product';
+  const manual = !!g('manualProbability', false);
+  const initialProb = g('probability', manual ? 50 : probabilityForStage(g('stage', 'Prospect')));
+
+  const body = `
+    <div class="form-row">
+      <label>${t('fCompany')} *</label>
+      <input id="pl-f-company" value="${escapeHtml(g('companyName', ''))}">
+    </div>
+
+    <div class="form-section-title">${t('secContact')}</div>
+    <div class="form-row row-2">
+      <div><label>${t('fContact')}</label><input id="pl-f-contact" value="${escapeHtml(g('contactName', ''))}"></div>
+      <div><label>${t('fDesignation')}</label><input id="pl-f-designation" value="${escapeHtml(g('contactDesignation', ''))}"></div>
+    </div>
+    <div class="form-row row-2">
+      <div><label>${t('fEmail')}</label><input id="pl-f-email" type="email" value="${escapeHtml(g('contactEmail', ''))}"></div>
+      <div><label>${t('fPhone')}</label><input id="pl-f-phone" value="${escapeHtml(g('contactPhone', ''))}"></div>
+    </div>
+
+    <div class="form-section-title">${t('secOpportunity')}</div>
+    <div class="form-row">
+      <label>${t('fSource')}</label>
+      <select id="pl-f-source" onchange="plToggleCustomSource()">${sourceOpts}</select>
+    </div>
+    <div class="form-row ${showCustomSrc ? '' : 'hidden'}" id="pl-f-source-custom-row">
+      <label>${t('fSourceCustom')}</label>
+      <input id="pl-f-source-custom" value="${escapeHtml(g('leadSourceCustom', ''))}">
+    </div>
+    <div class="form-row row-2">
+      <div><label>${t('fType')}</label><select id="pl-f-type" onchange="plOnTypeChange()">${typeOpts}</select></div>
+      <div><label>${t('fProduct')}</label><select id="pl-f-product">${plProductOptionsHtml(curType, g('productId', ''))}</select></div>
+    </div>
+    <div class="form-row ${showPartner ? '' : 'hidden'}" id="pl-f-partner-row">
+      <label>${t('fPartner')}</label>
+      <select id="pl-f-partner">${partnerOpts}</select>
+    </div>
+    <div class="form-row row-2">
+      <div><label>${t('fStage')}</label><select id="pl-f-stage" onchange="plOnStageChange()">${stageOpts}</select></div>
+      <div>
+        <label>${t('fProbability')}</label>
+        <input id="pl-f-prob" type="number" min="0" max="100" value="${initialProb}" ${manual ? '' : ''}>
+        <div class="checkbox-row">
+          <input type="checkbox" id="pl-f-manual" ${manual ? 'checked' : ''} onchange="plOnManualToggle()">
+          <label for="pl-f-manual" style="margin:0;cursor:pointer">${t('fManual')}</label>
+        </div>
+      </div>
+    </div>
+    <div class="form-row row-2">
+      <div><label>${t('fValue')}</label><input id="pl-f-value" type="number" min="0" value="${g('expectedValue', '')}"></div>
+      <div><label>${t('fCloseDate')}</label><input id="pl-f-close" type="date" value="${escapeHtml(g('expectedCloseDate', '') || '')}"></div>
+    </div>
+    <div class="form-row row-2">
+      <div><label>${t('fNextAction')}</label><input id="pl-f-nextaction" value="${escapeHtml(g('nextAction', ''))}"></div>
+      <div><label>${t('fDeadline')}</label><input id="pl-f-deadline" type="date" value="${escapeHtml(g('nextActionDue', '') || '')}"></div>
+    </div>
+    <div class="form-row">
+      <label>${t('fNotes')}</label>
+      <textarea id="pl-f-notes">${escapeHtml(g('notes', ''))}</textarea>
+    </div>
+
+    <div class="form-section-title">${t('secAttachments')}</div>
+    <div id="pl-attach-container"></div>
+    <button class="btn ghost sm" type="button" onclick="plAddAttachment()">${t('addAttachment')}</button>
+
+    <div class="form-section-title">${t('secKeyContacts')}</div>
+    <div id="pl-kc-container"></div>
+    <button class="btn ghost sm" type="button" id="pl-kc-add-btn" onclick="plAddKeyContact()">${t('kcAdd')}</button>`;
+
+  const foot = `
+    <button class="btn" onclick="plSaveLead(${id ? `'${id}'` : 'null'})">${t('save')}</button>
+    <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`;
+
+  openModal(id ? t('formEditTitle') : t('formAddTitle'), body, foot);
+  plRenderAttachments();
+  plRenderKeyContacts();
+}
+
+function plToggleCustomSource() {
+  const v = document.getElementById('pl-f-source').value;
+  document.getElementById('pl-f-source-custom-row').classList.toggle('hidden', v !== 'Other');
+}
+function plOnTypeChange() {
+  const type = document.getElementById('pl-f-type').value;
+  document.getElementById('pl-f-partner-row').classList.toggle('hidden', type !== 'partner-product');
+  // refilter product dropdown by the chosen type
+  const prodSel = document.getElementById('pl-f-product');
+  const keep = prodSel.value;
+  prodSel.innerHTML = plProductOptionsHtml(type, keep);
+}
+function plOnStageChange() {
+  const manual = document.getElementById('pl-f-manual').checked;
+  if (manual) return;
+  const stage = document.getElementById('pl-f-stage').value;
+  document.getElementById('pl-f-prob').value = probabilityForStage(stage);
+}
+function plOnManualToggle() {
+  const manual = document.getElementById('pl-f-manual').checked;
+  if (!manual) {
+    const stage = document.getElementById('pl-f-stage').value;
+    document.getElementById('pl-f-prob').value = probabilityForStage(stage);
+  }
+}
+
+/* ---- Attachments ---- */
+function plSyncAttachmentsFromDOM() {
+  const rows = document.querySelectorAll('#pl-attach-container .pl-attach-row');
+  editAttachments = Array.from(rows).map(r => ({
+    name: r.querySelector('.att-name').value.trim(),
+    url: r.querySelector('.att-url').value.trim(),
+    description: r.querySelector('.att-desc').value.trim()
+  }));
+}
+function plRenderAttachments() {
+  const c = document.getElementById('pl-attach-container');
+  if (!c) return;
+  c.innerHTML = editAttachments.map((a, i) => `
+    <div class="pl-attach-row" data-idx="${i}">
+      <input class="att-name" placeholder="${t('attachName')}" value="${escapeHtml(a.name)}">
+      <input class="att-url" placeholder="${t('attachUrl')}" value="${escapeHtml(a.url)}">
+      <input class="att-desc" placeholder="${t('attachDesc')}" value="${escapeHtml(a.description)}">
+      <button type="button" class="pl-mini-del" onclick="plRemoveAttachment(${i})">×</button>
+    </div>`).join('');
+}
+function plAddAttachment() {
+  plSyncAttachmentsFromDOM();
+  editAttachments.push({ name: '', url: '', description: '' });
+  plRenderAttachments();
+}
+function plRemoveAttachment(idx) {
+  plSyncAttachmentsFromDOM();
+  editAttachments.splice(idx, 1);
+  plRenderAttachments();
+}
+
+/* ---- Key Contacts (max 3) ---- */
+const KC_INFLUENCE = ['High', 'Medium', 'Low'];
+const KC_RELATIONSHIP = ['Warm', 'Neutral', 'Cold'];
+function plSyncKeyContactsFromDOM() {
+  const rows = document.querySelectorAll('#pl-kc-container .pl-kc-row');
+  editKeyContacts = Array.from(rows).map(r => ({
+    name: r.querySelector('.kc-name').value.trim(),
+    role: r.querySelector('.kc-role').value.trim(),
+    influence: r.querySelector('.kc-influence').value,
+    relationship: r.querySelector('.kc-relationship').value,
+    introPath: r.querySelector('.kc-intro').value.trim()
+  }));
+}
+function plRenderKeyContacts() {
+  const c = document.getElementById('pl-kc-container');
+  if (!c) return;
+  const infLabel = { High: t('kcHigh'), Medium: t('kcMedium'), Low: t('kcLow') };
+  const relLabel = { Warm: t('kcWarm'), Neutral: t('kcNeutral'), Cold: t('kcCold') };
+  c.innerHTML = editKeyContacts.map((c2, i) => `
+    <div class="pl-kc-row" data-idx="${i}">
+      <input class="kc-name" placeholder="${t('kcName')}" value="${escapeHtml(c2.name)}">
+      <input class="kc-role" placeholder="${t('kcRole')}" value="${escapeHtml(c2.role)}">
+      <select class="kc-influence">${KC_INFLUENCE.map(v => `<option value="${v}" ${c2.influence === v ? 'selected' : ''}>${infLabel[v]}</option>`).join('')}</select>
+      <select class="kc-relationship">${KC_RELATIONSHIP.map(v => `<option value="${v}" ${c2.relationship === v ? 'selected' : ''}>${relLabel[v]}</option>`).join('')}</select>
+      <input class="kc-intro" placeholder="${t('kcIntroPath')}" value="${escapeHtml(c2.introPath)}">
+      <button type="button" class="pl-mini-del" onclick="plRemoveKeyContact(${i})">×</button>
+    </div>`).join('');
+  const addBtn = document.getElementById('pl-kc-add-btn');
+  if (addBtn) addBtn.style.display = editKeyContacts.length >= 3 ? 'none' : '';
+}
+function plAddKeyContact() {
+  plSyncKeyContactsFromDOM();
+  if (editKeyContacts.length >= 3) return;
+  editKeyContacts.push({ name: '', role: '', influence: 'Medium', relationship: 'Neutral', introPath: '' });
+  plRenderKeyContacts();
+}
+function plRemoveKeyContact(idx) {
+  plSyncKeyContactsFromDOM();
+  editKeyContacts.splice(idx, 1);
+  plRenderKeyContacts();
+}
+/* Returns the first "warm" key contact (High influence OR Warm relationship), or null. */
+function warmKeyContact(lead) {
+  if (!lead || !Array.isArray(lead.keyContacts)) return null;
+  return lead.keyContacts.find(c => c && (c.influence === 'High' || c.relationship === 'Warm')) || null;
+}
+/* Returns the product's acceleration tip for this lead's current stage, or '' if none. */
+function productStageTip(lead) {
+  if (!lead || !lead.productId) return '';
+  const p = getProduct(lead.productId);
+  if (!p || !p.stageTips) return '';
+  const tip = p.stageTips[lead.stage];
+  return (typeof tip === 'string' && tip.trim()) ? tip.trim() : '';
+}
+
+async function plSaveLead(id) {
+  const companyName = document.getElementById('pl-f-company').value.trim();
+  if (!companyName) { alert(t('alertCompanyRequired')); return; }
+
+  plSyncAttachmentsFromDOM();
+  const attachments = editAttachments.filter(a => a.name || a.url || a.description);
+  plSyncKeyContactsFromDOM();
+  const keyContacts = editKeyContacts.filter(c => c.name || c.role || c.introPath).slice(0, 3);
+
+  const leadSource = document.getElementById('pl-f-source').value;
+  const leadType = document.getElementById('pl-f-type').value;
+  const stage = document.getElementById('pl-f-stage').value;
+  const manualProbability = document.getElementById('pl-f-manual').checked;
+  const nextAction = document.getElementById('pl-f-nextaction').value.trim();
+  const nextActionDue = document.getElementById('pl-f-deadline').value || null;
+
+  // Require action + deadline ONLY when the stage actually changes (edit case).
+  if (id) {
+    const existingLead = state.leads.find(l => l.id === id);
+    if (existingLead && existingLead.stage !== stage && !CLOSED_STAGES.includes(stage) && (!nextAction || !nextActionDue)) {
+      alert(t('alertStageNeedsAction'));
+      return;
+    }
+  }
+
+  const data = {
+    companyName,
+    contactName: document.getElementById('pl-f-contact').value.trim(),
+    contactDesignation: document.getElementById('pl-f-designation').value.trim(),
+    contactEmail: document.getElementById('pl-f-email').value.trim(),
+    contactPhone: document.getElementById('pl-f-phone').value.trim(),
+    leadSource,
+    leadSourceCustom: leadSource === 'Other' ? document.getElementById('pl-f-source-custom').value.trim() : '',
+    leadType,
+    productId: document.getElementById('pl-f-product').value || '',
+    partnerId: leadType === 'partner-product' ? document.getElementById('pl-f-partner').value : '',
+    stage,
+    manualProbability,
+    probability: Math.max(0, Math.min(100, parseInt(document.getElementById('pl-f-prob').value, 10) || 0)),
+    expectedValue: parseFloat(document.getElementById('pl-f-value').value) || 0,
+    expectedCloseDate: document.getElementById('pl-f-close').value || null,
+    notes: document.getElementById('pl-f-notes').value.trim(),
+    nextAction,
+    nextActionDue,
+    attachments,
+    keyContacts
+  };
+
+  // If this save closes the lead (Won/Lost) for the first time (or switches closure type),
+  // capture a Win/Loss reason first, then finalize.
+  const existing = id ? state.leads.find(l => l.id === id) : null;
+  const isClosingNow = CLOSED_STAGES.includes(data.stage) && (!existing || existing.stage !== data.stage);
+  if (isClosingNow) {
+    pendingClose = { id, data, prevNotes: existing ? (existing.wonLostNotes || '') : '' };
+    plOpenReasonModal(data.stage);
+    return;
+  }
+  await finalizeSaveLead(id, data, null);
+}
+
+/* Commit a lead save. closeInfo = {reason, notes} when the lead is being closed now. */
+async function finalizeSaveLead(id, data, closeInfo) {
+  let lead;
+  if (id) {
+    lead = state.leads.find(l => l.id === id);
+    const wasClosed = isClosed(lead);
+    const prevStage = lead.stage;
+    const prevEnteredAt = lead.stageEnteredAt;
+    const stageChanged = prevStage !== data.stage;
+    Object.assign(lead, data);
+    lead.updatedAt = nowISO();
+    if (stageChanged) {
+      recordStageDuration(lead, prevStage, prevEnteredAt);  // learn velocity from time in the stage being left
+      lead.stageEnteredAt = nowISO();
+      // Auto-clear any review reminder on stage change.
+      lead.reminderDate = null; lead.reminderReason = ''; lead.reminderSetAt = null;
+    }
+    if (isClosed(lead)) {
+      if (closeInfo) {
+        lead.wonLostReason = closeInfo.reason;
+        lead.wonLostNotes = closeInfo.notes;
+        lead.closedStage = lead.stage;
+        lead.closedAt = nowISO();
+      } else if (!wasClosed) {
+        lead.closedAt = nowISO();
+      }
+    } else {
+      // Re-opened: clear closure data.
+      lead.closedAt = null;
+      lead.wonLostReason = '';
+      lead.wonLostNotes = '';
+      lead.closedStage = null;
+    }
+    if (isClosed(lead)) { lead.reminderDate = null; lead.reminderReason = ''; lead.reminderSetAt = null; }
+    if (lead.stage === 'Closed Won') recomputeStageVelocity();
+    toast(t('toastSaved'));
+  } else {
+    lead = {
+      id: uid(), ...data,
+      createdAt: nowISO(), updatedAt: nowISO(),
+      stageEnteredAt: nowISO(),
+      closedAt: CLOSED_STAGES.includes(data.stage) ? nowISO() : null
+    };
+    if (CLOSED_STAGES.includes(lead.stage) && closeInfo) {
+      lead.wonLostReason = closeInfo.reason;
+      lead.wonLostNotes = closeInfo.notes;
+      lead.closedStage = lead.stage;
+    }
+    state.leads.push(lead);
+    if (lead.stage === 'Closed Won') recomputeStageVelocity();
+    toast(t('toastAdded'));
+  }
+  closeModal();
+  render();
+  await persistRow('leads', lead);
+}
+
+/* ============================================================================
+   NEXT REVIEW REMINDER (snooze)
+   ============================================================================ */
+function plRemindLater(id) {
+  const lead = state.leads.find(l => l.id === id); if (!lead) return;
+  const body =
+    `<div class="form-row"><label>${t('remindInDays')}</label><input id="pl-remind-days" type="number" min="1" max="30" value="3"></div>` +
+    `<div class="form-row"><label>${t('reminderReasonLabel')}</label><input id="pl-remind-reason" value="${escapeHtml(lead.reminderReason || '')}"></div>`;
+  openModal(t('reminderTitle'), body,
+    `<button class="btn" onclick="plSetReminder('${id}')">${t('save')}</button>` +
+    `<button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+async function plSetReminder(id) {
+  const lead = state.leads.find(l => l.id === id); if (!lead) return;
+  let days = parseInt(document.getElementById('pl-remind-days').value, 10) || 3;
+  days = Math.max(1, Math.min(30, days));
+  const d = new Date(); d.setDate(d.getDate() + days);
+  lead.reminderDate = d.toISOString().slice(0, 10);
+  lead.reminderSetAt = todayDate();
+  lead.reminderReason = document.getElementById('pl-remind-reason').value.trim();
+  lead.updatedAt = nowISO();
+  closeModal(); render(); toast(t('reminderSet', lead.reminderDate));
+  await persistRow('leads', lead);
+}
+async function plClearReminder(id) {
+  const lead = state.leads.find(l => l.id === id); if (!lead) return;
+  lead.reminderDate = null; lead.reminderReason = ''; lead.reminderSetAt = null;
+  lead.updatedAt = nowISO();
+  render(); toast(t('toastSaved'));
+  await persistRow('leads', lead);
+}
+
+/* ============================================================================
+   WIN/LOSS REASON CAPTURE
+   ============================================================================ */
+const WON_REASONS = ['won_pricing', 'won_fit', 'won_relationship', 'won_technical', 'won_urgent', 'won_other'];
+const LOST_REASONS = ['lost_budget', 'lost_competitor', 'lost_nodecision', 'lost_fit', 'lost_timing', 'lost_relationship', 'lost_other'];
+let pendingClose = null;
+
+function plOpenReasonModal(stage) {
+  const won = stage === 'Closed Won';
+  const reasons = won ? WON_REASONS : LOST_REASONS;
+  const opts = '<option value="">' + t('reasonSelect') + '</option>' +
+    reasons.map(r => '<option value="' + r + '">' + t('reason_' + r) + '</option>').join('');
+  const prevNotes = pendingClose ? (pendingClose.prevNotes || '') : '';
+  const body =
+    '<div class="form-row"><label>' + t('reasonLabel') + ' *</label><select id="pl-reason-select">' + opts + '</select></div>' +
+    '<div class="form-row"><label>' + t('reasonNotes') + '</label><textarea id="pl-reason-notes">' + escapeHtml(prevNotes) + '</textarea></div>';
+  openModal(won ? t('reasonWonTitle') : t('reasonLostTitle'), body,
+    '<button class="btn" onclick="plConfirmClose()">' + t('save') + '</button>' +
+    '<button class="btn ghost" onclick="plCancelClose()">' + t('cancel') + '</button>');
+}
+function plConfirmClose() {
+  if (!pendingClose) { closeModal(); return; }
+  const reason = document.getElementById('pl-reason-select').value;
+  if (!reason) { alert(t('reasonRequired')); return; }
+  const notes = document.getElementById('pl-reason-notes').value.trim();
+  const ctx = pendingClose; pendingClose = null;
+  finalizeSaveLead(ctx.id, ctx.data, { reason: reason, notes: notes });
+}
+function plCancelClose() {
+  // Abort the closure; re-open the edit form so the user can adjust the stage.
+  const ctx = pendingClose; pendingClose = null;
+  closeModal();
+  if (ctx && ctx.id) plOpenLeadForm(ctx.id);
+}
+
+/* ============================================================================
+   WIN/LOSS ANALYSIS
+   ============================================================================ */
+let wlFrom = '', wlTo = '';
+function reasonLabel(key) { return (!key) ? t('reasonNone') : (T[currentLang]['reason_' + key] ? t('reason_' + key) : key); }
+function wlInRange(closedAt) {
+  if (!wlFrom && !wlTo) return true;
+  if (!closedAt) return false;
+  const d = String(closedAt).slice(0, 10);
+  if (wlFrom && d < wlFrom) return false;
+  if (wlTo && d > wlTo) return false;
+  return true;
+}
+function wlTally(list) {
+  const map = {};
+  list.forEach(l => { const k = l.wonLostReason || ''; map[k] = (map[k] || 0) + 1; });
+  const total = list.length || 1;
+  return Object.keys(map).map(k => ({ key: k, count: map[k], pct: Math.round(map[k] / total * 100) }))
+    .sort((a, b) => b.count - a.count);
+}
+function plOpenWinLoss() {
+  const closed = state.leads.filter(l => isClosed(l) && wlInRange(l.closedAt));
+  const won = closed.filter(l => l.stage === 'Closed Won');
+  const lost = closed.filter(l => l.stage === 'Closed Lost');
+  const winRate = (won.length + lost.length) ? Math.round(won.length / (won.length + lost.length) * 100) : null;
+
+  const rows = (list, cls) => {
+    if (!list.length) return '<div class="wl-empty">' + (cls === 'won' ? t('wlNoWon') : t('wlNoLost')) + '</div>';
+    const tally = wlTally(list);
+    return tally.map(r =>
+      '<div class="wl-row ' + cls + '"><span class="lbl">' + escapeHtml(reasonLabel(r.key)) + '</span>' +
+      '<span class="bar"><span style="width:' + r.pct + '%"></span></span>' +
+      '<span class="cnt">' + r.count + ' · ' + r.pct + '%</span></div>'
+    ).join('');
+  };
+
+  const body =
+    '<div class="wl-filter">' +
+      '<div class="fld"><label>' + t('wlFrom') + '</label><input type="date" id="pl-wl-from" value="' + escapeHtml(wlFrom) + '" onchange="plWinLossApply()"></div>' +
+      '<div class="fld"><label>' + t('wlTo') + '</label><input type="date" id="pl-wl-to" value="' + escapeHtml(wlTo) + '" onchange="plWinLossApply()"></div>' +
+    '</div>' +
+    '<div class="wl-cards">' +
+      '<div class="wl-card won"><div class="v">' + won.length + '</div><div class="l">' + t('wlTotalWon') + '</div></div>' +
+      '<div class="wl-card lost"><div class="v">' + lost.length + '</div><div class="l">' + t('wlTotalLost') + '</div></div>' +
+      '<div class="wl-card rate"><div class="v">' + (winRate == null ? t('noData') : winRate + '%') + '</div><div class="l">' + t('wlWinRate') + '</div></div>' +
+    '</div>' +
+    (closed.length ? '' : '<div class="wl-empty">' + t('wlNoData') + '</div>') +
+    '<div class="wl-sec-title">' + t('wlWonReasons') + '</div>' + rows(won, 'won') +
+    '<div class="wl-sec-title">' + t('wlLostReasons') + '</div>' + rows(lost, 'lost');
+
+  openModal(t('wlTitle'), body,
+    '<button class="btn ghost" onclick="plWinLossReset()">' + t('wlReset') + '</button>' +
+    '<button class="btn" onclick="closeModal()">' + t('wlClose') + '</button>');
+}
+function plWinLossApply() {
+  wlFrom = document.getElementById('pl-wl-from').value || '';
+  wlTo = document.getElementById('pl-wl-to').value || '';
+  plOpenWinLoss();
+}
+function plWinLossReset() {
+  wlFrom = ''; wlTo = '';
+  plOpenWinLoss();
+}
+
+/* ============================================================================
+   DELETE
+   ============================================================================ */
+function plDeleteLead(id) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead) return;
+  openModal(t('delTitle'),
+    `<p style="font-size:14px;color:var(--ink-muted)">${t('delMsg', escapeHtml(lead.companyName))}</p>`,
+    `<button class="btn" style="background:var(--red)" onclick="plConfirmDelete('${id}')">${t('confirmDelete')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+async function plConfirmDelete(id) {
+  state.leads = state.leads.filter(l => l.id !== id);
+  closeModal();
+  render();
+  toast(t('toastDeleted'));
+  await removeRow('leads', id);
+}
+
+/* ============================================================================
+   CONVERT TO PARTNER & PROJECT (unchanged from pipeline)
+   ============================================================================ */
+function plConvertLead(id) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead || isClosed(lead)) return;
+  openModal(t('convTitle'),
+    `<p style="font-size:14px;color:var(--ink-muted)">${t('convMsg', escapeHtml(lead.companyName))}</p>`,
+    `<button class="btn gold" onclick="plConfirmConvert('${id}')">${t('confirmConvert')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+async function plConfirmConvert(id) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead || isClosed(lead)) { closeModal(); return; }
+  closeModal();
+
+  let partnerId = lead.partnerId || '';
+  const ops = [];
+
+  // Create a partner only if the lead isn't already linked to one.
+  if (!partnerId) {
+    const newPartner = {
+      id: uid(), name: lead.companyName,
+      type: 'other', customType: 'Client',
+      contact: lead.contactName || '', phone: lead.contactPhone || '',
+      email: lead.contactEmail || '', notes: lead.notes || '',
+      team: [], createdAt: todayDate()
+    };
+    partnerId = newPartner.id;
+    state.partners.push(newPartner);
+    ops.push(persistRow('partners', newPartner));
+  }
+
+  // Mark the lead as Closed Won. Do NOT create a project — the user will do that in governance.
+  lead.stage = 'Closed Won';
+  lead.wonLostReason = 'won_converted';
+  lead.wonLostNotes = '';
+  lead.closedStage = 'Closed Won';
+  lead.closedAt = nowISO();
+  lead.updatedAt = nowISO();
+  lead.stageEnteredAt = nowISO();
+  if (!lead.partnerId) lead.partnerId = partnerId;
+  ops.push(persistRow('leads', lead));
+
+  render();
+  await Promise.all(ops);
+  toast(t('toastConverted'));
+
+  // Open the governance partner detail page in a new tab so the user can create the project there.
+  try {
+    window.open('index.html?view=partnerDetail&partnerId=' + encodeURIComponent(partnerId), '_blank');
+  } catch (e) { /* popup blocked — user still has the toast */ }
+}
+
+/* ============================================================================
+   PROBABILITY CONFIG MODAL
+   ============================================================================ */
+function plOpenProbConfig() {
+  const c = getProbConfig();
+  const rows = CONFIGURABLE_STAGES.map(s => `
+    <div class="form-row">
+      <label>${t('stage_' + s)}</label>
+      <input id="pl-prob-${s}" type="number" min="0" max="100" value="${c[s]}">
+    </div>`).join('');
+  openModal(t('probTitle'),
+    `<p style="font-size:13px;color:var(--ink-faint);margin-bottom:14px">${t('probHint')}</p>${rows}`,
+    `<button class="btn" onclick="plSaveProbConfig()">${t('save')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+function plSaveProbConfig() {
+  const c = {};
+  CONFIGURABLE_STAGES.forEach(s => {
+    c[s] = Math.max(0, Math.min(100, parseInt(document.getElementById('pl-prob-' + s).value, 10) || 0));
+  });
+  try { localStorage.setItem(PROB_CONFIG_KEY, JSON.stringify(c)); } catch (e) {}
+  closeModal();
+  toast(t('toastProbSaved'));
+}
+
+/* ============================================================================
+   SCORE FORMULA CONFIG MODAL
+   ============================================================================ */
+function plOpenScoreConfig() {
+  const c = getScoreConfig();
+  const stageRows = CONFIGURABLE_STAGES.map(st => `
+    <div class="form-row"><label>${t('scoreStageBonus', t('stage_' + st))}</label>
+      <input id="pl-score-bonus-${st}" type="number" value="${c.stageBonus[st] || 0}"></div>`).join('');
+  const body = `
+    <p style="font-size:13px;color:var(--ink-faint);margin-bottom:14px">${t('scoreHint')}</p>
+    <div class="form-row"><label>${t('scoreProbWeight')}</label>
+      <input id="pl-score-weight" type="number" step="0.1" min="0" value="${c.probabilityWeight}"></div>
+    ${stageRows}
+    <div class="form-row row-2">
+      <div><label>${t('scoreHighValueThreshold')}</label><input id="pl-score-hvt" type="number" min="0" value="${c.highValueThreshold}"></div>
+      <div><label>${t('scoreHighValueBonus')}</label><input id="pl-score-hvb" type="number" min="0" value="${c.highValueBonus}"></div>
+    </div>`;
+  openModal(t('scoreTitle'), body,
+    `<button class="btn" onclick="plSaveScoreConfig()">${t('save')}</button>
+     <button class="btn ghost" onclick="plResetScoreConfig()">${t('resetDefaults')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+function plSaveScoreConfig() {
+  const cfg = {
+    probabilityWeight: parseFloat(document.getElementById('pl-score-weight').value) || 0,
+    stageBonus: {},
+    highValueThreshold: parseFloat(document.getElementById('pl-score-hvt').value) || 0,
+    highValueBonus: parseFloat(document.getElementById('pl-score-hvb').value) || 0
+  };
+  CONFIGURABLE_STAGES.forEach(st => {
+    cfg.stageBonus[st] = parseFloat(document.getElementById('pl-score-bonus-' + st).value) || 0;
+  });
+  try { localStorage.setItem(SCORE_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  _scoreCfg = null;        // invalidate cache so the table recomputes
+  closeModal();
+  render();
+  toast(t('toastScoreSaved'));
+}
+function plResetScoreConfig() {
+  try { localStorage.removeItem(SCORE_CONFIG_KEY); } catch (e) {}
+  _scoreCfg = null;
+  render();
+  plOpenScoreConfig();     // reopen showing the restored defaults
+  toast(t('toastScoreSaved'));
+}
+
+/* ============================================================================
+   PRODUCT CONFIG MODAL (add / edit / delete)
+   ============================================================================ */
+function plOpenProductConfig() {
+  editingProductId = null;
+  renderProductConfig();
+}
+const TIP_STAGES = ['Prospect', 'Qualified', 'Proposal', 'Negotiation'];
+function renderProductConfig() {
+  const listHtml = state.products.length
+    ? `<div class="pl-cfg-list">` + state.products.map(p => `
+        <div class="pl-cfg-item">
+          <div>
+            <div class="name">${escapeHtml(p.name)}</div>
+            <div class="sub">${t('type_' + p.type)}${p.description ? ' · ' + escapeHtml(p.description) : ''}</div>
+          </div>
+          <div class="row-actions">
+            <button class="row-btn" onclick="plEditProduct('${p.id}')">${t('editProduct')}</button>
+            <button class="row-btn danger" onclick="plDeleteProduct('${p.id}')">${t('deleteBtn')}</button>
+          </div>
+        </div>`).join('') + `</div>`
+    : `<div class="empty" style="padding:20px">${t('noProducts')}</div>`;
+
+  const editing = editingProductId ? state.products.find(p => p.id === editingProductId) : null;
+  const typeOpts = TYPES.map(s => `<option value="${s}" ${editing && editing.type === s ? 'selected' : ''}>${t('type_' + s)}</option>`).join('');
+
+  const formHtml = `
+    <div class="form-section-title">${editing ? t('editProduct') : t('addProduct')}</div>
+    <div class="form-row"><label>${t('prodName')} *</label><input id="pl-prod-name" value="${editing ? escapeHtml(editing.name) : ''}"></div>
+    <div class="form-row"><label>${t('prodType')}</label><select id="pl-prod-type">${typeOpts}</select></div>
+    <div class="form-row"><label>${t('prodDesc')}</label><textarea id="pl-prod-desc">${editing ? escapeHtml(editing.description || '') : ''}</textarea></div>
+    <div class="form-section-title">${t('stageTipSection')}</div>
+    ${TIP_STAGES.map(st => `<div class="form-row"><label>${t('stageTip' + st)}</label><textarea id="pl-prod-tip-${st}" rows="2" maxlength="150">${editing && editing.stageTips ? escapeHtml(editing.stageTips[st] || '') : ''}</textarea></div>`).join('')}
+    <button class="btn sm" onclick="plSaveProduct()">${t('saveProduct')}</button>
+    ${editing ? `<button class="btn ghost sm" onclick="plOpenProductConfig()">${t('cancel')}</button>` : ''}`;
+
+  openModal(t('prodTitle'), listHtml + formHtml,
+    `<button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+function plEditProduct(id) { editingProductId = id; renderProductConfig(); }
+async function plSaveProduct() {
+  const name = document.getElementById('pl-prod-name').value.trim();
+  if (!name) { alert(t('alertProductNameRequired')); return; }
+  const type = document.getElementById('pl-prod-type').value;
+  const description = document.getElementById('pl-prod-desc').value.trim();
+
+  const stageTips = {};
+  TIP_STAGES.forEach(st => {
+    const el = document.getElementById('pl-prod-tip-' + st);
+    const v = el ? el.value.trim().slice(0, 150) : '';
+    if (v) stageTips[st] = v;
+  });
+
+  let product;
+  if (editingProductId) {
+    product = state.products.find(p => p.id === editingProductId);
+    Object.assign(product, { name, type, description, stageTips });
+  } else {
+    product = { id: uid(), name, type, description, stageTips };
+    state.products.push(product);
+  }
+  editingProductId = null;
+  toast(t('toastProductSaved'));
+  renderProductConfig();
+  render();
+  await persistRow('products', product);
+}
+async function plDeleteProduct(id) {
+  state.products = state.products.filter(p => p.id !== id);
+  if (editingProductId === id) editingProductId = null;
+  toast(t('toastProductDeleted'));
+  renderProductConfig();
+  render();
+  await removeRow('products', id);
+}
+
+/* ============================================================================
+   CSV EXPORT (filtered leads, all columns)
+   ============================================================================ */
+function csvCell(v) {
+  if (v == null) v = '';
+  v = String(v).replace(/"/g, '""');
+  return `"${v}"`;
+}
+function plExportCSV() {
+  const rows = filteredLeads();
+  const headers = [
+    'Company', 'Contact Name', 'Designation', 'Email', 'Phone',
+    'Source', 'Type', 'Product', 'Partner', 'Stage',
+    'Probability (%)', 'Manual Override', 'Expected Value (SAR)', 'Expected Close Date', 'Next Action', 'Deadline',
+    'Lead Score', 'Days In Stage',
+    'Created At', 'Updated At', 'Closed At', 'Attachments', 'Notes'
+  ];
+  const lines = [headers.map(csvCell).join(',')];
+
+  rows.forEach(l => {
+    const product = getProduct(l.productId);
+    const partner = l.partnerId ? state.partners.find(p => p.id === l.partnerId) : null;
+    const attachStr = (l.attachments || []).map(a => `${a.name || ''} (${a.url || ''})`).join(' | ');
+    lines.push([
+      l.companyName, l.contactName, l.contactDesignation, l.contactEmail, l.contactPhone,
+      l.leadSource === 'Other' ? (l.leadSourceCustom || 'Other') : l.leadSource,
+      l.leadType, product ? product.name : '', partner ? partner.name : '', l.stage,
+      Number(l.probability) || 0, l.manualProbability ? 'Yes' : 'No',
+      Number(l.expectedValue) || 0, l.expectedCloseDate || '', l.nextAction || '', l.nextActionDue || '',
+      leadScore(l), daysInCurrentStage(l),
+      l.createdAt || '', l.updatedAt || '', l.closedAt || '',
+      attachStr, l.notes
+    ].map(csvCell).join(','));
+  });
+
+  const csv = '\uFEFF' + lines.join('\r\n'); // BOM for Excel/Arabic
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'opportunities_export_' + todayDate() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(t('toastExported'));
+}
+
+/* ============================================================================
+   EXECUTIVE PDF REPORT (print-to-PDF; no external dependencies)
+   ============================================================================ */
+function plReportMetrics() {
+  const leads = state.leads;
+  const open = leads.filter(l => !isClosed(l));
+  const won = leads.filter(l => l.stage === 'Closed Won');
+  const lost = leads.filter(l => l.stage === 'Closed Lost');
+  const pipelineValue = open.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const weighted = open.reduce((s, l) => s + (Number(l.expectedValue) || 0) * ((Number(l.probability) || 0) / 100), 0);
+  const winRate = (won.length + lost.length) ? Math.round(won.length / (won.length + lost.length) * 100) : null;
+  const stats = computeStats();
+  const hot = leads.filter(isHot).length;
+  const stale = leads.filter(isStale).length;
+  const byStage = CONFIGURABLE_STAGES.map(st => {
+    const ls = open.filter(l => l.stage === st);
+    return { stage: st, count: ls.length, value: ls.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0) };
+  });
+  const top = open.slice().sort((a, b) => leadScore(b) - leadScore(a)).slice(0, 6);
+  const today = todayDate();
+  const needsMap = {};
+  open.forEach(l => {
+    const reasons = [];
+    if (l.nextActionDue && l.nextActionDue < today) reasons.push('overdue');
+    if (businessDaysBetween(stageEnteredAt(l), nowISO()) > getThresholds().stuckBizDays) reasons.push('stuck');
+    if (l.stage === 'Negotiation' && (Number(l.expectedValue) || 0) > 200000) reasons.push('highvalue');
+    if (reasons.length) needsMap[l.id] = { lead: l, reasons: reasons };
+  });
+  const needs = Object.values(needsMap).sort((a, b) => leadScore(b.lead) - leadScore(a.lead));
+  return { total: leads.length, open: open.length, won: won.length, lost: lost.length, pipelineValue: pipelineValue, weighted: weighted, winRate: winRate, stats: stats, hot: hot, stale: stale, byStage: byStage, top: top, needs: needs };
+}
+
+function plOpenReportConfig() {
+  const body = `
+    <div class="form-row">
+      <label>${t('reportRecipient')}</label>
+      <select id="pl-rep-recipient" onchange="plRepRecipientChange()">
+        <option value="ceo">${t('recipientCEO')}</option>
+        <option value="vp">${t('recipientVP')}</option>
+        <option value="custom">${t('recipientCustom')}</option>
+      </select>
+    </div>
+    <div class="form-row hidden" id="pl-rep-custom-row">
+      <label>${t('recipientCustom')}</label>
+      <input id="pl-rep-custom">
+    </div>
+    <div class="form-row"><label>${t('reportPreparedBy')}</label><input id="pl-rep-by"></div>
+    <div class="form-row"><label>${t('reportSummaryNote')}</label><textarea id="pl-rep-note"></textarea></div>
+    <div class="form-row"><label>${t('reportAttentionComments')}</label><textarea id="pl-rep-attention"></textarea></div>
+    <div class="checkbox-row"><input type="checkbox" id="pl-rep-comments" checked><label for="pl-rep-comments" style="margin:0;cursor:pointer">${t('reportIncludeComments')}</label></div>`;
+  openModal(t('reportModalTitle'), body,
+    `<button class="btn" onclick="plGenerateReport()">${t('reportGenerate')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+function plRepRecipientChange() {
+  const v = document.getElementById('pl-rep-recipient').value;
+  document.getElementById('pl-rep-custom-row').classList.toggle('hidden', v !== 'custom');
+}
+
+function plGenerateReport() {
+  const rsel = document.getElementById('pl-rep-recipient').value;
+  const recipient = rsel === 'ceo' ? t('recipientCEO')
+    : rsel === 'vp' ? t('recipientVP')
+    : (document.getElementById('pl-rep-custom').value.trim() || t('recipientCustom'));
+  const cfg = {
+    recipient: recipient,
+    preparedBy: document.getElementById('pl-rep-by').value.trim(),
+    note: document.getElementById('pl-rep-note').value.trim(),
+    attention: document.getElementById('pl-rep-attention').value.trim(),
+    includeComments: document.getElementById('pl-rep-comments').checked
+  };
+  const html = plBuildReportHtml(cfg, plReportMetrics());
+  const w = window.open('', '_blank');
+  if (!w) { alert(t('reportPopupBlocked')); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  closeModal();
+}
+
+function plBuildReportHtml(cfg, m) {
+  const lang = currentLang, dir = lang === 'ar' ? 'rtl' : 'ltr';
+  const logo = (document.getElementById('pl-soe-logo') || {}).src || '';
+  const money = v => fmtMoney(v) + ' ' + t('currencySAR');
+  const reasonLabel = r => r === 'overdue' ? t('repReasonOverdue') : r === 'stuck' ? t('repReasonStuck') : t('repReasonHighValue');
+  const noteHtml = cfg.note ? escapeHtml(cfg.note).replace(/\n/g, '<br>') : '';
+
+  const metric = (label, val) => '<div class="m-box"><div class="m-val">' + val + '</div><div class="m-lab">' + label + '</div></div>';
+  const metricsHtml =
+    metric(t('repMTotal'), m.total) +
+    metric(t('repMOpen'), m.open) +
+    metric(t('repMPipeline'), money(m.pipelineValue)) +
+    metric(t('repMWon'), m.won) +
+    metric(t('repMLost'), m.lost) +
+    metric(t('repMWinRate'), m.winRate == null ? '—' : m.winRate + '%') +
+    metric(t('repMHot'), m.hot) +
+    metric(t('repMStale'), m.stale) +
+    metric(t('repMAvgWin'), m.stats.avgWin == null ? '—' : m.stats.avgWin + ' ' + t('days'));
+
+  const totalCount = m.byStage.reduce((s, r) => s + r.count, 0);
+  const totalVal = m.byStage.reduce((s, r) => s + r.value, 0);
+  const stageRows = m.byStage.map(r =>
+    '<tr><td>' + t('stage_' + r.stage) + '</td><td class="num">' + r.count + '</td><td class="num">' + money(r.value) + '</td></tr>').join('')
+    + '<tr class="total"><td>' + t('repColTotal') + '</td><td class="num">' + totalCount + '</td><td class="num">' + money(totalVal) + '</td></tr>';
+
+  const topRows = m.top.length ? m.top.map(l => {
+    const act = l.nextAction ? escapeHtml(l.nextAction) + (l.nextActionDue ? ' (' + escapeHtml(l.nextActionDue) + ')' : '') : '—';
+    return '<tr><td><b>' + escapeHtml(l.companyName) + '</b></td><td>' + t('stage_' + l.stage) + '</td><td class="num">' + (Number(l.probability) || 0) + '%</td><td class="num">' + money(Number(l.expectedValue) || 0) + '</td><td>' + act + '</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="muted">—</td></tr>';
+
+  let needsHtml = '';
+  if (cfg.includeComments) {
+    // Preparer's notes added DURING export (typed in the generate dialog).
+    const bdNotesHtml = cfg.attention
+      ? '<div class="bd-note"><div class="bd-note-h">' + t('repBDNotes') + '</div>' + escapeHtml(cfg.attention).replace(/\n/g, '<br>') + '</div>'
+      : '';
+    let inner;
+    if (!m.needs.length) {
+      inner = '<p class="muted">' + t('repNoNeeds') + '</p>';
+    } else {
+      inner = m.needs.map(x => {
+        const l = x.lead;
+        const tags = x.reasons.map(r => '<span class="tag">' + reasonLabel(r) + '</span>').join(' ');
+        const sug = suggestionFor(l);
+        const action = sug.arg !== undefined ? t(sug.key, sug.arg) : t(sug.key);
+        const due = l.nextActionDue ? ' · ' + escapeHtml(l.nextActionDue) : '';
+        return '<div class="need">' +
+          '<div class="need-head"><span class="need-co">' + escapeHtml(l.companyName) + '</span> ' + tags + '</div>' +
+          '<div class="need-sub">' + t('stage_' + l.stage) + ' · ' + money(Number(l.expectedValue) || 0) + ' · ' + (Number(l.probability) || 0) + '%' + due + '</div>' +
+          '<div class="need-act">\u{1F4A1} ' + escapeHtml(action) + '</div>' +
+          '<div class="note-line"><span class="lbl">' + t('repYourNote') + '</span><div class="edit" contenteditable="true" data-ph="' + escapeHtml(t('repEditHint')) + '"></div></div>' +
+          '</div>';
+      }).join('');
+    }
+    // CEO's editable response on this section (filled AFTER export).
+    const execRespond = '<div class="resp"><div class="resp-lbl">' + t('repExecRespond') + '</div><div class="edit" contenteditable="true" data-ph="' + escapeHtml(t('repEditHint')) + '"></div></div>';
+    needsHtml =
+      '<h2>' + t('repSecNeeds') + '</h2>' + bdNotesHtml + inner + execRespond +
+      '<h2 class="mt">' + t('repSecComments') + '</h2><div class="exec-edit" contenteditable="true" data-ph="' + escapeHtml(t('repEditHint')) + '"></div>';
+  }
+
+  const printLabel = t('repPrint');
+  const generated = t('repGeneratedAt') + ': ' + new Date().toLocaleString(lang === 'ar' ? 'ar' : 'en-GB');
+
+  const html =
+'<!DOCTYPE html><html lang="' + lang + '" dir="' + dir + '"><head><meta charset="UTF-8">' +
+'<title>' + t('reportTitle') + ' – SOE</title>' +
+'<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
+'<style>' +
+'@page { size: A4; margin: 14mm; }' +
+'* { box-sizing: border-box; }' +
+'body { font-family: "IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif; color: #1a1f2e; margin: 0; font-size: 12.5px; line-height: 1.5; }' +
+'h1,h2 { font-family: "Reem Kufi",serif; }' +
+'.toolbar { background: #f5f3ee; padding: 10px 16px; text-align: ' + (dir === 'rtl' ? 'left' : 'right') + '; border-bottom: 1px solid #e4e0d6; }' +
+'.toolbar button { background: #1a3a52; color: #fff; border: none; padding: 9px 18px; border-radius: 5px; font-family: inherit; font-size: 13px; cursor: pointer; }' +
+'.rep-header { background: #1a3a52; color: #f5f3ee; padding: 22px 26px; display: flex; align-items: center; gap: 18px; }' +
+'.rep-header img { height: 46px; width: auto; }' +
+'.rep-divider { width: 1px; height: 40px; background: rgba(245,243,238,0.25); }' +
+'.rep-header h1 { margin: 0; font-size: 22px; color: #fff; font-weight: 700; }' +
+'.rep-header .sub { font-size: 12px; color: #c9a96e; margin-top: 2px; }' +
+'.rep-body { padding: 22px 26px; }' +
+'.rep-meta { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 12px; color: #5a6478; border-bottom: 2px solid #c9a96e; padding-bottom: 12px; margin-bottom: 18px; }' +
+'.rep-meta b { color: #1a1f2e; }' +
+'.note { background: #faf8f3; border-inline-start: 3px solid #c9a96e; padding: 12px 14px; border-radius: 5px; margin-bottom: 18px; font-size: 12.5px; }' +
+'h2 { font-size: 15px; color: #1a3a52; margin: 20px 0 10px; padding-bottom: 5px; border-bottom: 1px solid #e4e0d6; }' +
+'h2.mt { margin-top: 26px; }' +
+'.metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }' +
+'.m-box { border: 1px solid #e4e0d6; border-radius: 6px; padding: 12px; background: #fff; text-align: center; }' +
+'.m-val { font-family: "Reem Kufi",serif; font-size: 17px; font-weight: 600; color: #1a3a52; }' +
+'.m-lab { font-size: 10.5px; color: #5a6478; margin-top: 3px; }' +
+'table { width: 100%; border-collapse: collapse; font-size: 12px; }' +
+'th,td { text-align: ' + (dir === 'rtl' ? 'right' : 'left') + '; padding: 7px 9px; border-bottom: 1px solid #e4e0d6; }' +
+'th { background: #faf8f3; color: #5a6478; font-weight: 600; }' +
+'th.num, td.num { text-align: center; white-space: nowrap; }' +
+'tr.total td { font-weight: 700; background: #faf8f3; border-top: 2px solid #c9a96e; }' +
+'.muted { color: #8a92a3; }' +
+'.need { border: 1px solid #e4e0d6; border-radius: 6px; padding: 11px 13px; margin-bottom: 10px; page-break-inside: avoid; }' +
+'.need-co { font-weight: 700; font-size: 13px; }' +
+'.tag { display: inline-block; background: #f5e0de; color: #b04540; border: 1px solid rgba(176,69,64,0.3); border-radius: 10px; font-size: 10px; padding: 1px 8px; margin-inline-start: 4px; }' +
+'.need-sub { font-size: 11px; color: #5a6478; margin: 3px 0; }' +
+'.need-act { font-size: 12px; margin-bottom: 8px; }' +
+'.cap { font-size: 10.5px; color: #8a92a3; margin-top: 7px; font-style: italic; }' +
+'.note-line { margin-top: 7px; }' +
+'.note-line .lbl { font-size: 11px; color: #8a92a3; display: block; margin-bottom: 4px; }' +
+'.edit { border: 1px solid #d8d3c6; border-radius: 5px; padding: 8px 10px; min-height: 34px; background: #fffdf8; outline: none; font-size: 12px; }' +
+'.edit:focus, .exec-edit:focus { border-color: #1a3a52; box-shadow: 0 0 0 2px rgba(26,58,82,0.08); }' +
+'.exec-edit { border: 1px solid #d8d3c6; border-radius: 6px; padding: 12px 14px; min-height: 168px; outline: none; font-size: 12.5px; line-height: 26px; background-image: repeating-linear-gradient(#fffdf8, #fffdf8 25px, #ece7da 26px); }' +
+'[contenteditable][data-ph]:empty:before { content: attr(data-ph); color: #b5bdc9; }' +
+'.bd-note { background: #eef3f7; border-inline-start: 3px solid #1a3a52; padding: 11px 13px; border-radius: 5px; margin: 10px 0 14px; font-size: 12.5px; }' +
+'.bd-note-h { font-weight: 700; font-size: 11px; color: #1a3a52; letter-spacing: 0.04em; margin-bottom: 5px; }' +
+'.resp { margin-top: 12px; }' +
+'.resp-lbl { font-size: 11px; font-weight: 600; color: #5a6478; margin-bottom: 5px; }' +
+'.rep-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e4e0d6; display: flex; justify-content: space-between; font-size: 10.5px; color: #8a92a3; }' +
+'@media print { .toolbar { display: none; } [contenteditable][data-ph]:empty:before { content: ""; } .edit { background: #fff; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }' +
+'</style></head><body data-autoprint="1">' +
+'<div class="toolbar"><button onclick="repSaveCopy()" style="background:#b8884a;margin-inline-end:8px">' + t('repSaveCopy') + '</button><button onclick="window.print()">' + printLabel + '</button></div>' +
+'<div class="rep-header">' + (logo ? '<img src="' + logo + '" alt="SOE">' : '') + '<div class="rep-divider"></div>' +
+'<div><h1>' + t('reportTitle') + '</h1><div class="sub">' + t('reportSubtitle') + '</div></div></div>' +
+'<div class="rep-body">' +
+'<div class="rep-meta">' +
+'<div>' + t('reportDate') + ': <b>' + todayDate() + '</b></div>' +
+'<div>' + t('reportPreparedForLabel') + ': <b>' + escapeHtml(cfg.recipient) + '</b></div>' +
+(cfg.preparedBy ? '<div>' + t('reportPreparedByLabel') + ': <b>' + escapeHtml(cfg.preparedBy) + '</b></div>' : '') +
+'</div>' +
+(noteHtml ? '<div class="note">' + noteHtml + '</div>' : '') +
+'<h2>' + t('repSecMetrics') + '</h2><div class="metrics">' + metricsHtml + '</div>' +
+'<h2>' + t('repSecPipeline') + '</h2><table><thead><tr><th>' + t('repColStage') + '</th><th class="num">' + t('repColCount') + '</th><th class="num">' + t('repColValue') + '</th></tr></thead><tbody>' + stageRows + '</tbody></table>' +
+'<h2>' + t('repSecTop') + '</h2><table><thead><tr><th>' + t('repColCompany') + '</th><th>' + t('repColStage') + '</th><th class="num">' + t('repColProb') + '</th><th class="num">' + t('repColValue') + '</th><th>' + t('repColAction') + '</th></tr></thead><tbody>' + topRows + '</tbody></table>' +
+needsHtml +
+'<div class="rep-footer"><span>' + t('repConfidential') + '</span><span>' + generated + '</span></div>' +
+'</div>' +
+'<scr' + 'ipt>' + 'function repSaveCopy(){var b=document.body;b.setAttribute("data-autoprint","0");var html="<!DOCTYPE html>"+document.documentElement.outerHTML;var blob=new Blob([html],{type:"text/html;charset=utf-8"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="Business_Development_Report.html";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(a.href);},1000);}' + 'window.onload=function(){if(document.body.getAttribute("data-autoprint")==="1"){setTimeout(function(){try{window.focus();window.print();}catch(e){}},400);}};' + '<' + '/scr' + 'ipt>' +
+'</body></html>';
+  return html;
+}
+
+/* ============================================================================
+   DATA MANAGEMENT: Backup (JSON) / Import / Clear  (scoped to leads + products)
+   ============================================================================ */
+function plOpenDataModal() {
+  const body =
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    '<button class="btn ghost" style="width:100%;justify-content:flex-start" onclick="plBackupJSON()">\u{1F4E6} ' + t('backupJSON') + '</button>' +
+    '<button class="btn ghost" style="width:100%;justify-content:flex-start" onclick="document.getElementById(\'pl-import-file\').click()">\u{1F4E5} ' + t('importData') + '</button>' +
+    '<input type="file" id="pl-import-file" accept=".json,application/json" style="display:none" onchange="plImportData(event)">' +
+    '<button class="btn ghost" style="width:100%;justify-content:flex-start;border-color:rgba(176,69,64,0.4);color:var(--red)" onclick="plClearConfirm()">\u{1F5D1}\uFE0F ' + t('clearAll') + '</button>' +
+    '</div>' +
+    '<p style="font-size:11.5px;color:var(--ink-faint);margin-top:14px;line-height:1.5">' + t('dataHint') + '</p>';
+  openModal(t('dataTitle'), body, '<button class="btn ghost" onclick="closeModal()">' + t('cancel') + '</button>');
+}
+
+function plBackupJSON() {
+  const payload = {
+    type: 'opportunities-backup', version: 1, exportedAt: nowISO(),
+    leads: state.leads, products: state.products,
+    settings: { probConfig: getProbConfig(), scoreConfig: getScoreConfig() }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'opportunities_backup_' + todayDate() + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(t('toastBackup'));
+}
+
+function plImportData(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function () {
+    let data;
+    try { data = JSON.parse(reader.result); } catch (e) { toast(t('importError'), true); ev.target.value = ''; return; }
+    let leads = [], products = [], settings = null;
+    if (Array.isArray(data)) { leads = data; }
+    else if (data && typeof data === 'object') {
+      leads = Array.isArray(data.leads) ? data.leads : [];
+      products = Array.isArray(data.products) ? data.products : [];
+      settings = data.settings || null;
+    }
+    if (!leads.length && !products.length) { toast(t('importError'), true); ev.target.value = ''; return; }
+    if (!confirm(t('importConfirm'))) { ev.target.value = ''; return; }
+
+    state.leads = leads;
+    if (products.length) state.products = products;
+    if (settings) {
+      try {
+        if (settings.probConfig) localStorage.setItem(PROB_CONFIG_KEY, JSON.stringify(settings.probConfig));
+        if (settings.scoreConfig) { localStorage.setItem(SCORE_CONFIG_KEY, JSON.stringify(settings.scoreConfig)); _scoreCfg = null; }
+      } catch (e) {}
+    }
+    cacheLocal(); render(); closeModal();
+    toast(t('toastImported'));
+
+    if (supabaseClient) {
+      try {
+        if (state.leads.length) await supabaseClient.from('leads').upsert(state.leads.map(l => ({ id: l.id, data: l })), { onConflict: 'id' });
+        if (products.length) await supabaseClient.from('products').upsert(state.products.map(p => ({ id: p.id, data: p })), { onConflict: 'id' });
+      } catch (e) { console.error('Import push failed:', e); toast(t('toastError'), true); }
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function plClearConfirm() {
+  openModal(t('clearTitle'),
+    '<p style="font-size:14px;color:var(--ink-muted)">' + t('clearMsg') + '</p>',
+    '<button class="btn" style="background:var(--red)" onclick="plClearAll()">' + t('confirmClear') + '</button>' +
+    '<button class="btn ghost" onclick="closeModal()">' + t('cancel') + '</button>');
+}
+async function plClearAll() {
+  const leadIds = state.leads.map(l => l.id);
+  const prodIds = state.products.map(p => p.id);
+  state.leads = []; state.products = [];
+  cacheLocal(); render(); closeModal();
+  toast(t('toastCleared'));
+  if (supabaseClient) {
+    try {
+      if (leadIds.length) await supabaseClient.from('leads').delete().in('id', leadIds);
+      if (prodIds.length) await supabaseClient.from('products').delete().in('id', prodIds);
+    } catch (e) { console.error('Clear failed:', e); toast(t('toastError'), true); }
+  }
+}
+
+/* ============================================================================
+   ALERT THRESHOLDS CONFIG MODAL (business days)
+   ============================================================================ */
+function plOpenThresholds() {
+  const c = getThresholds();
+  const row = (id, label, val) => `<div class="form-row"><label>${label}</label><input id="pl-thr-${id}" type="number" min="0" value="${val}"></div>`;
+  const body = `<p style="font-size:13px;color:var(--ink-faint);margin-bottom:14px">${t('thrHint')}</p>`
+    + row('agingWarn', t('thrAgingWarn'), c.agingWarn)
+    + row('agingCrit', t('thrAgingCrit'), c.agingCrit)
+    + row('staleDays', t('thrStaleDays'), c.staleDays)
+    + row('stageStaleDays', t('thrStageStale'), c.stageStaleDays)
+    + row('stuckBizDays', t('thrStuckBiz'), c.stuckBizDays);
+  openModal(t('thrTitle'), body,
+    `<button class="btn" onclick="plSaveThresholds()">${t('save')}</button>
+     <button class="btn ghost" onclick="plResetThresholds()">${t('resetDefaults')}</button>
+     <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`);
+}
+function plSaveThresholds() {
+  const g = id => Math.max(0, parseInt(document.getElementById('pl-thr-' + id).value, 10) || 0);
+  const cfg = { agingWarn: g('agingWarn'), agingCrit: g('agingCrit'), staleDays: g('staleDays'), stageStaleDays: g('stageStaleDays'), stuckBizDays: g('stuckBizDays') };
+  try { localStorage.setItem(THRESHOLDS_KEY, JSON.stringify(cfg)); } catch (e) {}
+  _thrCfg = null; closeModal(); render(); toast(t('toastThrSaved'));
+}
+function plResetThresholds() {
+  try { localStorage.removeItem(THRESHOLDS_KEY); } catch (e) {}
+  _thrCfg = null; render(); plOpenThresholds(); toast(t('toastThrSaved'));
+}
+
+/* ============================================================================
+   OFFLINE ACTION PACK  — generates a self-contained, offline HTML file
+   ============================================================================ */
+function plExportOfflinePack() {
+  const lang = currentLang;
+  const rtl = lang === 'ar';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const open = state.leads.filter(l => !isClosed(l));
+  const today = todayDate();
+
+  // Localised labels baked into the generated file (no runtime t() dependency).
+  const L = rtl ? {
+    title: 'حقيبة العمل دون اتصال', subtitle: 'تطوير أعمال SOE',
+    intro: 'استخدم هذه الحقيبة دون اتصال. يمكنك حفظ ملاحظاتك محليًا ثم تصديرها إلى PDF أو نسخها إلى النظام الرئيسي لاحقًا.',
+    generated: 'تاريخ الإنشاء', count: 'فرص مفتوحة',
+    save: '💾 حفظ الملاحظات في المتصفح', load: '📂 تحميل الملاحظات المحفوظة', pdf: '🖨️ تصدير إلى PDF', copy: '📋 نسخ كل الملاحظات',
+    contact: 'جهة الاتصال', email: 'البريد', phone: 'الهاتف', stage: 'المرحلة', prob: 'الاحتمالية', value: 'القيمة المتوقعة',
+    nextAction: 'الإجراء التالي', deadline: 'الموعد النهائي', keyContacts: 'جهات الاتصال الرئيسية', tip: 'نصيحة تسريع المرحلة',
+    notes: '📝 ملاحظات / نتيجة المكالمة', reminder: '☑️ تذكير مكالمة / عرض', sar: 'ريال', none: '—',
+    saved: 'تم حفظ الملاحظات في هذا المتصفح.', loaded: 'تم تحميل الملاحظات المحفوظة.', copied: 'تم نسخ الملاحظات إلى الحافظة.', warm: 'جهة اتصال دافئة'
+  } : {
+    title: 'Offline Action Pack', subtitle: 'SOE Business Development',
+    intro: 'Use this pack offline. You can save your notes locally, then export to PDF or copy back to the main system later.',
+    generated: 'Generated', count: 'open opportunities',
+    save: '💾 Save notes to browser', load: '📂 Load saved notes', pdf: '🖨️ Export to PDF', copy: '📋 Copy all notes',
+    contact: 'Contact', email: 'Email', phone: 'Phone', stage: 'Stage', prob: 'Probability', value: 'Expected value',
+    nextAction: 'Next action', deadline: 'Deadline', keyContacts: 'Key contacts', tip: 'Stage acceleration tip',
+    notes: '📝 Notes / call outcome', reminder: '☑️ Call / demo reminder', sar: 'SAR', none: '—',
+    saved: 'Notes saved in this browser.', loaded: 'Saved notes loaded.', copied: 'Notes copied to clipboard.', warm: 'Warm contact'
+  };
+  const stageLabel = st => rtl
+    ? ({ 'Prospect': 'مبدئي', 'Qualified': 'مؤهّل', 'Proposal': 'عرض', 'Negotiation': 'تفاوض' }[st] || st)
+    : st;
+
+  const cards = open.map(l => {
+    const p = getProduct(l.productId);
+    const tip = productStageTip(l);
+    const kc = Array.isArray(l.keyContacts) ? l.keyContacts.filter(c => c && (c.name || c.role)) : [];
+    const kcHtml = kc.length ? ('<div class="oap-kc"><div class="oap-lbl">' + L.keyContacts + '</div>' + kc.map(c => {
+      const warm = (c.influence === 'High' || c.relationship === 'Warm');
+      return '<div class="oap-kc-row' + (warm ? ' warm' : '') + '">' + (warm ? '🤝 ' : '') + '<b>' + esc(c.name || L.none) + '</b>' + (c.role ? ' · ' + esc(c.role) : '') + (c.introPath ? ' <span class="oap-intro">(' + esc(c.introPath) + ')</span>' : '') + '</div>';
+    }).join('') + '</div>') : '';
+    const tipHtml = tip ? '<div class="oap-tip"><span class="oap-tip-ico">📌</span><div><div class="oap-lbl">' + L.tip + '</div>' + esc(tip) + '</div></div>' : '';
+    const due = l.nextActionDue ? esc(l.nextActionDue) : '';
+    const actionHtml = (l.nextAction || due) ? '<div class="oap-action"><span class="oap-lbl">' + L.nextAction + ':</span> ' + esc(l.nextAction || L.none) + (due ? ' <span class="oap-due">· ' + L.deadline + ': ' + due + '</span>' : '') + '</div>' : '';
+    const prob = (Number(l.probability) || 0) + '%';
+    const val = l.expectedValue ? (Number(l.expectedValue).toLocaleString('en-US') + ' ' + L.sar) : L.none;
+    return '' +
+      '<div class="oap-card" data-id="' + esc(l.id) + '">' +
+        '<div class="oap-head"><div class="oap-company">' + esc(l.companyName || L.none) + '</div>' +
+          '<span class="oap-badge">' + esc(stageLabel(l.stage)) + '</span></div>' +
+        '<div class="oap-meta">' +
+          '<div><span class="oap-lbl">' + L.contact + ':</span> ' + esc(l.contactName || L.none) + (l.contactDesignation ? ' · ' + esc(l.contactDesignation) : '') + '</div>' +
+          '<div><span class="oap-lbl">' + L.email + ':</span> ' + esc(l.contactEmail || L.none) + ' &nbsp; <span class="oap-lbl">' + L.phone + ':</span> ' + esc(l.contactPhone || L.none) + '</div>' +
+          '<div><span class="oap-lbl">' + L.prob + ':</span> ' + prob + ' &nbsp; <span class="oap-lbl">' + L.value + ':</span> ' + esc(val) + '</div>' +
+        '</div>' +
+        actionHtml + kcHtml + tipHtml +
+        '<label class="oap-note-lbl">' + L.notes + '</label>' +
+        '<textarea class="oap-note" data-id="' + esc(l.id) + '" rows="3"></textarea>' +
+        '<label class="oap-check"><input type="checkbox" class="oap-rem" data-id="' + esc(l.id) + '"> ' + L.reminder + '</label>' +
+      '</div>';
+  }).join('');
+
+  // Build the standalone document. Scripts split so the inner closing tag can't close the outer one.
+  const S1 = '<' + 'script>';
+  const S2 = '<' + '/' + 'script>';
+  const doc =
+'<!DOCTYPE html><html lang="' + lang + '" dir="' + (rtl ? 'rtl' : 'ltr') + '"><head><meta charset="UTF-8">' +
+'<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>' + L.title + ' — SOE</title><style>' +
+':root{--bg:#f5f3ee;--card:#fff;--ink:#1a1f2e;--muted:#5a6478;--faint:#8a92a3;--line:#e4e0d6;--line2:#c8c2b0;--accent:#1a3a52;--gold:#c9a96e;--warm:#b8884a;--green:#4a7c59;--amber:#c47e2a;--red:#b04540;--amber-bg:#faf0e0;--green-bg:#e8f0e8}' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:"Segoe UI",Tahoma,Arial,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;padding:0 0 50px}' +
+'.oap-top{background:var(--accent);color:#f5f3ee;padding:26px 28px}' +
+'.oap-brand{display:flex;align-items:center;gap:12px}.oap-bd{width:40px;height:40px;border:1.5px solid rgba(201,169,110,.6);border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:700}' +
+'.oap-top h1{font-size:22px}.oap-top .sub{color:var(--gold);font-size:13px;margin-top:2px}' +
+'.oap-intro{font-size:13px;color:rgba(245,243,238,.85);margin-top:12px;max-width:760px}' +
+'.oap-genline{font-size:12px;color:rgba(245,243,238,.7);margin-top:8px}' +
+'.oap-bar{position:sticky;top:0;z-index:5;background:#ece7dd;border-bottom:1px solid var(--line);padding:10px 28px;display:flex;flex-wrap:wrap;gap:8px}' +
+'.oap-btn{background:var(--accent);color:#f5f3ee;border:none;padding:9px 14px;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer}' +
+'.oap-btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--line2)}.oap-btn:hover{opacity:.92}' +
+'.oap-msg{font-size:12px;color:var(--green);align-self:center;margin-inline-start:6px}' +
+'.oap-wrap{max-width:880px;margin:0 auto;padding:20px 28px}' +
+'.oap-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(26,31,46,.05)}' +
+'.oap-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}' +
+'.oap-company{font-size:17px;font-weight:700;color:var(--accent)}' +
+'.oap-badge{background:#eef3f7;color:var(--accent);border:1px solid #d4e0e9;border-radius:11px;padding:3px 11px;font-size:11px;font-weight:600;white-space:nowrap}' +
+'.oap-meta{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px;margin-bottom:8px}' +
+'.oap-lbl{color:var(--faint);font-size:11.5px}' +
+'.oap-action{font-size:13px;background:#faf8f3;border:1px solid var(--line);border-radius:6px;padding:7px 10px;margin:6px 0}.oap-due{color:var(--red)}' +
+'.oap-kc{margin:8px 0}.oap-kc-row{font-size:13px;padding:3px 0}.oap-kc-row.warm{background:var(--green-bg);border-radius:5px;padding:4px 8px}.oap-intro{color:var(--faint);font-size:12px}' +
+'.oap-tip{display:flex;gap:8px;background:var(--amber-bg);border:1px solid #ecd9b6;border-radius:6px;padding:8px 10px;margin:8px 0;font-size:13px}.oap-tip-ico{flex:none}' +
+'.oap-note-lbl{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600}' +
+'.oap-note{width:100%;border:1px solid var(--line2);border-radius:6px;padding:9px;font-family:inherit;font-size:14px;resize:vertical;min-height:62px;background:#fafaf7}' +
+'.oap-check{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer}.oap-check input{width:17px;height:17px}' +
+'@media print{.oap-bar{display:none}.oap-top{-webkit-print-color-adjust:exact;print-color-adjust:exact}.oap-card{break-inside:avoid;box-shadow:none}.oap-note{border:none;background:transparent;min-height:0;padding:4px 0}body{background:#fff}}' +
+'</style></head><body>' +
+'<div class="oap-top"><div class="oap-brand"><div class="oap-bd">BD</div><div><h1>' + L.title + '</h1><div class="sub">' + L.subtitle + '</div></div></div>' +
+'<div class="oap-intro">' + L.intro + '</div>' +
+'<div class="oap-genline">' + L.generated + ': ' + today + ' · ' + open.length + ' ' + L.count + '</div></div>' +
+'<div class="oap-bar">' +
+'<button class="oap-btn" onclick="oapSave()">' + L.save + '</button>' +
+'<button class="oap-btn ghost" onclick="oapLoad()">' + L.load + '</button>' +
+'<button class="oap-btn ghost" onclick="window.print()">' + L.pdf + '</button>' +
+'<button class="oap-btn ghost" onclick="oapCopy()">' + L.copy + '</button>' +
+'<span class="oap-msg" id="oap-msg"></span></div>' +
+'<div class="oap-wrap">' + (cards || '<p style="color:var(--faint)">' + L.none + '</p>') + '</div>' +
+S1 +
+'var OAP_KEY="offline_action_pack_notes";' +
+'var MSG={saved:' + JSON.stringify(L.saved) + ',loaded:' + JSON.stringify(L.loaded) + ',copied:' + JSON.stringify(L.copied) + '};' +
+'function oapMsg(t){var e=document.getElementById("oap-msg");e.textContent=t;setTimeout(function(){if(e.textContent===t)e.textContent="";},2600);}' +
+'function oapSave(){var d={};document.querySelectorAll(".oap-note").forEach(function(n){d[n.getAttribute("data-id")]=d[n.getAttribute("data-id")]||{};d[n.getAttribute("data-id")].note=n.value;});' +
+'document.querySelectorAll(".oap-rem").forEach(function(c){var id=c.getAttribute("data-id");d[id]=d[id]||{};d[id].reminder=c.checked;});' +
+'try{localStorage.setItem(OAP_KEY,JSON.stringify(d));oapMsg(MSG.saved);}catch(e){oapMsg("⚠️ "+e.message);}}' +
+'function oapLoad(){var raw;try{raw=localStorage.getItem(OAP_KEY);}catch(e){return;}if(!raw)return;var d=JSON.parse(raw);' +
+'document.querySelectorAll(".oap-note").forEach(function(n){var id=n.getAttribute("data-id");if(d[id]&&d[id].note!=null)n.value=d[id].note;});' +
+'document.querySelectorAll(".oap-rem").forEach(function(c){var id=c.getAttribute("data-id");if(d[id])c.checked=!!d[id].reminder;});oapMsg(MSG.loaded);}' +
+'function oapCopy(){var NL=String.fromCharCode(10);var out=[];document.querySelectorAll(".oap-card").forEach(function(card){var id=card.getAttribute("data-id");' +
+'var company=(card.querySelector(".oap-company")||{}).textContent||"";var note=(card.querySelector(".oap-note")||{}).value||"";var rem=(card.querySelector(".oap-rem")||{}).checked?"yes":"no";' +
+'out.push("=== "+company+" (id: "+id+") ===");out.push("Reminder: "+rem);out.push("Note: "+note);out.push("");});' +
+'var text=out.join(NL);function done(){oapMsg(MSG.copied);}' +
+'if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,function(){fallback();});}else{fallback();}' +
+'function fallback(){var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done();}catch(e){oapMsg("⚠️");}document.body.removeChild(ta);}}' +
+'try{oapLoad();}catch(e){}' +
+S2 +
+'</body></html>';
+
+  const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'offline_action_pack_' + today + '.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  toast(t('toastOfflinePack'));
+}
+
+/* ============================================================================
+   RENDER ROOT
+   ============================================================================ */
+function renderToday() {
+  const el = document.getElementById('pl-today'); if (!el) return;
+  const opts = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+  const ds = new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-GB', opts);
+  el.textContent = '📅 ' + t('todayLabel') + ': ' + ds;
+}
+function renderLegend() {
+  const el = document.getElementById('pl-legend'); if (!el) return;
+  const thr = getThresholds();
+  el.innerHTML =
+    `<span class="lg-title">${t('legendTitle')}:</span>` +
+    `<span class="lg-item"><span class="lg-sw" style="background:#ffd1d1"></span>${t('legendOverdue')}</span>` +
+    `<span class="lg-item"><span class="lg-sw" style="background:#ffe1c4"></span>${t('legendCritical', thr.agingCrit)}</span>` +
+    `<span class="lg-item"><span class="lg-sw" style="background:#fdf3d3"></span>${t('legendStale', thr.agingWarn, thr.stageStaleDays)}</span>`;
+}
+function render() {
+  renderToday();
+  renderFocus();
+  renderStats();
+  renderLegend();
+  renderFilters();
+  renderTable();
+}
+
+/* ============================================================================
+   BOOT
+   ============================================================================ */
+document.getElementById('modal-close').onclick = closeModal;
+document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
+
+applyLangToDocument();
+loadData();
+</script>
+</body>
+</html>
