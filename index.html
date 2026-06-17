@@ -1045,6 +1045,30 @@
   .back-to-top.show { display: inline-flex; }
   .back-to-top:hover { filter: brightness(1.1); }
 
+  /* Header sync badge — clearly visible pill near the page title */
+  #sync-badge {
+    position: fixed; top: 18px; right: 28px; z-index: 1500;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 24px;
+    font-size: 13px; font-weight: 600; line-height: 1;
+    color: #fff;
+    background: linear-gradient(135deg, #1f3a5f 0%, #2c4f7c 100%);
+    border: 1.5px solid var(--gold, #c9a84c);
+    box-shadow: 0 4px 14px rgba(31,58,95,0.25), 0 0 0 3px rgba(201,168,76,0.12);
+    opacity: 0; transform: translateY(-6px); pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #sync-badge.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  #sync-badge.updated { background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%); border-color: #95d5b2; }
+  #sync-badge .sync-spinner {
+    width: 14px; height: 14px; border: 2.5px solid rgba(255,255,255,0.25);
+    border-top-color: var(--gold, #c9a84c); border-radius: 50%;
+    animation: syncSpin 0.7s linear infinite;
+  }
+  html[dir="rtl"] #sync-badge { right: auto; left: 28px; }
+  @media (max-width: 720px) { #sync-badge { top: 12px; right: 14px; padding: 7px 14px; font-size: 12px; } html[dir="rtl"] #sync-badge { left: 14px; right: auto; } }
+  @keyframes syncSpin { to { transform: rotate(360deg); } }
+
   @media (max-width: 980px) {
     /* Hamburger visible on tablet/phone */
     .hamburger-btn {
@@ -1242,6 +1266,9 @@
 <div class="app">
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- Sync badge (header-level, survives re-renders) -->
+  <div id="sync-badge"><span class="sync-spinner"></span><span id="sync-badge-text"></span></div>
 
   <!-- Main content -->
   <main class="main" id="main-content">
@@ -1973,7 +2000,7 @@ const T = {
     colMeetingDateScheduled: 'تاريخ الجدولة',
     // Notifications
     enableNotifications: '🔔 تفعيل التنبيهات',
-    syncNowBtn: '🔄 مزامنة الآن', syncOfflineBtn: '🔄 إعادة المحاولة', syncOnline: 'متزامن مع السحابة', syncOffline: 'غير متصل — التغييرات محفوظة محليًا وستُزامَن', syncingNow: 'جارٍ المزامنة…',
+    syncNowBtn: '🔄 مزامنة الآن', syncOfflineBtn: '🔄 إعادة المحاولة', syncOnline: 'متزامن مع السحابة', syncOffline: 'غير متصل — التغييرات محفوظة محليًا وستُزامَن', syncingNow: 'جارٍ المزامنة…', syncBadgeSyncing: 'جارٍ المزامنة…', syncBadgeUpdated: 'تم التحديث ✓',
     notificationsEnabled: '✓ التنبيهات مفعلة',
     notificationsDenied: '🔕 التنبيهات معطلة',
     notifTitle: 'تذكير: مهام معلقة',
@@ -2599,7 +2626,7 @@ const T = {
     colMeetingDateScheduled: 'Date Scheduled',
     // Notifications
     enableNotifications: '🔔 Enable Notifications',
-    syncNowBtn: '🔄 Sync Now', syncOfflineBtn: '🔄 Retry Sync', syncOnline: 'Synced with cloud', syncOffline: 'Offline — changes saved locally & will sync', syncingNow: 'Syncing…',
+    syncNowBtn: '🔄 Sync Now', syncOfflineBtn: '🔄 Retry Sync', syncOnline: 'Synced with cloud', syncOffline: 'Offline — changes saved locally & will sync', syncingNow: 'Syncing…', syncBadgeSyncing: 'Syncing…', syncBadgeUpdated: 'Updated ✓',
     notificationsEnabled: '✓ Notifications Enabled',
     notificationsDenied: '🔕 Notifications Blocked',
     notifTitle: 'Reminder: Pending Tasks',
@@ -2840,6 +2867,15 @@ function renderSidebar() {
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         ${t('navSettings')}
       </button>
+      <button class="nav-item" onclick="window.open('opportunities.html', '_blank')">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/>
+          <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <path d="M3 13h18"/>
+          <path d="M11 12h2v2h-2z"/>
+        </svg>
+        🎯 Business Opportunities
+      </button>
     </nav>
 
     <div class="sidebar-actions">
@@ -2869,8 +2905,10 @@ function renderSidebar() {
       ${t('sidebarFooter2')}
     </div>
   `;
-  // Re-bind handlers since we replaced the DOM
-  document.querySelectorAll('.nav-item').forEach(b => {
+  // Re-bind handlers since we replaced the DOM.
+  // Only items with a data-view drive in-app navigation; the Business
+  // Opportunities button uses its own inline onclick (opens a new tab).
+  document.querySelectorAll('.nav-item[data-view]').forEach(b => {
     b.addEventListener('click', () => navigate(b.dataset.view));
   });
   document.getElementById('export-data-btn').onclick = exportData;
@@ -2878,6 +2916,31 @@ function renderSidebar() {
   document.getElementById('import-file').onchange = (e) => { if (e.target.files[0]) importData(e.target.files[0]); };
   document.getElementById('reset-btn').onclick = resetData;
   try { updateSyncIndicator(); } catch (e) {}
+}
+
+// Header-level sync badge: shows "Syncing…" / "Updated ✓" with fade animation.
+let _syncBadgeTimer = null;
+function setSyncBadge(phase) {
+  const badge = document.getElementById('sync-badge');
+  const label = document.getElementById('sync-badge-text');
+  if (!badge || !label) return;
+  if (_syncBadgeTimer) { clearTimeout(_syncBadgeTimer); _syncBadgeTimer = null; }
+  const spinner = badge.querySelector('.sync-spinner');
+  if (phase === 'syncing') {
+    label.textContent = t('syncBadgeSyncing');
+    if (spinner) spinner.style.display = '';
+    badge.classList.remove('updated');
+    badge.classList.add('visible');
+  } else if (phase === 'updated') {
+    label.textContent = t('syncBadgeUpdated');
+    if (spinner) spinner.style.display = 'none';
+    badge.classList.add('updated');
+    badge.classList.add('visible');
+    _syncBadgeTimer = setTimeout(() => { badge.classList.remove('visible'); badge.classList.remove('updated'); }, 2000);
+  } else {
+    badge.classList.remove('visible');
+    badge.classList.remove('updated');
+  }
 }
 
 // Reflect online/offline sync status in the sidebar (indicator dot + Sync Now label).
@@ -2919,7 +2982,7 @@ function describeSupabaseError(e) {
 // online so every user sees the same shared data on refresh. Per-table resilience: if one
 // table errors we keep its cached copy instead of discarding all cloud data; only a total
 // failure (every table errors) falls back fully to localStorage.
-async function loadState(force) {
+async function _loadStateInner(force) {
   if (!supabaseClient) return loadStateFromLocalStorage();
 
   // 1) Fetch ONLY the tiny per-table stamps (one small row).
@@ -2988,6 +3051,18 @@ async function loadState(force) {
   setSyncOnline(true);
   failed.forEach(r => console.error('Supabase load: table "' + r.t.table + '" failed — kept cached copy:', describeSupabaseError(r.error)));
   return true;
+}
+
+// Public wrapper: shows the "Syncing…" / "Updated ✓" header badge around EVERY load,
+// so init, refreshFromCloud, syncNow all light up the indicator uniformly.
+async function loadState(force) {
+  if (!supabaseClient) return _loadStateInner(force); // local-only path: no badge needed
+  setSyncBadge('syncing');
+  try {
+    const r = await _loadStateInner(force);
+    setSyncBadge('updated');
+    return r;
+  } catch (e) { setSyncBadge('idle'); throw e; }
 }
 
 // Derive the highest sequential report number from the reports list (e.g. RPT-2026-0005 → 5).
@@ -3149,7 +3224,7 @@ async function saveState() {
 // Background writer: upserts ONLY dirty tables + applies queued deletes, then bumps
 // the per-table cloud stamps. On failure everything stays queued and retries with
 // exponential backoff. This is the single write path (Minimum Egress).
-async function flushWrites() {
+async function _flushWritesInner() {
   if (!supabaseClient) return;
   if (dirtyTables.size === 0 && !hasPendingDeletes()) { setSyncOnline(true); return; }
   const dirtyList = Array.from(dirtyTables);
@@ -3186,6 +3261,17 @@ async function flushWrites() {
     if (typeof toast === 'function') toast(t('offlineSaveWarning'));
     scheduleRetry(flushWrites);     // exponential backoff
   }
+}
+
+// Public wrapper: any actual upload (dirty tables or queued deletes) shows the
+// "Syncing…" / "Updated ✓" header badge. A no-op flush stays silent.
+async function flushWrites() {
+  if (!supabaseClient) return;
+  const hadWork = dirtyTables.size > 0 || hasPendingDeletes();
+  if (!hadWork) return; // nothing to upload → no badge flash
+  setSyncBadge('syncing');
+  try { await _flushWritesInner(); setSyncBadge('updated'); }
+  catch (e) { setSyncBadge('idle'); throw e; }
 }
 
 // Read-merge-write the single sync_meta stamp row so concurrent table updates from
