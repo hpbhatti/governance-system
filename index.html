@@ -10640,10 +10640,22 @@ async function resetData() {
   // 1) Try a FAST local load first so the UI can paint immediately.
   try { loadStateFromLocalStorage(); } catch (e) {}
   ['partners','team','projects','actions','reports'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
-  const seededNow = seedIfEmpty();
+  const seededNow = false; // DISABLED — sample data removed permanently (was seedIfEmpty())
 
   // 2) Paint the UI right away — never leave the page blank.
-  try { state.currentView = 'dashboard'; } catch (e) {}
+  // Deep link from Opportunities convert: ?view=partnerDetail&partnerId=xxx
+  let _deepLink = null;
+  try {
+    const _qp = new URLSearchParams(window.location.search || '');
+    const _v = _qp.get('view'), _pid = _qp.get('partnerId');
+    if (_v === 'partnerDetail' && _pid) {
+      _deepLink = { view: 'partnerDetail', partnerId: _pid };
+      if ((state.partners || []).some(p => p && p.id === _pid)) {
+        state.currentView = 'partnerDetail';
+        state.detailParam = _pid;
+      } else { state.currentView = 'dashboard'; }
+    } else { state.currentView = 'dashboard'; }
+  } catch (e) { state.currentView = 'dashboard'; }
   try { migrateBilingualContent(); } catch (e) {}
   try { renderSidebar(); } catch (e) { console.error('renderSidebar failed:', e); }
   try { render(); } catch (e) { console.error('render failed:', e); }
@@ -10655,17 +10667,23 @@ async function resetData() {
       // Per-request timeouts inside loadState now guarantee it completes (~7s worst
       // case) instead of hanging, so the outer guard is a generous safety net only.
       const hadCloud = await withTimeout(loadState(), 12000, 'loadState');
-      // If cloud had nothing and we just seeded locally, push the seed up.
-      if (state.partners && state.partners.length === 0) {
-        if (seedIfEmpty()) await withTimeout(saveState(), 12000, 'saveState');
-      } else if (seededNow && hadCloud) {
-        // Cloud actually had data; our seed was premature — cloud already applied.
-      }
+      // Sample-data seed PERMANENTLY DISABLED.
+      // The seed previously injected 6 Arabic partners, 7 projects and 21 tasks
+      // into empty browsers and could push them to Supabase — polluting real data.
+      // Fresh browsers now show an empty dashboard until the cloud sync completes.
       try { migrateBilingualContent(); } catch (e) {}
       await withTimeout(loadConfig(), 12000, 'loadConfig');
       // Re-render with reconciled data.
       try { renderSidebar(); } catch (e) {}
-      try { render(); } catch (e) {}
+      try {
+        if (_deepLink && _deepLink.view === 'partnerDetail') {
+          if ((state.partners || []).some(p => p && p.id === _deepLink.partnerId)) {
+            state.currentView = 'partnerDetail';
+            state.detailParam = _deepLink.partnerId;
+          }
+        }
+      } catch (e) {}
+      try { render(state.detailParam); } catch (e) {}
       try { applyContentLanguage(currentLang); } catch (e) {}
     } catch (e) {
       console.error('Background cloud sync failed (UI already shown):', e);
