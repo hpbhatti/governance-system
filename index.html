@@ -400,7 +400,24 @@
   .search-input:focus { outline: none; border-color: var(--accent); }
 
   /* Action card list (for daily report) */
-  .action-card {
+  .drill-shell { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+.drill-shell:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,31,46,.08); }
+.drill-shell:active { transform: translateY(0); }
+.drill-shell .action-card { pointer-events: none; } /* let the shell take the click */
+.drill-shell .action-card .btn { pointer-events: auto; } /* but keep buttons usable */
+.drill-shell .action-card .badge { pointer-events: auto; }
+.action-card.flash-target,
+tr.flash-target { animation: flashTarget 1.6s ease-out; outline: 2px solid var(--accent-warm); outline-offset: 2px; }
+tr.flash-target > td { background: rgba(201,169,110,.18) !important; }
+tr.drillable { cursor: pointer; transition: background .12s ease; }
+tr.drillable:hover > td { background: #faf8f3; }
+tr.drillable:active > td { background: #f3eee0; }
+@keyframes flashTarget {
+  0% { background: rgba(201,169,110,.22); }
+  50% { background: rgba(201,169,110,.10); }
+  100% { background: transparent; }
+}
+.action-card {
     background: var(--bg-card);
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -1097,8 +1114,99 @@
     body.sidebar-open .sidebar-backdrop { display: block; }
     /* Leave room for the fixed hamburger */
     .main { padding-top: 64px; }
-    /* Force tables wide enough that they scroll rather than crush columns */
-    .table-wrap table { min-width: 560px; }
+    /* On phones, tables convert to stacked cards (see <=720px block below).
+       On tablets, allow tables to scroll horizontally without crushing columns. */
+    .table-wrap { overflow-x: auto; }
+    .table-wrap table { min-width: 100%; }
+  }
+
+  /* === PHONE: stack tables as cards, never overflow horizontally === */
+  @media (max-width: 720px) {
+    /* Container never permits horizontal overflow */
+    html, body { overflow-x: hidden; }
+    .app, .main { max-width: 100vw; overflow-x: hidden; }
+    .main { padding: 16px !important; padding-top: 64px !important; }
+    .page-head { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .page-actions { width: 100%; flex-wrap: wrap; }
+
+    /* Headings sized for narrow screens */
+    .page-title { font-size: 22px; line-height: 1.25; }
+    .page-subtitle { font-size: 13px; }
+
+    /* Stats grid: single column */
+    .stats { grid-template-columns: 1fr !important; }
+    .stat-value { font-size: 26px; }
+
+    /* Detail grids stack */
+    .detail-grid { grid-template-columns: 1fr !important; }
+
+    /* Filter chips & search wrap, never push width */
+    .filters, .filter-row { flex-wrap: wrap; }
+    .filter-chip { font-size: 12px; }
+    .search-input, input[type="text"], input[type="search"], input[type="email"],
+    input[type="tel"], input[type="number"], input[type="date"], select, textarea {
+      max-width: 100%; box-sizing: border-box;
+    }
+
+    /* TABLES → stacked cards */
+    .table-wrap { overflow-x: visible !important; }
+    .table-wrap table { min-width: 0 !important; width: 100% !important; border-collapse: separate; }
+    .table-wrap thead { display: none; }
+    .table-wrap tbody, .table-wrap tr, .table-wrap td { display: block; width: 100%; }
+    .table-wrap tr {
+      background: var(--bg-card, #fff); border: 1px solid var(--line);
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .table-wrap tr[onclick] { cursor: pointer; }
+    .table-wrap tr.flash-target > td { background: transparent !important; }
+    .table-wrap tr.flash-target { background: rgba(201,169,110,.18) !important; }
+    .table-wrap td {
+      padding: 6px 0; border: none !important;
+      display: flex; gap: 8px; align-items: flex-start;
+      flex-wrap: wrap; min-height: 0;
+    }
+    .table-wrap td:before {
+      content: attr(data-label);
+      flex: 0 0 110px; max-width: 110px;
+      font-size: 11px; font-weight: 600; color: var(--ink-faint);
+      text-transform: uppercase; letter-spacing: .03em;
+      padding-top: 2px;
+    }
+    .table-wrap td:empty, .table-wrap td:has(> :empty:only-child) { display: none; }
+    /* Cells with only action buttons (no label) take full width */
+    .table-wrap td:not([data-label]) { padding: 8px 0 4px; }
+    .table-wrap td:not([data-label]):before { display: none; }
+    /* When a row has action buttons, give them breathing room */
+    .row-actions { gap: 6px; flex-wrap: wrap; }
+    .row-btn { padding: 8px 12px; font-size: 12px; }
+
+    /* Action cards (tasks/meetings) on dashboard, agenda, project detail */
+    .action-card { padding: 14px; }
+    .action-card .ac-head { flex-wrap: wrap; gap: 6px; }
+    .action-card .ac-meta { flex-wrap: wrap; gap: 6px 12px; font-size: 12px; }
+
+    /* Daily Reminder banner */
+    .reminder-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .reminder-banner .actions { width: 100%; justify-content: flex-end; }
+
+    /* Topbar hamburger spacing */
+    .hamburger-btn { top: 10px; inset-inline-end: 10px; width: 42px; height: 42px; }
+
+    /* Logo + brand on dashboard */
+    .brand-row { flex-wrap: wrap; }
+
+    /* Modals: full-width on phones */
+    .modal { width: 94vw !important; max-width: 94vw !important; margin: 16px auto; max-height: 88vh; }
+    .modal-body { padding: 16px !important; }
+    .modal .checkbox-grid { grid-template-columns: 1fr; }
+
+    /* Sync badge */
+    #sync-badge { top: 10px; right: 64px; padding: 6px 12px; font-size: 11px; }
+    html[dir="rtl"] #sync-badge { left: 64px; right: auto; }
+
+    /* Hide the bulky "Today's Date" floating block on phones */
+    .page-head .today-date { display: none; }
   }
 
   @media (max-width: 600px) {
@@ -1666,7 +1774,7 @@ const T = {
     filterOverdue: 'فات موعدها',
     filterMissed: 'لم يتم', filterCompleted: 'مكتمل',
     filterCritical: 'حرجة (+{0} يوم)',
-    drillDown: 'التفاصيل', drillHint: 'اضغط لعرض التفاصيل',
+    drillDown: 'التفاصيل', drillHint: 'اضغط لعرض التفاصيل', drillTaskHint: 'اضغط لفتح المهمة في المشروع', drillMeetingHint: 'اضغط لفتح الاجتماع في المشروع', backToAgenda: '← العودة إلى الأجندة اليومية', backToTeamMember: '← العودة إلى {0}',
     reportGroupByLabel: 'طريقة العرض',
     groupByStatus: 'حسب الحالة (افتراضي)',
     groupByProject: 'حسب المشروع',
@@ -2292,7 +2400,7 @@ const T = {
     filterOverdue: 'Overdue',
     filterMissed: 'Missed', filterCompleted: 'Completed',
     filterCritical: 'Critical (+{0}d)',
-    drillDown: 'Details', drillHint: 'Click to view details',
+    drillDown: 'Details', drillHint: 'Click to view details', drillTaskHint: 'Click to open this task in its project', drillMeetingHint: 'Click to open this meeting in its project', backToAgenda: '← Back to Daily Agenda', backToTeamMember: '← Back to {0}',
     reportGroupByLabel: 'Grouping',
     groupByStatus: 'By Status (default)',
     groupByProject: 'By Project',
@@ -3348,67 +3456,13 @@ function formatDateTime(iso) {
 
 /* ========== SAMPLE DATA ========== */
 function loadSampleData() {
-  const today = new Date();
-  const daysAgo = (n) => {
-    const d = new Date(today); d.setDate(d.getDate() - n);
-    return d.toISOString().split('T')[0];
-  };
-  const daysAhead = (n) => {
-    const d = new Date(today); d.setDate(d.getDate() + n);
-    return d.toISOString().split('T')[0];
-  };
-
-  state.team = [
-    { id: 'tm1', name: 'يوسف الدوسري', email: 'yousef@lmak.sa', role: 'مدير مشاريع', createdAt: daysAgo(150) },
-    { id: 'tm2', name: 'لينا الشهري', email: 'lina@lmak.sa', role: 'مطوّرة', createdAt: daysAgo(140) },
-    { id: 'tm3', name: 'عمر القحطاني', email: 'omar@lmak.sa', role: 'ضمان الجودة', createdAt: daysAgo(120) }
-  ];
-
-  state.partners = [
-    { id: 'p1', name: 'شركة الأفق التقنية', type: 'development', contact: 'م. خالد الحربي', phone: '0501234567', email: 'k@alofuq.sa', notes: 'شراكة في تطوير منصة الخدمات الرقمية', createdAt: daysAgo(120), incomeRating: 5, team: [ {id:'pm_p1a', name:'م. خالد الحربي', email:'k@alofuq.sa'}, {id:'pm_p1b', name:'سعد المطيري', email:'saad@alofuq.sa'} ] },
-    { id: 'p2', name: 'مؤسسة نخبة المعرفة', type: 'supervision', contact: 'أ. منى السبيعي', phone: '0509876543', email: 'm@nokhba.sa', notes: 'إشراف على مشاريع التحول الرقمي للعميل', createdAt: daysAgo(90), incomeRating: 4, team: [ {id:'pm_p2a', name:'أ. منى السبيعي', email:'m@nokhba.sa'} ] },
-    { id: 'p3', name: 'مجموعة بيت الإبداع', type: 'development', contact: 'م. عبدالله الزهراني', phone: '0556677889', email: 'abz@bayt.sa', notes: 'شراكة استراتيجية - منصة المحتوى', createdAt: daysAgo(60), incomeRating: 4, team: [ {id:'pm_p3a', name:'م. عبدالله الزهراني', email:'abz@bayt.sa'} ] },
-    { id: 'p4', name: 'دار الرواد للاستشارات', type: 'supervision', contact: 'د. سارة العتيبي', phone: '0533445566', email: 's@rwad.sa', notes: 'إشراف وتدقيق', createdAt: daysAgo(45), incomeRating: 3, team: [ {id:'pm_p4a', name:'د. سارة العتيبي', email:'s@rwad.sa'} ] },
-    { id: 'p5', name: 'مشاريع داخلية - الفريق', type: 'ownership', contact: 'إدارة المنتجات', phone: '', email: 'products@internal', notes: 'مشاريع مملوكة بالكامل مع توزيع نسب داخلي للفريق', createdAt: daysAgo(150), incomeRating: 5, team: [] },
-    { id: 'p6', name: 'مزوّد الحلول السحابية', type: 'vendor', contact: 'م. ريم الغامدي', phone: '0544556677', email: 'reem@cloudvendor.sa', notes: 'مورّد خدمات استضافة وبنية تحتية', createdAt: daysAgo(35), incomeRating: 3, team: [ {id:'pm_p6a', name:'م. ريم الغامدي', email:'reem@cloudvendor.sa'} ] }
-  ];
-
-  state.projects = [
-    { id: 'pr1', name: 'منصة الخدمات الرقمية', partnerId: 'p1', partnerIds: ['p1'], teamMemberIds: ['tm2'], description: 'تطوير منصة متكاملة للخدمات الإلكترونية', startDate: daysAgo(80), targetDate: daysAhead(30), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 35, partnershipCurrency: '%', partnershipValue: '35%' },
-    { id: 'pr2', name: 'تطبيق التحول الرقمي', partnerId: 'p2', partnerIds: ['p2'], teamMemberIds: ['tm3'], description: 'إشراف على تنفيذ التطبيق للعميل الرئيسي', startDate: daysAgo(60), targetDate: daysAhead(15), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 80000, partnershipCurrency: 'SAR', partnershipValue: '80,000 ر.س' },
-    { id: 'pr3', name: 'منصة المحتوى التعليمي', partnerId: 'p3', partnerIds: ['p3'], teamMemberIds: [], description: 'تطوير منصة تعليمية تفاعلية', startDate: daysAgo(40), targetDate: daysAhead(45), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 25, partnershipCurrency: '%', partnershipValue: '25%' },
-    { id: 'pr4', name: 'نظام إدارة الموارد', partnerId: 'p1', partnerIds: ['p1'], teamMemberIds: ['tm2'], description: 'نظام داخلي لإدارة الموارد البشرية', startDate: daysAgo(30), targetDate: daysAhead(60), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 45000, partnershipCurrency: 'SAR', partnershipValue: '45,000 ر.س' },
-    { id: 'pr5', name: 'تدقيق المشروع الحكومي', partnerId: 'p4', partnerIds: ['p4'], teamMemberIds: ['tm1'], description: 'إشراف ومراجعة مشروع حكومي', startDate: daysAgo(20), targetDate: daysAhead(10), status: 'active', attachments: [], partnershipModel: 'fixed', partnershipAmount: 12000, partnershipCurrency: 'USD', partnershipValue: '$12,000' },
-    { id: 'pr6', name: 'منصة محاسبة داخلية', partnerId: 'p5', partnerIds: ['p5'], teamMemberIds: [], description: 'مشروع ملكية خاصة مع توزيع نسب للفريق المطور', startDate: daysAgo(70), targetDate: daysAhead(40), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' },
-    { id: 'pr7', name: 'أداة تحليلات SaaS', partnerId: 'p5', partnerIds: ['p5'], teamMemberIds: [], description: 'منتج داخلي تجاري — توزيع نسبي بين الفريق المؤسس', startDate: daysAgo(15), targetDate: daysAhead(90), status: 'active', attachments: [], partnershipModel: 'percentage', partnershipAmount: 100, partnershipCurrency: '%', partnershipValue: '100%' }
-  ];
-
-  state.actions = [
-    { id: 'a1', type: 'task', title: 'تسليم النسخة التجريبية الأولى', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'high', dueDate: daysAgo(15), completedDate: daysAgo(14), reason: '', createdAt: daysAgo(30), ownerKind:'partner', ownerId:'pm_p1a' },
-    { id: 'a2', type: 'task', title: 'مراجعة وثيقة المتطلبات', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'medium', dueDate: daysAgo(8), completedDate: daysAgo(7), reason: '', createdAt: daysAgo(20), ownerKind:'partner', ownerId:'pm_p1a' },
-    { id: 'a3', type: 'task', title: 'تجهيز بيئة الاختبار', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: 'في انتظار اعتماد الميزانية من الإدارة', createdAt: daysAgo(15), ownerKind:'internal', ownerId:'tm2', dependsOnIds:['a8'] },
-    { id: 'a4', type: 'task', title: 'تسليم تقرير التقدم الشهري', projectId: 'pr2', partnerId: 'p2', status: 'open', priority: 'medium', dueDate: daysAgo(10), completedDate: null, reason: 'تأخر استلام البيانات من العميل', createdAt: daysAgo(20), ownerKind:'partner', ownerId:'pm_p2a' },
-    { id: 'a5', type: 'task', title: 'مراجعة الكود البرمجي', projectId: 'pr2', partnerId: 'p2', status: 'open', priority: 'high', dueDate: daysAgo(2), completedDate: null, reason: 'يحتاج اجتماع تنسيق', createdAt: daysAgo(10), ownerKind:'internal', ownerId:'tm3' },
-    { id: 'a6', type: 'task', title: 'إعداد دليل المستخدم', projectId: 'pr3', partnerId: 'p3', status: 'completed', priority: 'low', dueDate: daysAgo(5), completedDate: daysAgo(4), reason: '', createdAt: daysAgo(15), ownerKind:'partner', ownerId:'pm_p3a' },
-    { id: 'a7', type: 'task', title: 'تحليل متطلبات المرحلة الثانية', projectId: 'pr3', partnerId: 'p3', status: 'open', priority: 'medium', dueDate: daysAhead(3), completedDate: null, reason: '', createdAt: daysAgo(7) },
-    { id: 'a8', type: 'task', title: 'تكامل واجهة برمجة التطبيقات', projectId: 'pr4', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAgo(20), completedDate: null, reason: 'مشكلة فنية في التكامل مع النظام الخارجي - تحت المعالجة', createdAt: daysAgo(28), ownerKind:'partner', ownerId:'pm_p1a' },
-    { id: 'a9', type: 'task', title: 'تقرير التدقيق المرحلي', projectId: 'pr5', partnerId: 'p4', status: 'open', priority: 'high', dueDate: daysAgo(7), completedDate: null, reason: 'في انتظار الوثائق من جهة العميل', createdAt: daysAgo(14), ownerKind:'internal', ownerId:'tm1' },
-    { id: 'a10', type: 'meeting', title: 'اجتماع المراجعة الأسبوعي', projectId: 'pr5', partnerId: 'p4', status: 'completed', priority: 'medium', dueDate: daysAgo(3), meetingTime: '10:00', completedDate: daysAgo(3), reason: '', createdAt: daysAgo(8), participants: 'د. سارة العتيبي، فريق التدقيق', meetingNotes: 'مراجعة بنود التدقيق المرحلي', meetingLink: '', linkedTaskId: 'a9' },
-    { id: 'a11', type: 'task', title: 'تحديث وثيقة المعمارية', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'low', dueDate: daysAhead(7), completedDate: null, reason: '', createdAt: daysAgo(3) },
-    { id: 'a12', type: 'task', title: 'اختبار الأمان', projectId: 'pr3', partnerId: 'p3', status: 'open', priority: 'high', dueDate: daysAgo(12), completedDate: null, reason: 'تأخر إرسال نتائج الفحص الأولي', createdAt: daysAgo(25), ownerKind:'partner', ownerId:'pm_p3a' },
-    // Meetings
-    { id: 'm1', type: 'meeting', title: 'اجتماع كيك أوف منصة المحتوى', projectId: 'pr3', partnerId: 'p3', status: 'completed', priority: 'high', dueDate: daysAgo(35), meetingTime: '11:00', completedDate: daysAgo(35), reason: 'تم الاتفاق على الجدول الزمني', createdAt: daysAgo(40) },
-    { id: 'm2', type: 'meeting', title: 'اجتماع متابعة المرحلة الثانية', projectId: 'pr1', partnerId: 'p1', status: 'scheduled', priority: 'high', dueDate: daysAhead(2), meetingTime: '14:00', completedDate: null, reason: '', createdAt: daysAgo(5), participants: 'م. خالد الحربي، فريق التطوير', meetingNotes: 'استعراض خطة المرحلة الثانية وتوزيع المهام', meetingLink: 'https://teams.microsoft.com/l/meetup-join/sample', linkedTaskId: 'a3' },
-    { id: 'm3', type: 'meeting', title: 'مراجعة معمارية النظام', projectId: 'pr1', partnerId: 'p1', status: 'postponed', priority: 'medium', dueDate: daysAhead(7), meetingTime: '09:30', completedDate: null, reason: 'تأجيل بناءً على طلب الفريق التقني', createdAt: daysAgo(10), participants: 'الفريق التقني', meetingNotes: '', meetingLink: '', linkedTaskId: '' },
-    { id: 'm4', type: 'meeting', title: 'اجتماع تنسيق مع العميل الرئيسي', projectId: 'pr2', partnerId: 'p2', status: 'missed', priority: 'high', dueDate: daysAgo(4), meetingTime: '13:00', completedDate: null, reason: 'لم يحضر ممثل العميل', createdAt: daysAgo(12), participants: 'أ. منى السبيعي، ممثل العميل', meetingNotes: '', meetingLink: '', linkedTaskId: 'a4' },
-    { id: 'm5', type: 'meeting', title: 'استعراض نتائج التدقيق', projectId: 'pr5', partnerId: 'p4', status: 'scheduled', priority: 'medium', dueDate: todayDate(), meetingTime: '15:30', completedDate: null, reason: '', createdAt: daysAgo(7), participants: 'د. سارة العتيبي', meetingNotes: 'عرض النتائج الأولية للتدقيق', meetingLink: 'https://meet.google.com/sample-abc-xyz', linkedTaskId: 'a9' },
-    { id: 'm6', type: 'meeting', title: 'اجتماع شهري - بيت الإبداع', projectId: 'pr3', partnerId: 'p3', status: 'scheduled', priority: 'medium', dueDate: daysAhead(5), meetingTime: '10:00', completedDate: null, reason: '', createdAt: daysAgo(2), participants: 'م. عبدالله الزهراني', meetingNotes: '', meetingLink: 'https://zoom.us/j/0000000000', linkedTaskId: '' },
-    { id: 'ms1', type: 'task', isMilestone: true, title: 'إطلاق النسخة التجريبية', projectId: 'pr1', partnerId: 'p1', status: 'completed', priority: 'high', dueDate: daysAgo(15), completedDate: daysAgo(14), reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOnIds:[], note:'', createdAt: daysAgo(60) },
-    { id: 'ms2', type: 'task', isMilestone: true, title: 'الإطلاق الرسمي للمنصة', projectId: 'pr1', partnerId: 'p1', status: 'open', priority: 'high', dueDate: daysAhead(20), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p1a', dependsOnIds:['a3'], note:'', createdAt: daysAgo(60) },
-    { id: 'ms3', type: 'task', isMilestone: true, title: 'الحصول على ترخيص هيئة النقل', projectId: 'pr5', partnerId: 'p4', status: 'open', priority: 'high', dueDate: daysAgo(5), completedDate: null, reason: '', tracking: [], ownerKind:'partner', ownerId:'pm_p4a', dependsOnIds:[], note:'بانتظار رد الجهة', createdAt: daysAgo(40) }
-  ];
-
-  saveState();
+  // PERMANENTLY REMOVED — was injecting 6 placeholder Arabic partners (p1-p6),
+  // 7 projects (pr1-pr7) and 21 tasks/meetings into empty browsers, with a path
+  // to push them to Supabase via saveState() on a transient sync failure — which
+  // polluted the real database. The function body has been deleted; only this
+  // guard remains so any accidental call (from future code, IDE auto-restore,
+  // or merge conflict) fails loudly instead of silently corrupting data.
+  throw new Error('loadSampleData() is permanently disabled — see comment in source.');
 }
 
 /* ========== HELPERS ========== */
@@ -4666,7 +4720,7 @@ views.teamMemberDetail = (memberId) => {
                     else if (cause.key === 'dep') causeHtml = `<span class="cause-chip dep">⛓ ${escapeHtml(cause.label)}</span>`;
                     else if (cause.key === 'other') causeHtml = `<span class="cause-chip other">${escapeHtml(cause.label)}</span>`;
                     else causeHtml = `<span class="cause-chip ok">${t('onTrackLabel')}</span>`;
-                    return `<tr>
+                    return `<tr id="actcard-${a.id}" class="team-task-row drillable" onclick="openActionFromTeamMember('${a.id}','${memberId}')" title="${t('drillTaskHint')}">
                       <td><div class="name">${escapeHtml(a.title)}</div></td>
                       <td>${statusBadge(a.status)}</td>
                       <td>${fmtDate(a.dueDate)}${isOpen(a)&&getDelayDays(a)>0?`<div class="sub" style="color:var(--crit)">+${getDelayDays(a)} ${t('days')}</div>`:''}</td>
@@ -4855,7 +4909,7 @@ views.dashboard = () => {
         <button class="btn ghost sm" onclick="goToTasksFiltered('delayed')">${t('viewFullReport')}</button>
       </div>
       ${recentDelayed.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noDelayed')}</div></div>` :
-        recentDelayed.map(a => renderActionCard(a)).join('')}
+        recentDelayed.map(a => `<div class="drill-shell" onclick="openActionFromDashboard('${a.id}')" title="${t('drillTaskHint')}">${renderActionCard(a)}</div>`).join('')}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
@@ -4956,7 +5010,7 @@ function renderActionCard(a, opts) {
   const meeting = isMeeting(a);
   const linkedTask = meeting && a.linkedTaskId ? state.actions.find(x => x.id === a.linkedTaskId && isTask(x)) : null;
   return `
-    <div class="action-card ${isMissed(a) ? 'crit' : risk.cls}">
+    <div class="action-card ${isMissed(a) ? 'crit' : risk.cls}" id="actcard-${a.id}" data-actid="${a.id}">
       <div class="ac-head">
         <div>
           <div class="ac-title">${meeting ? '🗓 ' : (isMilestone(a) ? '🎯 ' : '')}${escapeHtml(a.title)}${isMilestone(a) ? ` <span class="badge sup" style="font-size:10px">${t('milestoneBadge')}</span>` : ''}</div>
@@ -5378,7 +5432,7 @@ views.agenda = () => {
       </div>
       ${filteredTasks.length === 0
         ? `<div class="empty" style="padding:24px"><div class="empty-icon">✅</div>${t('agendaNoTasks')}</div>`
-        : `<div class="card-list">${filteredTasks.map(a => renderActionCard(a)).join('')}</div>`
+        : `<div class="card-list">${filteredTasks.map(a => `<div class="drill-shell" onclick="openActionFromAgenda('${a.id}')" title="${t('drillTaskHint')}">${renderActionCard(a)}</div>`).join('')}</div>`
       }
     </div>
 
@@ -5389,7 +5443,7 @@ views.agenda = () => {
       </div>
       ${filteredMeetings.length === 0
         ? `<div class="empty" style="padding:24px"><div class="empty-icon">📅</div>${t('agendaNoMeetings')}</div>`
-        : `<div class="card-list">${filteredMeetings.map(a => renderActionCard(a)).join('')}</div>`
+        : `<div class="card-list">${filteredMeetings.map(a => `<div class="drill-shell" onclick="openActionFromAgenda('${a.id}')" title="${t('drillMeetingHint')}">${renderActionCard(a)}</div>`).join('')}</div>`
       }
     </div>
   `;
@@ -5706,6 +5760,7 @@ views.projects = () => {
 views.projectDetail = (projectId) => {
   const p = getProject(projectId);
   if (!p) return `<div class="empty">${t('noProjects')}</div>`;
+  const _projectBack = (state.navOrigin === 'agenda' || state.navOrigin === 'dashboard' || state.navOrigin === 'teamMember') ? backToOriginBtn() : backToDashBtn();
   const partner = getPartner(p.partnerId);
   const actions = getProjectActions(projectId);
   // Tasks, milestones and meetings are kept strictly separate
@@ -5718,7 +5773,7 @@ views.projectDetail = (projectId) => {
   const score = getProjectScore(projectId);
 
   return `
-    ${backToDashBtn()}
+    ${_projectBack}
     <div class="page-head">
       <div>
         <button class="btn ghost sm" onclick="navigate('projects')" style="margin-bottom:10px">${t('backToProjects')}</button>
@@ -5769,7 +5824,7 @@ views.projectDetail = (projectId) => {
           <thead><tr><th>${t('fieldMilestoneTitle')}</th><th>${t('colDate')}</th><th>${t('colStatus')}</th><th></th></tr></thead>
           <tbody>
             ${milestones.slice().sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')).map(ms => `
-              <tr>
+              <tr id="actcard-${ms.id}" class="milestone-row">
                 <td><div class="name">🎯 ${escapeHtml(ms.title)}</div>${getOwnerName(ms)?`<div class="sub">${ownerTag(ms)}</div>`:''}</td>
                 <td>${fmtDate(ms.dueDate)}${isOpen(ms)&&getDelayDays(ms)>0?`<div class="sub" style="color:var(--crit)">+${getDelayDays(ms)} ${t('days')}</div>`:''}</td>
                 <td>${statusBadge(ms.status)}</td>
@@ -5857,7 +5912,7 @@ views.projectDetail = (projectId) => {
             <tbody>
               ${completed.slice(0, 10).map(a => {
                 const d = getDelayDays(a);
-                return `<tr>
+                return `<tr id="actcard-${a.id}" class="completed-row">
                   <td><div class="name">${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</div></td>
                   <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
                   <td>${fmtDate(a.completedDate)}</td>
@@ -5882,7 +5937,7 @@ views.projectDetail = (projectId) => {
             <tbody>
               ${[...projectMeetings].sort((a,b)=>{const _c=(a.dueDate||'').localeCompare(b.dueDate||''); return state.filters.projMeetingSort==='asc' ? _c : -_c;}).map(a => {
                 const linkedTask = a.linkedTaskId ? state.actions.find(x => x.id === a.linkedTaskId && isTask(x)) : null;
-                return `<tr>
+                return `<tr id="actcard-${a.id}" class="meeting-row">
                   <td>
                     <div class="name">🗓 ${escapeHtml(a.title)}</div>
                     ${a.participants ? `<div class="sub">👥 ${escapeHtml(a.participants)}</div>` : ''}
@@ -5911,6 +5966,7 @@ views.projectDetail = (projectId) => {
 };
 
 views.actions = () => {
+  const _showOriginBack = state.navOrigin === 'dashboard';
   const filter = state.filters.actionStatus || 'all';
   const projFilter = state.filters.actionProject || 'all';
   const partnerFilter = state.filters.actionPartner || 'all';
@@ -5978,7 +6034,7 @@ views.actions = () => {
   else if (period === 'month') periodLabel = ` · ${new Date(actionDate).toLocaleDateString(t('locale'), { year: 'numeric', month: 'long' })}`;
 
   return `
-    ${backToDashBtn()}
+    ${_showOriginBack ? backToOriginBtn() : backToDashBtn()}
     <div class="page-head">
       <div>
         <h1 class="page-title">${t('actionsNav')}</h1>
@@ -6604,23 +6660,111 @@ function backToDashBtn() {
 
 function navigate(view, param) {
   state.currentView = view;
+  // Reset the drill-down origin when the user lands on a top-level page (dashboard/agenda).
+  // This stops the "Back to Dashboard" pill from appearing on unrelated pages later.
+  if (view === 'dashboard' || view === 'agenda' || view === 'team') { state.navOrigin = null; state.navOriginParam = null; }
   renderSidebar();
   render(param);
+  try { _consumeScrollTarget(); } catch(e) {}
+  try { _annotateTableCellsForMobile(); } catch(e) {}
+}
+
+// Mobile table support: stamp each <td> with data-label from its corresponding <th>.
+// CSS-only stacking under 720px reads these to render compact "Label: value" pairs.
+// Idempotent and cheap — runs in <2ms even with dozens of tables.
+function _annotateTableCellsForMobile() {
+  document.querySelectorAll('.table-wrap table').forEach(table => {
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent || '').trim());
+    if (!headers.length) return;
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      Array.from(tr.children).forEach((td, i) => {
+        const label = headers[i];
+        if (label && !td.hasAttribute('data-label')) td.setAttribute('data-label', label);
+      });
+    });
+  });
+}
+
+// Origin-aware back button: shows "Back to Dashboard" / "Back to Daily Agenda" / "Back to <Member>"
+// depending on where the user came from. For team-member origin we keep the member id in navOriginParam
+// so the button returns to that specific member's detail page (not the team list).
+function backToOriginBtn() {
+  const o = state.navOrigin || 'dashboard';
+  if (o === 'teamMember' && state.navOriginParam) {
+    const m = getTeamMember(state.navOriginParam);
+    const label = t('backToTeamMember', (m && m.name) ? m.name : t('internalTeam'));
+    return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="_backToTeamMemberOrigin()" style="font-size:12px;padding:4px 12px">' + label + '</button></div>';
+  }
+  const label = o === 'agenda' ? t('backToAgenda') : t('backToDashboard');
+  return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="navigate(\'' + o + '\')" style="font-size:12px;padding:4px 12px">' + label + '</button></div>';
+}
+function _backToTeamMemberOrigin() {
+  const id = state.navOriginParam;
+  state.navOrigin = null;
+  state.navOriginParam = null;
+  state.currentView = 'teamMemberDetail';
+  state.detailParam = id;
+  renderSidebar();
+  render(id);
+}
+window._backToTeamMemberOrigin = _backToTeamMemberOrigin;
+
+// When a user clicks a task/meeting from Dashboard or Agenda, open its project page and
+// scroll to that action card with a brief highlight. The Back button reflects the origin.
+function _openActionInProject(actionId, origin, originParam) {
+  const a = state.actions.find(x => x.id === actionId);
+  if (!a) return;
+  state.navOrigin = origin;          // 'dashboard' | 'agenda' | 'teamMember'
+  state.navOriginParam = originParam || null;  // e.g. team member id when origin === 'teamMember'
+  state.scrollToActionId = actionId; // consumed once by render() below
+  if (a.projectId) {
+    state.currentView = 'projectDetail';
+    state.detailParam = a.projectId;
+  } else {
+    // Orphan action (no project) — fall back to Tasks view filtered to this item.
+    state.filters.actionStatus = 'all';
+    state.filters.actionProject = 'all';
+    state.filters.actionPartner = 'all';
+    state.filters.actionPeriod = 'all';
+    state.filters.includeMeetings = true;
+    state.filters.actionSearch = a.title || '';
+    state.currentView = 'actions';
+  }
+  renderSidebar();
+  render(state.detailParam);
+  try { _consumeScrollTarget(); } catch(e) {}
+}
+window.openActionFromDashboard = function(actionId) { _openActionInProject(actionId, 'dashboard'); };
+window.openActionFromAgenda = function(actionId) { _openActionInProject(actionId, 'agenda'); };
+window.openActionFromTeamMember = function(actionId, memberId) { _openActionInProject(actionId, 'teamMember', memberId); };
+
+// After any render, if state.scrollToActionId is set, find the card and flash it.
+function _consumeScrollTarget() {
+  const id = state.scrollToActionId;
+  if (!id) return;
+  state.scrollToActionId = null;
+  // Use rAF to let the DOM settle.
+  requestAnimationFrame(() => {
+    const el = document.getElementById('actcard-' + id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash-target');
+    setTimeout(() => el.classList.remove('flash-target'), 1700);
+  });
 }
 
 // Dashboard drill-down: jump to the right view pre-filtered.
 window.goToTasksFiltered = function(filter) {
-  if (filter === 'critical') {
-    // Critical Cases → Tasks tab with the "Critical" filter applied (threshold from settings)
-    state.filters.actionStatus = 'critical';
-    state.filters.actionPeriod = 'all';
-    navigate('actions');
-    return;
-  }
-  // Delayed (and others) → Daily Agenda with the delayed filter
-  state.filters.agendaTaskFilter = 'delayed';
-  state.filters.agendaMeetFilter = 'delayed';
-  navigate('agenda');
+  // All status-based drill-downs now land on Tasks (editable + filterable), not Agenda.
+  // The user can edit/complete/delete tasks here, and the Tasks view shows a
+  // "Back to Dashboard" affordance via state.navOrigin.
+  state.filters.actionStatus = filter === 'critical' ? 'critical' : (filter === 'delayed' ? 'delayed' : 'all');
+  state.filters.actionPeriod = 'all';
+  state.filters.actionProject = 'all';
+  state.filters.actionPartner = 'all';
+  state.filters.includeMeetings = false;
+  state.navOrigin = 'dashboard';
+  navigate('actions');
 };
 
 // Daily Reminder "View all" → Daily Agenda with TODAY filter for tasks & meetings
@@ -6842,6 +6986,7 @@ function viewPartner(id) {
   state.detailParam = id;
   renderSidebar();
   render(id);
+  try { _annotateTableCellsForMobile(); } catch(e) {}
 }
 
 function viewProject(id) {
@@ -6849,6 +6994,8 @@ function viewProject(id) {
   state.detailParam = id;
   renderSidebar();
   render(id);
+  try { _consumeScrollTarget(); } catch(e) {}
+  try { _annotateTableCellsForMobile(); } catch(e) {}
 }
 
 function viewTeamMember(id) {
@@ -6856,6 +7003,7 @@ function viewTeamMember(id) {
   state.detailParam = id;
   renderSidebar();
   render(id);
+  try { _annotateTableCellsForMobile(); } catch(e) {}
 }
 window.viewTeamMember = viewTeamMember;
 
@@ -10614,36 +10762,23 @@ async function resetData() {
 
   // Synchronously seed/normalize sample data when there's nothing loaded yet.
   const seedIfEmpty = () => {
-    if (state.partners && state.partners.length) return false;
-    try {
-      loadSampleData();
-      state.actions.forEach(a => {
-        if (a.type !== 'meeting' && !a.startDate) {
-          const proj = state.projects.find(pr => pr.id === a.projectId);
-          if (proj && proj.startDate) a.startDate = proj.startDate;
-          else if (a.dueDate) { const d = new Date(a.dueDate+'T00:00:00'); d.setDate(d.getDate()-7); a.startDate = d.toISOString().slice(0,10); }
-          else a.startDate = todayDate();
-        }
-      });
-      state.projects.forEach(pr => {
-        if (pr.partnershipCurrency === 'USD') pr.partnershipCurrency = 'SAR';
-        if (!pr.engagementModel) pr.engagementModel = pr.partnershipModel === 'percentage' ? 'joint-venture' : 'client-fixed';
-        if (pr.revenueCertainty === undefined || pr.revenueCertainty === null) {
-          pr.revenueCertainty = ['joint-venture','own-strategic','own-vendor'].includes(pr.engagementModel) ? 0.4 : 1.0;
-        }
-      });
-      migrateProjectsToContributions();
-      return true;
-    } catch (e) { console.error('Seed failed:', e); return false; }
+    // PERMANENTLY REMOVED — see loadSampleData() above. Returns false so any
+    // accidental callsite that checks the return value still does nothing.
+    return false;
   };
 
   // 1) Try a FAST local load first so the UI can paint immediately.
   try { loadStateFromLocalStorage(); } catch (e) {}
   ['partners','team','projects','actions','reports'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
-  const seededNow = false; // DISABLED — sample data removed permanently (was seedIfEmpty())
+  // Sample-data seed PERMANENTLY DISABLED — was injecting 6 Arabic partners (p1-p6),
+  // 7 projects (pr1-pr7), 21 tasks/meetings into empty browsers, and could push them up
+  // to Supabase via saveState() on cold-start race, polluting the real database.
+  const seededNow = false;
 
   // 2) Paint the UI right away — never leave the page blank.
   // Deep link from Opportunities convert: ?view=partnerDetail&partnerId=xxx
+  // If the requested partner isn't in the local cache yet, the post-cloud-sync re-render below
+  // will route to the detail page once the partner row arrives.
   let _deepLink = null;
   try {
     const _qp = new URLSearchParams(window.location.search || '');
@@ -10658,7 +10793,7 @@ async function resetData() {
   } catch (e) { state.currentView = 'dashboard'; }
   try { migrateBilingualContent(); } catch (e) {}
   try { renderSidebar(); } catch (e) { console.error('renderSidebar failed:', e); }
-  try { render(); } catch (e) { console.error('render failed:', e); }
+  try { render(state.detailParam); } catch (e) { console.error('render failed:', e); }
 
   // 3) In the background, reconcile with the cloud (bounded), then re-render if
   //    the cloud returned newer data. Never blocks or blanks the UI.
@@ -10667,14 +10802,14 @@ async function resetData() {
       // Per-request timeouts inside loadState now guarantee it completes (~7s worst
       // case) instead of hanging, so the outer guard is a generous safety net only.
       const hadCloud = await withTimeout(loadState(), 12000, 'loadState');
-      // Sample-data seed PERMANENTLY DISABLED.
-      // The seed previously injected 6 Arabic partners, 7 projects and 21 tasks
-      // into empty browsers and could push them to Supabase — polluting real data.
-      // Fresh browsers now show an empty dashboard until the cloud sync completes.
+      // Sample-data seed PERMANENTLY DISABLED (see Step 1 above).
+      // Empty cloud is now genuinely treated as empty — no auto-injection of placeholder
+      // partners, and no risk of polluting the cloud with sample rows on a transient sync failure.
+      // The seedIfEmpty() function still exists in the file but is no longer called anywhere.
       try { migrateBilingualContent(); } catch (e) {}
       await withTimeout(loadConfig(), 12000, 'loadConfig');
-      // Re-render with reconciled data.
-      try { renderSidebar(); } catch (e) {}
+      // If we arrived via a deep link, route to the partner detail now that the partner
+      // row has (hopefully) been pulled in by the cloud sync.
       try {
         if (_deepLink && _deepLink.view === 'partnerDetail') {
           if ((state.partners || []).some(p => p && p.id === _deepLink.partnerId)) {
@@ -10683,7 +10818,9 @@ async function resetData() {
           }
         }
       } catch (e) {}
-      try { render(state.detailParam); } catch (e) {}
+      // Re-render with reconciled data.
+      try { renderSidebar(); } catch (e) {}
+      try { render(); } catch (e) {}
       try { applyContentLanguage(currentLang); } catch (e) {}
     } catch (e) {
       console.error('Background cloud sync failed (UI already shown):', e);
