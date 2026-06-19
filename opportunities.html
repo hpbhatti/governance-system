@@ -168,7 +168,56 @@
   .stat-meta { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
 
   /* ---- Focus widget (NEW: sits ABOVE the stats) ---- */
-  .pl-focus { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; margin-bottom: 20px; }
+  .pl-agenda { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px 18px; margin-bottom: 18px; box-shadow: var(--shadow); }
+.pl-agenda-collapsed { padding: 0; margin-bottom: 14px; cursor: pointer; transition: background .15s, border-color .15s; }
+.pl-agenda-collapsed:hover { background: #faf8f3; border-color: var(--line2); }
+.pl-agenda-collapsed:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pl-agenda-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 13px; line-height: 1.4; }
+.pl-agenda-bar-title { color: var(--accent); font-weight: 600; font-family: 'Reem Kufi', serif; font-size: 14px; }
+.pl-agenda-bar-sep { color: var(--ink-faint); }
+.pl-agenda-bar-summary { color: var(--ink-muted); flex: 1; min-width: 0; }
+.pl-agenda-bar-summary b { color: var(--accent); font-weight: 700; }
+.pl-agenda-bar-empty { color: var(--ink-faint); font-style: italic; }
+.pl-agenda-bar-chevron { color: var(--ink-faint); font-size: 14px; flex: none; }
+.pl-agenda-collapse-btn { background: transparent; border: 1px solid var(--line); color: var(--ink-faint); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; font-family: inherit; transition: background .12s, color .12s; margin-inline-start: 8px; }
+.pl-agenda-collapse-btn:hover { background: #faf8f3; color: var(--ink); }
+.pl-agenda-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.pl-agenda-head h3 { font-size: 16px; color: var(--accent); margin: 0; font-family: 'Reem Kufi', serif; }
+.pl-agenda-head .pl-agenda-sub { font-size: 12px; color: var(--ink-faint); }
+.pl-agenda-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pl-agenda-chip { background: #faf8f3; border: 1px solid var(--line); color: var(--ink-muted); padding: 5px 11px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background .12s, border-color .12s; font-family: inherit; }
+.pl-agenda-chip:hover { background: #f3eee0; }
+.pl-agenda-chip.active { background: var(--accent); color: #f5f3ee; border-color: var(--accent); }
+.pl-agenda-count { font-size: 11px; color: var(--ink-faint); margin-inline-start: auto; }
+.pl-agenda-empty { color: var(--ink-faint); font-size: 13px; padding: 14px 0; text-align: center; }
+.pl-agenda-list { display: grid; gap: 8px; }
+.pl-agenda-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; padding: 10px 12px; background: #faf8f3; border: 1px solid var(--line); border-inline-start: 3px solid var(--line); border-radius: 7px; cursor: pointer; transition: background .12s, transform .08s; align-items: center; }
+.pl-agenda-item:hover { background: #f3eee0; }
+.pl-agenda-item:active { transform: translateY(1px); }
+.pl-agenda-item.overdue { border-inline-start-color: var(--red); background: #fff5f4; }
+.pl-agenda-item.today { border-inline-start-color: var(--amber); background: #fffaf0; }
+.pl-agenda-item.reminder { border-inline-start-color: var(--accent); }
+.pl-ag-when { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 5px; background: #ece7dd; color: var(--ink-muted); white-space: nowrap; min-width: 70px; text-align: center; }
+.pl-ag-when.overdue { background: var(--red); color: #fff; }
+.pl-ag-when.today { background: var(--amber); color: #fff; }
+.pl-ag-when.future { background: #ece7dd; color: var(--ink-muted); }
+.pl-ag-body { min-width: 0; }
+.pl-ag-action { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; word-wrap: break-word; }
+.pl-ag-action .pl-ag-tag { font-size: 10.5px; font-weight: 600; color: var(--ink-faint); margin-inline-end: 6px; }
+.pl-ag-context { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.5; }
+.pl-ag-context b { color: var(--ink); font-weight: 600; }
+.pl-ag-context .pl-ag-sep { color: var(--line2); margin: 0 6px; }
+.pl-ag-context .pl-ag-stage { color: var(--accent); font-weight: 600; }
+.pl-ag-context .pl-ag-value { color: var(--accent-warm); font-weight: 600; }
+.pl-ag-meta { font-size: 11px; color: var(--ink-faint); text-align: end; white-space: nowrap; }
+.pl-ag-meta .pl-ag-score { font-weight: 700; color: var(--accent); font-size: 13px; display:block; }
+@media (max-width: 760px) {
+  .pl-agenda-item { grid-template-columns: 1fr; gap: 6px; }
+  .pl-ag-when { justify-self: start; min-width: 0; }
+  .pl-ag-meta { text-align: start; }
+}
+
+.pl-focus { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; margin-bottom: 20px; }
   .pl-focus-card {
     background: var(--bg-card); border: 1px solid var(--line);
     border-radius: 6px; padding: 18px 20px; position: relative; overflow: hidden;
@@ -569,6 +618,9 @@
     </div>
   </div>
 
+  <!-- Agenda — business-week filtered tasks aggregated from every lead's next action -->
+  <div id="pl-agenda"></div>
+
   <!-- Focus widget: ABOVE the stats -->
   <div class="pl-focus" id="pl-focus"></div>
 
@@ -728,7 +780,25 @@ const T = {
     sug_negotiation_any: 'حدّد العائق الأخير واحصل على التزام مبدئي بشأن التوقيت.',
     sug_referral_any: 'استثمر جهة الإحالة — اطلب منها تقديمًا دافئًا لصاحب القرار.',
     sug_outbound_low: 'غيّر القناة (لينكدإن أو اتصال) وابدأ بعرض قيمة أوضح.',
-    sug_fallback: 'توقّفت هذه الفرصة في مرحلة «{0}». أعد التواصل بخطوة محددة وموعد نهائي.'
+    sug_fallback: 'توقّفت هذه الفرصة في مرحلة «{0}». أعد التواصل بخطوة محددة وموعد نهائي.',
+    /* Agenda section */
+    agendaTitle: '📅 الأجندة', agendaSub: 'كل الإجراءات التالية لجميع الفرص — مرتبة حسب الاستحقاق', agendaExpandHint: 'اضغط لعرض القائمة الكاملة', agendaCollapseHint: 'طي الأجندة', agendaSummaryToday: 'اليوم', agendaSummaryWeek: 'هذا الأسبوع', agendaSummaryRem: 'تذكير', agendaSummaryEmpty: 'لا يوجد إجراءات معلّقة',
+    agendaFilterToday: 'اليوم', agendaFilterWeek: 'هذا الأسبوع (أحد–خميس)', agendaFilterMonth: 'هذا الشهر', agendaFilterReminders: '⏰ التذكيرات', agendaFilterAll: 'الكل',
+    agendaNoneToday: '✅ لا توجد إجراءات اليوم — استمتع بيومك',
+    agendaNoneWeek: '✅ لا توجد إجراءات هذا الأسبوع',
+    agendaNoneMonth: '✅ لا توجد إجراءات هذا الشهر',
+    agendaNoneReminders: '✅ لا توجد تذكيرات معلّقة',
+    agendaNoneAll: '✅ لا يوجد إجراء تالٍ محدد لأي فرصة',
+    agendaOverdueTag: 'متأخر',
+    agendaTodayTag: 'اليوم',
+    agendaInDays: 'خلال {0} يوم',
+    agendaReminderTag: '⏰ تذكير',
+    agendaActionTag: '🎯 الإجراء التالي',
+    agendaCount: '{0} عنصر',
+    agendaStageDays: 'المرحلة: {0} ({1} يوم)',
+    agendaScoreLabel: 'النقاط',
+    agendaDueLabel: 'الموعد'
+
   },
   en: {
     brandTitle: 'Opportunities', brandSub: 'SOE Business Development',
@@ -819,7 +889,25 @@ const T = {
     sug_negotiation_any: 'Pin down the final blocker and secure a verbal commitment on timing.',
     sug_referral_any: 'Leverage the referrer — ask them for a warm intro to the decision-maker.',
     sug_outbound_low: 'Switch channel (LinkedIn or a call) and lead with a sharper value hook.',
-    sug_fallback: 'This opportunity has stalled in "{0}". Re-engage with a concrete next step and a deadline.'
+    sug_fallback: 'This opportunity has stalled in "{0}". Re-engage with a concrete next step and a deadline.',
+    /* Agenda section */
+    agendaTitle: '📅 Agenda', agendaSub: 'Every next action across the pipeline — sorted by deadline', agendaExpandHint: 'Click to expand the full list', agendaCollapseHint: 'Collapse agenda', agendaSummaryToday: 'due today', agendaSummaryWeek: 'this week', agendaSummaryRem: 'reminders', agendaSummaryEmpty: 'Nothing pending',
+    agendaFilterToday: 'Today', agendaFilterWeek: 'This week (Sun–Thu)', agendaFilterMonth: 'This month', agendaFilterReminders: '⏰ Reminders', agendaFilterAll: 'All',
+    agendaNoneToday: '✅ Nothing on the agenda today — enjoy your day',
+    agendaNoneWeek: '✅ Nothing scheduled this week',
+    agendaNoneMonth: '✅ Nothing scheduled this month',
+    agendaNoneReminders: '✅ No pending reminders',
+    agendaNoneAll: '✅ No next action set on any lead',
+    agendaOverdueTag: 'OVERDUE',
+    agendaTodayTag: 'Today',
+    agendaInDays: 'in {0}d',
+    agendaReminderTag: '⏰ Reminder',
+    agendaActionTag: '🎯 Next action',
+    agendaCount: '{0} items',
+    agendaStageDays: 'Stage: {0} ({1}d)',
+    agendaScoreLabel: 'Score',
+    agendaDueLabel: 'Due'
+
   }
 };
 
@@ -1135,6 +1223,166 @@ function stuckLeads() {
     .map(l => ({ lead: l, biz: businessDaysBetween(stageEnteredAt(l), nowISO()) }))
     .filter(x => x.biz > getThresholds().stuckBizDays)
     .sort((a, b) => b.biz - a.biz);
+}
+
+/* ============================================================================
+   AGENDA — every open lead's next-action + reminders, business-week filtered.
+   Mirrors the Governance Daily Agenda pattern.
+   ============================================================================ */
+function _agendaSaudiWeekRange(ref) {
+  // Saudi work week: Sunday → Thursday. Today = Fri/Sat -> show the upcoming Sun..Thu.
+  const d = new Date(ref + 'T00:00:00');
+  const dow = d.getDay(); // Sun=0 ... Sat=6
+  let startOffset;
+  if (dow === 5) startOffset = 2;
+  else if (dow === 6) startOffset = 1;
+  else startOffset = -dow;
+  const sun = new Date(d); sun.setDate(d.getDate() + startOffset);
+  const thu = new Date(sun); thu.setDate(sun.getDate() + 4);
+  const iso = x => x.toISOString().slice(0,10);
+  return { start: iso(sun), end: iso(thu) };
+}
+function _agendaMonthRange(ref) {
+  const d = new Date(ref + 'T00:00:00');
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  const iso = x => x.toISOString().slice(0,10);
+  return { start: iso(start), end: iso(end) };
+}
+function plSetAgendaFilter(kind) {
+  state.agendaFilter = kind;
+  try { localStorage.setItem('opp_agenda_filter_v1', kind); } catch(e) {}
+  renderAgenda();
+}
+function plAgendaCollect() {
+  const items = [];
+  for (const l of state.leads) {
+    if (isClosed(l)) continue;
+    if (l.nextAction && l.nextActionDue) {
+      items.push({ kind: 'action', dueDate: l.nextActionDue, lead: l, text: l.nextAction });
+    }
+    if (l.reminderDate) {
+      items.push({ kind: 'reminder', dueDate: l.reminderDate, lead: l, text: l.reminderReason || t('agendaReminderTag') });
+    }
+  }
+  items.sort((a,b) => {
+    const da = a.dueDate || '9999-12-31', db = b.dueDate || '9999-12-31';
+    if (da !== db) return da < db ? -1 : 1;
+    return (leadScore(b.lead) - leadScore(a.lead));
+  });
+  return items;
+}
+function plToggleAgenda() {
+  state.agendaCollapsed = !state.agendaCollapsed;
+  try { localStorage.setItem('opp_agenda_collapsed_v1', state.agendaCollapsed ? '1' : '0'); } catch(e) {}
+  renderAgenda();
+}
+function renderAgenda() {
+  const mount = document.getElementById('pl-agenda');
+  if (!mount) return;
+  const today = todayDate();
+  const filter = state.agendaFilter || 'today';
+  const all = plAgendaCollect();
+
+  let scoped;
+  if (filter === 'today')          scoped = all.filter(it => it.dueDate <= today);
+  else if (filter === 'week')      { const r = _agendaSaudiWeekRange(today); scoped = all.filter(it => it.dueDate <= r.end); }
+  else if (filter === 'month')     { const r = _agendaMonthRange(today);    scoped = all.filter(it => it.dueDate <= r.end); }
+  else if (filter === 'reminders') scoped = all.filter(it => it.kind === 'reminder');
+  else                              scoped = all;
+
+  // Always compute the summary counts for the collapsed bar (independent of current filter)
+  const _todayCount = all.filter(it => it.dueDate <= today).length;
+  const _weekRange  = _agendaSaudiWeekRange(today);
+  const _weekCount  = all.filter(it => it.dueDate <= _weekRange.end).length;
+  const _remCount   = all.filter(it => it.kind === 'reminder').length;
+
+  // ----- Collapsed mode: just a slim summary bar with a chevron. -----
+  if (state.agendaCollapsed) {
+    const summaryParts = [];
+    summaryParts.push(`<b>${_todayCount}</b> ${t('agendaSummaryToday')}`);
+    summaryParts.push(`<b>${_weekCount}</b> ${t('agendaSummaryWeek')}`);
+    if (_remCount > 0) summaryParts.push(`<b>${_remCount}</b> ${t('agendaSummaryRem')}`);
+    const isEmpty = (_todayCount + _weekCount + _remCount) === 0;
+    mount.innerHTML = `
+      <div class="pl-agenda pl-agenda-collapsed" onclick="plToggleAgenda()" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();plToggleAgenda();}"
+           title="${t('agendaExpandHint')}">
+        <div class="pl-agenda-bar">
+          <span class="pl-agenda-bar-title">${t('agendaTitle')}</span>
+          <span class="pl-agenda-bar-sep">—</span>
+          <span class="pl-agenda-bar-summary">${isEmpty ? `<span class="pl-agenda-bar-empty">${t('agendaSummaryEmpty')}</span>` : summaryParts.join(' <span class="pl-ag-sep">·</span> ')}</span>
+          <span class="pl-agenda-bar-chevron">▾</span>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const emptyKey = { today:'agendaNoneToday', week:'agendaNoneWeek', month:'agendaNoneMonth', reminders:'agendaNoneReminders', all:'agendaNoneAll' }[filter];
+  const chip = (kind, label) => `<button class="pl-agenda-chip ${filter===kind?'active':''}" onclick="plSetAgendaFilter('${kind}')">${label}</button>`;
+
+  const body = scoped.length === 0
+    ? `<div class="pl-agenda-empty">${t(emptyKey)}</div>`
+    : `<div class="pl-agenda-list">` + scoped.map(it => {
+        const l = it.lead;
+        const due = it.dueDate;
+        const diff = businessDaysBetween(today, due);
+        let whenCls = 'future', whenTxt = '';
+        if (due < today)        { whenCls = 'overdue'; whenTxt = t('agendaOverdueTag'); }
+        else if (due === today) { whenCls = 'today';   whenTxt = t('agendaTodayTag'); }
+        else                    { whenCls = 'future';  whenTxt = t('agendaInDays', diff); }
+
+        const stageDays = daysInCurrentStage(l);
+        const value = Number(l.expectedValue) || 0;
+        const valueLbl = value ? value.toLocaleString() + ' SAR' : '—';
+        const score = leadScore(l);
+        const tag = it.kind === 'reminder' ? t('agendaReminderTag') : t('agendaActionTag');
+        const itemCls = it.kind === 'reminder' ? 'reminder' : whenCls;
+
+        return `
+          <div class="pl-agenda-item ${itemCls}" onclick="plOpenLeadForm('${l.id}')" title="${escapeHtml(l.companyName)} — ${escapeHtml(it.text)}">
+            <div class="pl-ag-when ${whenCls}">${whenTxt}</div>
+            <div class="pl-ag-body">
+              <div class="pl-ag-action"><span class="pl-ag-tag">${tag}</span>${escapeHtml(it.text)}</div>
+              <div class="pl-ag-context">
+                <b>${escapeHtml(l.companyName)}</b>${l.contactName ? ' · ' + escapeHtml(l.contactName) : ''}
+                <span class="pl-ag-sep">·</span>
+                <span class="pl-ag-stage">${escapeHtml(l.stage)}</span>
+                <span class="pl-ag-sep">·</span>
+                <span class="pl-ag-value">${valueLbl}</span>
+                <span class="pl-ag-sep">·</span>
+                <span>${t('agendaStageDays', l.stage, stageDays)}</span>
+                <span class="pl-ag-sep">·</span>
+                <span>${t('agendaDueLabel')}: ${escapeHtml(due)}</span>
+              </div>
+            </div>
+            <div class="pl-ag-meta">
+              <span class="pl-ag-score">${score}</span>
+              <span>${t('agendaScoreLabel')}</span>
+            </div>
+          </div>`;
+      }).join('') + `</div>`;
+
+  mount.innerHTML = `
+   <div class="pl-agenda">
+    <div class="pl-agenda-head">
+      <div>
+        <h3>${t('agendaTitle')}</h3>
+        <div class="pl-agenda-sub">${t('agendaSub')}</div>
+      </div>
+      <div class="pl-agenda-count">${t('agendaCount', scoped.length)}</div>
+      <button class="pl-agenda-collapse-btn" onclick="plToggleAgenda()" title="${t('agendaCollapseHint')}" aria-label="${t('agendaCollapseHint')}">▴</button>
+    </div>
+    <div class="pl-agenda-chips">
+      ${chip('today',     t('agendaFilterToday'))}
+      ${chip('week',      t('agendaFilterWeek'))}
+      ${chip('month',     t('agendaFilterMonth'))}
+      ${chip('reminders', t('agendaFilterReminders'))}
+      ${chip('all',       t('agendaFilterAll'))}
+    </div>
+    ${body}
+   </div>
+  `;
 }
 
 function renderFocus() {
@@ -2768,6 +3016,7 @@ function renderLegend() {
 }
 function render() {
   renderToday();
+  renderAgenda();
   renderFocus();
   renderStats();
   renderLegend();
@@ -2782,6 +3031,8 @@ document.getElementById('modal-close').onclick = closeModal;
 document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
 
 applyLangToDocument();
+try { state.agendaFilter = localStorage.getItem('opp_agenda_filter_v1') || 'today'; } catch(e) { state.agendaFilter = 'today'; }
+try { const v = localStorage.getItem('opp_agenda_collapsed_v1'); state.agendaCollapsed = v === null ? true : v === '1'; } catch(e) { state.agendaCollapsed = true; }
 loadData();
 </script>
 </body>
