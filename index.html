@@ -412,6 +412,10 @@ tr.flash-target > td { background: rgba(201,169,110,.18) !important; }
 tr.drillable { cursor: pointer; transition: background .12s ease; }
 tr.drillable:hover > td { background: #faf8f3; }
 tr.drillable:active > td { background: #f3eee0; }
+/* NEW: Tasks-tab rows have double-click drill-down. Show a subtle hover so users know. */
+tr.actions-tab-row { transition: background .12s ease; }
+tr.actions-tab-row:hover > td { background: #faf8f3; }
+tr.actions-tab-row { user-select: none; } /* avoid text selection on quick double-click */
 @keyframes flashTarget {
   0% { background: rgba(201,169,110,.22); }
   50% { background: rgba(201,169,110,.10); }
@@ -1367,6 +1371,127 @@ tr.drillable:active > td { background: #f3eee0; }
 </head>
 <body>
 
+<!-- ========== LOGIN OVERLAY (Auth Gate) ========== -->
+<div id="auth-gate" style="display:flex; position:fixed; inset:0; z-index:99999; background:#0a1628; align-items:center; justify-content:center; font-family:'IBM Plex Sans Arabic','Reem Kufi',sans-serif; flex-direction:column; overflow:hidden;">
+  <!-- Animated background -->
+  <style>
+    #auth-gate::before {
+      content:''; position:absolute; inset:0; z-index:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 80%, rgba(201,168,76,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(30,60,114,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 90% 60% at 50% 50%, rgba(15,30,60,0.9) 0%, transparent 70%),
+        linear-gradient(135deg,#0a1628 0%,#132744 25%,#1a2a4a 50%,#132744 75%,#0a1628 100%);
+    }
+    #auth-gate::after {
+      content:''; position:absolute; inset:0; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(201,168,76,0.3), transparent),
+        radial-gradient(1px 1px at 30% 40%, rgba(201,168,76,0.2), transparent),
+        radial-gradient(1.5px 1.5px at 55% 10%, rgba(232,220,200,0.15), transparent),
+        radial-gradient(1px 1px at 70% 60%, rgba(201,168,76,0.25), transparent),
+        radial-gradient(1px 1px at 85% 25%, rgba(232,220,200,0.12), transparent),
+        radial-gradient(1.5px 1.5px at 45% 75%, rgba(201,168,76,0.18), transparent),
+        radial-gradient(1px 1px at 15% 55%, rgba(232,220,200,0.1), transparent),
+        radial-gradient(1px 1px at 90% 80%, rgba(201,168,76,0.15), transparent),
+        radial-gradient(1.5px 1.5px at 25% 90%, rgba(232,220,200,0.12), transparent),
+        radial-gradient(1px 1px at 60% 35%, rgba(201,168,76,0.2), transparent);
+      animation: authStarsPulse 6s ease-in-out infinite alternate;
+    }
+    @keyframes authStarsPulse { 0%{opacity:0.4;} 100%{opacity:1;} }
+    #auth-gate .auth-glow {
+      position:absolute; border-radius:50%; filter:blur(80px); z-index:0; opacity:0.4;
+      animation: authGlowFloat 8s ease-in-out infinite alternate;
+    }
+    @keyframes authGlowFloat {
+      0%{transform:translate(0,0) scale(1);} 50%{transform:translate(20px,-15px) scale(1.1);} 100%{transform:translate(-10px,10px) scale(0.95);}
+    }
+    #auth-login-btn:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 4px 16px rgba(201,168,76,0.3); }
+    #auth-email:focus, #auth-password:focus { border-color:rgba(201,168,76,0.4); box-shadow:0 0 0 2px rgba(201,168,76,0.1); }
+  </style>
+  <div class="auth-glow" style="width:300px;height:300px;background:rgba(201,168,76,0.06);top:10%;left:5%;"></div>
+  <div class="auth-glow" style="width:250px;height:250px;background:rgba(30,60,114,0.12);bottom:15%;right:8%;animation-delay:-3s;"></div>
+  <div class="auth-glow" style="width:200px;height:200px;background:rgba(201,168,76,0.04);top:60%;left:60%;animation-delay:-5s;"></div>
+
+  <!-- Floating governance module icons -->
+  <style>
+    .auth-float-icon {
+      position:absolute; z-index:0; color:rgba(201,168,76,0.7);
+      animation: authIconFloat 10s ease-in-out infinite alternate;
+    }
+    .auth-float-icon svg { width:100%; height:100%; filter:drop-shadow(0 0 8px rgba(201,168,76,0.15)); }
+    .auth-float-icon .auth-icon-label {
+      display:block; margin-top:6px; font-size:9px; letter-spacing:1px; text-transform:uppercase;
+      color:rgba(201,168,76,0.5); font-family:'IBM Plex Sans Arabic',sans-serif; white-space:nowrap; text-align:center;
+    }
+    @keyframes authIconFloat {
+      0%{transform:translateY(0) rotate(0deg);} 33%{transform:translateY(-10px) rotate(2deg);} 66%{transform:translateY(5px) rotate(-1.5deg);} 100%{transform:translateY(-6px) rotate(1deg);}
+    }
+  </style>
+  <!-- LEFT column icons -->
+  <div class="auth-float-icon" style="width:36px;height:36px;top:10%;left:7%;animation-delay:0s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    <span class="auth-icon-label">Dashboard</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:28%;left:10%;animation-delay:-2s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="8" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg>
+    <span class="auth-icon-label">Agenda</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:46%;left:6%;animation-delay:-4s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="auth-icon-label">Partners</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:64%;left:9%;animation-delay:-6s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    <span class="auth-icon-label">Projects</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:82%;left:12%;animation-delay:-8s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
+    <span class="auth-icon-label">Analytics</span>
+  </div>
+
+  <!-- RIGHT column icons -->
+  <div class="auth-float-icon" style="width:36px;height:36px;top:10%;right:8%;animation-delay:-1s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    <span class="auth-icon-label">Tasks</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:28%;right:11%;animation-delay:-3s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span class="auth-icon-label">Reports</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:46%;right:7%;animation-delay:-5s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a5.5 5.5 0 0 1 11 0v2"/><circle cx="19" cy="9" r="2.5"/><path d="M22 21v-1.5a3.5 3.5 0 0 0-2.5-3.36"/><circle cx="5" cy="9" r="2.5"/><path d="M2 21v-1.5a3.5 3.5 0 0 1 2.5-3.36"/></svg>
+    <span class="auth-icon-label">Team</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:64%;right:10%;animation-delay:-7s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span class="auth-icon-label">Meetings</span>
+  </div>
+  <div class="auth-float-icon" style="width:36px;height:36px;top:82%;right:8%;animation-delay:-9s;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span class="auth-icon-label">Scoring</span>
+  </div>
+
+  <!-- Login card -->
+  <div style="position:relative; z-index:1; background:rgba(255,255,255,0.05); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:44px 40px 36px; width:90%; max-width:400px; text-align:center; box-shadow:0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);">
+    <div style="margin-bottom:28px;">
+      <img id="auth-logo" style="height:80px; margin-bottom:14px; opacity:0.92; filter:drop-shadow(0 2px 8px rgba(201,168,76,0.2));" alt="SOE">
+      <h2 style="color:#e8dcc8; margin:0 0 6px 0; font-size:24px; font-weight:600; letter-spacing:0.5px;">SOE Governance</h2>
+      <p style="color:rgba(232,220,200,0.45); margin:0; font-size:13px; letter-spacing:1px; text-transform:uppercase;">Authorized Access Only</p>
+    </div>
+    <div id="auth-error" style="display:none; background:rgba(220,60,60,0.15); border:1px solid rgba(220,60,60,0.3); color:#ff9494; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px;"></div>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="email" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.05); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
+    <input id="auth-password" type="password" placeholder="Password" autocomplete="current-password" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:22px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.05); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
+    <button id="auth-login-btn" onclick="handleAuthLogin()" style="width:100%; padding:13px; border:none; border-radius:10px; background:linear-gradient(135deg,#c9a84c,#b8942f); color:#0a1628; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.2s; letter-spacing:0.3px;">Sign In</button>
+  </div>
+
+  <!-- Footer -->
+  <div style="position:relative; z-index:1; margin-top:32px; text-align:center;">
+    <p style="color:rgba(232,220,200,0.25); margin:0 0 4px 0; font-size:11px;">© SOE Governance Platform</p>
+    <p style="color:rgba(201,168,76,0.3); margin:0; font-size:10px; letter-spacing:0.5px;">Designed & Developed by Karim & Hassan</p>
+  </div>
+</div>
+
 <!-- Mobile menu toggle (visible ≤980px) -->
 <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu" onclick="toggleSidebar()">☰</button>
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
@@ -1467,7 +1592,7 @@ function withRequestTimeout(queryBuilder, ms) {
   ]);
 }
 
-/* ========== SUPABASE (Phase 1: public, shared database — no auth, no RLS) ========== */
+/* ========== SUPABASE (Phase 2: email/password auth + RLS) ========== */
 // Project values from Supabase → Settings → API.
 // NOTE: the JS client needs the BASE project URL only — NOT the REST endpoint (no "/rest/v1/").
 const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co';
@@ -1774,7 +1899,7 @@ const T = {
     filterOverdue: 'فات موعدها',
     filterMissed: 'لم يتم', filterCompleted: 'مكتمل',
     filterCritical: 'حرجة (+{0} يوم)',
-    drillDown: 'التفاصيل', drillHint: 'اضغط لعرض التفاصيل', drillTaskHint: 'اضغط لفتح المهمة في المشروع', drillMeetingHint: 'اضغط لفتح الاجتماع في المشروع', backToAgenda: '← العودة إلى الأجندة اليومية', backToTeamMember: '← العودة إلى {0}',
+    drillDown: 'التفاصيل', drillHint: 'اضغط لعرض التفاصيل', drillTaskHint: 'اضغط لفتح المهمة في المشروع', drillMeetingHint: 'اضغط لفتح الاجتماع في المشروع', backToAgenda: '← العودة إلى الأجندة اليومية', backToTeamMember: '← العودة إلى {0}', backToTasks: '← العودة إلى المهام', drillDblClickHint: 'انقر مرتين لفتح المهمة في المشروع',
     reportGroupByLabel: 'طريقة العرض',
     groupByStatus: 'حسب الحالة (افتراضي)',
     groupByProject: 'حسب المشروع',
@@ -2400,7 +2525,7 @@ const T = {
     filterOverdue: 'Overdue',
     filterMissed: 'Missed', filterCompleted: 'Completed',
     filterCritical: 'Critical (+{0}d)',
-    drillDown: 'Details', drillHint: 'Click to view details', drillTaskHint: 'Click to open this task in its project', drillMeetingHint: 'Click to open this meeting in its project', backToAgenda: '← Back to Daily Agenda', backToTeamMember: '← Back to {0}',
+    drillDown: 'Details', drillHint: 'Click to view details', drillTaskHint: 'Click to open this task in its project', drillMeetingHint: 'Click to open this meeting in its project', backToAgenda: '← Back to Daily Agenda', backToTeamMember: '← Back to {0}', backToTasks: '← Back to Tasks', drillDblClickHint: 'Double-click to open in project',
     reportGroupByLabel: 'Grouping',
     groupByStatus: 'By Status (default)',
     groupByProject: 'By Project',
@@ -3006,6 +3131,7 @@ function renderSidebar() {
       <button class="sb-btn" id="import-data-btn">${t('importBtn')}</button>
       <input type="file" id="import-file" accept=".json" class="hidden">
       <button class="sb-btn danger" id="reset-btn">${t('resetBtn')}</button>
+      <button class="sb-btn" id="auth-logout-btn" onclick="handleAuthLogout()" style="background:rgba(220,60,60,0.15);color:#ff9494;border:1px solid rgba(220,60,60,0.3);margin-top:8px">🔒 ${currentLang==='ar'?'تسجيل الخروج':'Sign Out'}${_authUser?' ('+(_authUser.email||'')+ ')':''}</button>
     </div>
 
     <div class="sidebar-footer">
@@ -5760,7 +5886,7 @@ views.projects = () => {
 views.projectDetail = (projectId) => {
   const p = getProject(projectId);
   if (!p) return `<div class="empty">${t('noProjects')}</div>`;
-  const _projectBack = (state.navOrigin === 'agenda' || state.navOrigin === 'dashboard' || state.navOrigin === 'teamMember') ? backToOriginBtn() : backToDashBtn();
+  const _projectBack = (state.navOrigin === 'agenda' || state.navOrigin === 'dashboard' || state.navOrigin === 'teamMember' || state.navOrigin === 'tasks') ? backToOriginBtn() : backToDashBtn();
   const partner = getPartner(p.partnerId);
   const actions = getProjectActions(projectId);
   // Tasks, milestones and meetings are kept strictly separate
@@ -6112,7 +6238,7 @@ views.actions = () => {
             const risk = isOpen(a) ? getRiskLevel(delay) : null;
             const meeting = isMeeting(a);
             return `
-            <tr>
+            <tr ondblclick="openActionFromTasks('${a.id}')" class="actions-tab-row" title="${t('drillDblClickHint')}">
               <td>
                 <div class="name">${meeting ? '🗓 ' : ''}${escapeHtml(a.title)}</div>
                 ${meeting && a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
@@ -6162,7 +6288,7 @@ views.actions = () => {
               const delay = getDelayDays(a);
               const risk = isOpen(a) ? getRiskLevel(delay) : null;
               return `
-              <tr>
+              <tr ondblclick="openActionFromTasks('${a.id}')" class="actions-tab-row" title="${t('drillDblClickHint')}">
                 <td>
                   <div class="name">🗓 ${escapeHtml(a.title)}</div>
                   ${a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
@@ -6662,7 +6788,7 @@ function navigate(view, param) {
   state.currentView = view;
   // Reset the drill-down origin when the user lands on a top-level page (dashboard/agenda).
   // This stops the "Back to Dashboard" pill from appearing on unrelated pages later.
-  if (view === 'dashboard' || view === 'agenda' || view === 'team') { state.navOrigin = null; state.navOriginParam = null; }
+  if (view === 'dashboard' || view === 'agenda' || view === 'team' || view === 'actions') { state.navOrigin = null; state.navOriginParam = null; }
   renderSidebar();
   render(param);
   try { _consumeScrollTarget(); } catch(e) {}
@@ -6694,6 +6820,9 @@ function backToOriginBtn() {
     const m = getTeamMember(state.navOriginParam);
     const label = t('backToTeamMember', (m && m.name) ? m.name : t('internalTeam'));
     return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="_backToTeamMemberOrigin()" style="font-size:12px;padding:4px 12px">' + label + '</button></div>';
+  }
+  if (o === 'tasks') {
+    return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="navigate(\'actions\')" style="font-size:12px;padding:4px 12px">' + t('backToTasks') + '</button></div>';
   }
   const label = o === 'agenda' ? t('backToAgenda') : t('backToDashboard');
   return '<div style="margin-bottom:12px"><button class="btn ghost sm" onclick="navigate(\'' + o + '\')" style="font-size:12px;padding:4px 12px">' + label + '</button></div>';
@@ -6736,6 +6865,9 @@ function _openActionInProject(actionId, origin, originParam) {
 }
 window.openActionFromDashboard = function(actionId) { _openActionInProject(actionId, 'dashboard'); };
 window.openActionFromAgenda = function(actionId) { _openActionInProject(actionId, 'agenda'); };
+// NEW: Tasks tab double-click drill-down. Same flow as Agenda/Dashboard rows —
+// jumps to the task's project, scrolls + flashes, and shows a Back-to-Tasks pill.
+window.openActionFromTasks = function(actionId) { _openActionInProject(actionId, 'tasks'); };
 window.openActionFromTeamMember = function(actionId, memberId) { _openActionInProject(actionId, 'teamMember', memberId); };
 
 // After any render, if state.scrollToActionId is set, find the card and flash it.
@@ -10751,7 +10883,69 @@ async function resetData() {
 
 
 
+/* ========== AUTH GATE FUNCTIONS ========== */
+let _authUser = null;
+let _authResolve = null; // resolve callback for login wait
+
+async function handleAuthLogin() {
+  const btn = document.getElementById('auth-login-btn');
+  const errEl = document.getElementById('auth-error');
+  const email = (document.getElementById('auth-email').value || '').trim();
+  const pass = document.getElementById('auth-password').value || '';
+  errEl.style.display = 'none';
+  if (!email || !pass) { errEl.textContent = 'Please enter email and password'; errEl.style.display = 'block'; return; }
+  if (!supabaseClient) { errEl.textContent = 'System unavailable — please try later'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...'; btn.style.opacity = '0.6';
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    _authUser = data.user;
+    document.getElementById('auth-gate').style.display = 'none';
+    if (_authResolve) { _authResolve(); _authResolve = null; }
+  } catch (e) {
+    errEl.textContent = e.message || 'Invalid credentials';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In'; btn.style.opacity = '1';
+  }
+}
+
+async function handleAuthLogout() {
+  if (!supabaseClient) return;
+  try { await supabaseClient.auth.signOut(); } catch(e){}
+  _authUser = null;
+  document.getElementById('auth-gate').style.display = 'flex';
+  document.getElementById('auth-password').value = '';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function _checkExistingSession() {
+  if (!supabaseClient) return false;
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data && data.session && data.session.user) {
+      _authUser = data.session.user;
+      document.getElementById('auth-gate').style.display = 'none';
+      return true;
+    }
+  } catch(e){}
+  return false;
+}
+
+// Set login logo from SCE_LOGO constant & Enter key support
+try { document.getElementById('auth-logo').src = SCE_LOGO; } catch(e){}
+document.getElementById('auth-password').addEventListener('keydown', function(e) { if (e.key === 'Enter') handleAuthLogin(); });
+document.getElementById('auth-email').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+
 (async function init() {
+  // 0) Auth gate — check session or wait for login before booting the app.
+  if (supabaseClient) {
+    const hasSession = await _checkExistingSession();
+    if (!hasSession) {
+      await new Promise(resolve => { _authResolve = resolve; });
+    }
+  }
+
   applyLangToDocument();
 
   // Helper: never let an awaited cloud call hang the whole app.
