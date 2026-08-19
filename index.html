@@ -6760,57 +6760,15 @@ views.actions = () => {
 
     <div class="table-wrap">
       ${list.filter(a => !isMeeting(a)).length === 0 ? `<div class="empty"><div class="empty-icon">✓</div>${t('noActionsMatch')}</div>` : `
-      <table>
-        <thead>
-          <tr>
-            <th>${t('colTitle')}</th>
-            <th>${t('colPartnerProject')}</th>
-            <th>${t('colStatus')}</th>
-            <th>${t('colPriority')}</th>
-            <th>${t('colDate')}</th>
-            <th>${t('colDelay')}</th>
-            <th>${t('colRisk')}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${list.filter(a => !isMeeting(a)).map(a => {
-            const partner = getPartner(a.partnerId);
-            const project = getProject(a.projectId);
-            const delay = getDelayDays(a);
-            const risk = isOpen(a) ? getRiskLevel(delay) : null;
-            const meeting = isMeeting(a);
-            return `
-            <tr ondblclick="openActionFromTasks('${a.id}')" class="actions-tab-row" title="${t('drillDblClickHint')}">
-              <td>
-                <div class="name">${meeting ? '🗓 ' : ''}${escapeHtml(a.title)}</div>
-                ${meeting && a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
-                ${!meeting && getOwnerName(a) ? `<div class="sub">${ownerTag(a)}</div>` : ''}
-                ${!meeting && Array.isArray(a.dependsOnIds) && a.dependsOnIds.length > 0 ? `<div class="sub" style="color:var(--accent-warm)">⛓ ${a.dependsOnIds.map(did => { const dt = state.actions.find(x=>x.id===did); return escapeHtml(dt ? dt.title : '?'); }).join(', ')}</div>` : ''}
-                ${!meeting ? (() => { const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="sub" style="color:var(--crit)">⚠ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="sub">📝 ${escapeHtml(a.note)}</div>`; return ''; })() : ''}
-              </td>
-              <td>
-                <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
-                <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
-              </td>
-              <td>${(() => { const prog = getSubtaskProgress(a.id); const drift = getTaskDrift(a); return (prog.total > 0 ? `<span class="badge neutral" style="font-size:10px">${t('subtaskProgress', prog.done, prog.total)}</span> ` : '') + (drift > 0 ? `<span class="drift-chip">+${drift}</span>` : ''); })()}${statusBadge(a.status)}</td>
-              <td>${priorityBadge(a.priority)}</td>
-              <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${a.originalDueDate && a.originalDueDate !== a.dueDate ? `<span style="text-decoration:line-through;color:var(--ink-faint);font-size:11px">${fmtDate(a.originalDueDate)}</span> → ` : ''}${fmtDate(a.dueDate)}</td>
-              <td>${delay > 0 && !isCompleted(a) ? t('daysShort', delay) : (isCompleted(a) && delay > 0 ? `<span style="color:var(--ink-faint)">+${delay}</span>` : '—')}</td>
-              <td>${risk ? `<span class="badge ${risk.cls}">${risk.label}</span>` : (isMissed(a) ? `<span class="badge dark">${t('statusMissed')}</span>` : '—')}</td>
-              <td>
-                <div class="row-actions">
-                  ${isOpen(a) ? `<button class="row-btn" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}
-                  ${isOpen(a) && !isMeeting(a) ? `<button class="row-btn" onclick="showExtendDialog('${a.id}')">📅</button>` : ''}
-                  ${!isMeeting(a) && !a.parentId ? `<button class="row-btn" onclick="showActionForm(null,'${a.projectId}',null,'task',null,'${a.id}')">↳＋</button>` : ''}
-                  <button class="row-btn" onclick="showActionForm('${a.id}')">${t('edit')}</button>
-                  <button class="row-btn danger" onclick="deleteAction('${a.id}')">${t('delete')}</button>
-                </div>
-              </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>`}
+      ${(() => {
+        const taskList = list.filter(a => !isMeeting(a));
+        const listIds = new Set(taskList.map(a => a.id));
+        const topLevel = taskList.filter(a => {
+          if (!a.parentId) return true;
+          return !listIds.has(a.parentId);
+        });
+        return topLevel.map(a => renderTaskNode(a, false)).join('');
+      })()}`}
     </div>
     ${(state.filters.includeMeetings && list.some(isMeeting)) ? `
     <div class="ext-meetings-section" style="margin-top:26px">
