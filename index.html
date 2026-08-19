@@ -5697,43 +5697,7 @@ views.dashboard = () => {
 };
 
 function renderActionCard(a, opts) {
-  const hidePartner = !!(opts && typeof opts === 'object' && opts.hidePartner === true);
-  const showEdit = !!(opts && typeof opts === 'object' && opts.showEdit === true);
-  const delay = getDelayDays(a);
-  const risk = getRiskLevel(delay);
-  const partner = getPartner(a.partnerId);
-  const project = getProject(a.projectId);
-  const meeting = isMeeting(a);
-  const linkedTask = meeting && a.linkedTaskId ? state.actions.find(x => x.id === a.linkedTaskId && isTask(x)) : null;
-  return `
-    <div class="action-card ${isMissed(a) ? 'crit' : risk.cls}" id="actcard-${a.id}" data-actid="${a.id}">
-      <div class="ac-head">
-        <div>
-          <div class="ac-title">${meeting ? '🗓 ' : (isMilestone(a) ? '🎯 ' : '')}${escapeHtml(a.title)}${isMilestone(a) ? ` <span class="badge sup" style="font-size:10px">${t('milestoneBadge')}</span>` : ''}</div>
-          <div class="ac-meta">
-            <div class="ac-meta-item">${t('metaProject')} ${escapeHtml(project ? project.name : '—')}</div>
-            ${hidePartner ? '' : `<div class="ac-meta-item">${t('metaPartner')} ${escapeHtml(partner ? partner.name : '—')}</div>`}
-            ${!meeting && a.startDate ? `<div class="ac-meta-item">${t('metaDate')} ${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}
-            <div class="ac-meta-item">${t('metaDate')} ${meeting ? t('meetingDateLabel') : t('dueLabel')}: ${fmtDate(a.dueDate)}${meeting && a.meetingTime ? ' — ' + fmtTime(a.meetingTime) : ''}</div>
-            ${!meeting && getOwnerName(a) ? `<div class="ac-meta-item">${t('ownerLabel')}: ${ownerTag(a)}${isInternalOwned(a) ? ` · <span style="color:var(--ink-faint)">${t('internalOwnedNote')}</span>` : ''}</div>` : ''}
-            ${!meeting && Array.isArray(a.dependsOnIds) && a.dependsOnIds.length > 0 ? `<div class="ac-meta-item">⛓ ${t('blockedByLabel')}: ${a.dependsOnIds.map(did => { const dt = state.actions.find(x=>x.id===did); return `<span class="badge" style="font-size:10px;margin-inline:2px">${escapeHtml(dt ? dt.title : '—')}</span>`; }).join(' ')}</div>` : ''}
-            ${meeting && a.participants ? `<div class="ac-meta-item">👥 ${escapeHtml(a.participants)}</div>` : ''}
-            ${linkedTask ? `<div class="ac-meta-item">🔗 ${t('linkedToLabel')}: ${escapeHtml(linkedTask.title)}</div>` : ''}
-            ${isOpen(a) && delay > 0 ? `<div class="ac-meta-item">${t('metaDelayClock')} ${t('delayLabel')}: ${delay} ${t('days')}</div>` : ''}
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start">
-          ${statusBadge(a.status)}
-          ${priorityBadge(a.priority)}
-          ${isOpen(a) && delay > 0 ? `<span class="badge ${risk.cls}">${t('riskColon')} ${risk.label}</span>` : ''}
-          ${joinMeetingBtn(a)}
-          ${showEdit ? `${isOpen(a) ? `<button class="btn ghost sm" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}<button class="btn ghost sm" onclick="showActionForm('${a.id}')">${t('edit')}</button><button class="btn ghost sm" style="color:var(--red)" onclick="deleteAction('${a.id}')">${t('delete')}</button>` : ''}
-        </div>
-      </div>
-      ${meeting && a.meetingNotes ? `<div class="ac-reason">🗒 ${escapeHtml(a.meetingNotes)}</div>` : ''}
-      ${(() => { if (meeting) return ''; const c = getTaskDelayCause(a); if (c.key === 'dep') return `<div class="ac-reason">⛓ ${escapeHtml(c.label)}</div>`; if (c.key === 'other' && a.note) return `<div class="ac-reason">📝 ${escapeHtml(a.note)}</div>`; return ''; })()}
-    </div>
-  `;
+  return renderTaskNode(a, false);
 }
 
 views.report = () => {
@@ -6040,7 +6004,15 @@ function renderReportComprehensive(open, completed) {
           <div class="section-head">
             <div class="section-title">${labels[key]} <span style="color:var(--ink-faint);font-weight:400;font-size:13px;margin-inline-start:6px">(${list.length})</span><span class="accent-line"></span></div>
           </div>
-          ${list.map(a => renderActionCard(a)).join('')}
+          ${(() => {
+            const listIds = new Set(list.map(a => a.id));
+            const topLevel = list.filter(a => {
+              if (isMeeting(a)) return true;
+              if (!a.parentId) return true;
+              return !listIds.has(a.parentId);
+            });
+            return topLevel.map(a => renderActionCard(a)).join('');
+          })()}
         </div>
       `;
     }).join('')}
@@ -6049,7 +6021,10 @@ function renderReportComprehensive(open, completed) {
         <div class="section-head">
           <div class="section-title">${t('sectionTasksCompletedInPeriod')} (${completedTasks.length})<span class="accent-line"></span></div>
         </div>
-        ${completedTasks.slice(0, 30).map(renderActionCard).join('')}
+        ${(() => {
+            const compIds = new Set(completedTasks.map(a => a.id));
+            return completedTasks.filter(a => !a.parentId || !compIds.has(a.parentId)).slice(0, 30).map(renderActionCard).join('');
+          })()}
       </div>
     ` : ''}
     ${openTasks.length === 0 ? `<div class="table-wrap"><div class="empty"><div class="empty-icon">✓</div>${t('noOpenActions')}</div></div>` : ''}
@@ -9770,6 +9745,26 @@ function printAllTasksReport(existingEntry) {
               ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
                 sectionDivider(t('reportProjectHeader')) +
                 mainTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
+              ${projMeetings.length > 0 ? `
+                ${sectionDivider('🗓 ' + t('statMeetingsTotal') + ' (' + projMeetings.length + ')')}
+                <table class="rt" style="background:#fff">
+                  <thead><tr>
+                    <th>${t('colAgenda')}</th>
+                    <th>${t('colStatus')}</th>
+                    <th>${t('colDate')}</th>
+                  </tr></thead>
+                  <tbody>
+                    ${[...projMeetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => {
+                      const mDelay = getDelayDays(m);
+                      return `<tr>
+                        <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
+                        <td>${statusBadgeMini(m.status)}</td>
+                        <td>${fmtDate(m.dueDate)}${m.meetingTime ? ' · ' + fmtTime(m.meetingTime) : ''}${isOpen(m) && mDelay > 0 ? ' <span style="color:var(--red)">+' + mDelay + '</span>' : ''}</td>
+                      </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              ` : ''}
             </div>
           </div>
         `;
