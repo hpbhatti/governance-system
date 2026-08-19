@@ -2251,6 +2251,15 @@ const T = {
     addPartnerBtn: 'إضافة الشريك', saveChanges: 'حفظ التعديلات',
     addProjectTitle: 'إضافة مشروع', editProjectTitle: 'تعديل مشروع',
     suspendProject: '⏸ تعليق المشروع', resumeProject: '▶ استئناف المشروع',
+    subtasks: 'المهام الفرعية', subtask: 'مهمة فرعية', addSubtask: '＋ مهمة فرعية',
+    parentTask: 'المهمة الأم', noSubtasks: 'لا توجد مهام فرعية',
+    subtaskProgress: '{0} من {1} منجزة',
+    originalDueDate: 'التاريخ الأصلي', currentDueDate: 'التاريخ الحالي',
+    dueDateHistory: 'سجل التمديدات', extendDueDate: 'تمديد التاريخ',
+    extended: 'مُدّد', extensionReason: 'سبب التمديد',
+    extendReasonPlaceholder: 'سبب التمديد (اختياري)', confirmExtendBtn: 'تمديد',
+    extendedFromTo: 'من {0} إلى {1}',
+    parentAutoExtended: 'مُدّدت الرئيسية تلقائياً بسبب مهمة فرعية',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
@@ -2880,6 +2889,15 @@ const T = {
     addPartnerBtn: 'Add Partner', saveChanges: 'Save Changes',
     addProjectTitle: 'Add Project', editProjectTitle: 'Edit Project',
     suspendProject: '⏸ Suspend Project', resumeProject: '▶ Resume Project',
+    subtasks: 'Subtasks', subtask: 'Subtask', addSubtask: '＋ Subtask',
+    parentTask: 'Parent Task', noSubtasks: 'No subtasks',
+    subtaskProgress: '{0} of {1} done',
+    originalDueDate: 'Original Date', currentDueDate: 'Current Date',
+    dueDateHistory: 'Extension History', extendDueDate: 'Extend Date',
+    extended: 'Extended', extensionReason: 'Extension reason',
+    extendReasonPlaceholder: 'Extension reason (optional)', confirmExtendBtn: 'Extend',
+    extendedFromTo: 'from {0} to {1}',
+    parentAutoExtended: 'Parent auto-extended due to a subtask',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
@@ -3357,6 +3375,10 @@ function applyDataMigrations() {
           if (a.ownerKind === undefined) a.ownerKind = '';   // 'internal' | 'partner'
           if (a.note === undefined) a.note = '';              // optional context / delay reason
           if (a.isMilestone === undefined) a.isMilestone = false;
+          // Migration: subtask & extension fields
+          if (a.parentId === undefined) a.parentId = null;
+          if (a.originalDueDate === undefined) a.originalDueDate = a.dueDate || null;
+          if (!Array.isArray(a.extensions)) a.extensions = [];
           // NEW: task startDate migration
           if (!a.startDate) {
             const proj = state.projects.find(pr => pr.id === a.projectId);
@@ -4235,6 +4257,75 @@ function agreementWeight(project) {
 //  - importance: how much the project matters strategically (NOT lowered by poor execution)
 //  - health:     how well execution is going (milestones reached + partner commitment − delays)
 // Then focus = importance × risk, so important + struggling projects rise to the top.
+// ── Subtask Hierarchy ──
+function getSubtasks(taskId) {
+  return state.actions.filter(a => a.parentId === taskId);
+}
+function getParentAction(a) {
+  return a.parentId ? state.actions.find(x => x.id === a.parentId) : null;
+}
+function getProjectMainTasks(projectId) {
+  return state.actions.filter(a => a.projectId === projectId && !a.parentId && !isMeeting(a));
+}
+function getSubtaskProgress(taskId) {
+  const subs = getSubtasks(taskId);
+  return { done: subs.filter(isCompleted).length, total: subs.length };
+}
+
+// ── Task Extensions with Audit Trail ──
+function getTaskDrift(a) {
+  return (a.extensions || []).reduce((sum, e) => sum + (e.days || 0), 0);
+}
+
+function extendTaskDueDate(taskId, newDate, reason, sourceSubtaskId) {
+  const a = state.actions.find(x => x.id === taskId);
+  if (!a || !newDate) return;
+  const oldDate = a.dueDate;
+  if (newDate === oldDate) return;
+  if (!a.originalDueDate) a.originalDueDate = oldDate;
+  const driftDays = oldDate ? daysBetween(oldDate, newDate) : 0;
+  a.extensions = a.extensions || [];
+  a.extensions.push({
+    id: 'ext_' + uid(), from: oldDate, to: newDate,
+    days: driftDays > 0 ? driftDays : 0,
+    reason: reason || '',
+    date: new Date().toISOString(),
+    source: sourceSubtaskId ? 'subtask' : 'manual',
+    sourceId: sourceSubtaskId || null
+  });
+  a.dueDate = newDate;
+  if (a.status === 'postponed' && !isMeeting(a)) a.status = 'open';
+  a.tracking = a.tracking || [];
+  const trackText = '📅 ' + t('extended') + ': ' + t('extendedFromTo', oldDate ? fmtDate(oldDate) : '—', fmtDate(newDate)) + (driftDays > 0 ? ' (+' + driftDays + ')' : '') + (reason ? ' — ' + reason : '');
+  a.tracking.push({ id: 'tr_' + uid(), text: trackText, date: new Date().toISOString() });
+  // Cascade to parent
+  if (a.parentId) {
+    const parent = state.actions.find(x => x.id === a.parentId);
+    if (parent && parent.dueDate && newDate > parent.dueDate) {
+      extendTaskDueDate(parent.id, newDate, t('parentAutoExtended'), a.id);
+    }
+  }
+}
+
+function showExtendDialog(taskId) {
+  const a = state.actions.find(x => x.id === taskId);
+  if (!a) return;
+  const html = '<div class="form-row"><label>' + t('currentDueDate') + '</label><div style="font-size:14px;color:var(--ink-muted);padding:6px 0">' + fmtDate(a.dueDate) + (a.originalDueDate && a.originalDueDate !== a.dueDate ? ' <span style="font-size:11px;color:var(--ink-faint)">(' + t('originalDueDate') + ': ' + fmtDate(a.originalDueDate) + ')</span>' : '') + '</div></div><div class="form-row"><label>' + t('extendDueDate') + ' *</label><input type="date" id="f-extend-date" value="' + (a.dueDate || '') + '" min="' + (a.dueDate || '') + '"></div><div class="form-row"><label>' + t('extensionReason') + '</label><textarea id="f-extend-reason" placeholder="' + t('extendReasonPlaceholder') + '"></textarea></div>';
+  const foot = '<button class="btn" onclick="confirmExtendAction(\'' + taskId + '\')">' + t('confirmExtendBtn') + '</button> <button class="btn ghost" onclick="closeModal()">' + t('cancel') + '</button>';
+  openModal(t('extendDueDate') + ' — ' + escapeHtml(a.title), html, foot);
+}
+
+function confirmExtendAction(taskId) {
+  const newDate = document.getElementById('f-extend-date').value;
+  if (!newDate) return;
+  const reason = document.getElementById('f-extend-reason').value.trim();
+  extendTaskDueDate(taskId, newDate, reason, null);
+  saveState();
+  toast(t('toastSaved'));
+  closeModal();
+  render(state.detailParam);
+}
+
 // ── Project Suspend/Resume ──
 function isProjectSuspended(p) { return !!(p && p.suspended); }
 function getReportableProjects() { return state.projects.filter(p => !isProjectSuspended(p)); }
@@ -6279,14 +6370,16 @@ views.actions = () => {
                 <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
                 <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
               </td>
-              <td>${statusBadge(a.status)}</td>
+              <td>${(() => { const prog = getSubtaskProgress(a.id); const drift = getTaskDrift(a); return (prog.total > 0 ? `<span class="badge neutral" style="font-size:10px">${t('subtaskProgress', prog.done, prog.total)}</span> ` : '') + (drift > 0 ? `<span class="drift-chip">+${drift}</span>` : ''); })()}${statusBadge(a.status)}</td>
               <td>${priorityBadge(a.priority)}</td>
-              <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
+              <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${a.originalDueDate && a.originalDueDate !== a.dueDate ? `<span style="text-decoration:line-through;color:var(--ink-faint);font-size:11px">${fmtDate(a.originalDueDate)}</span> → ` : ''}${fmtDate(a.dueDate)}</td>
               <td>${delay > 0 && !isCompleted(a) ? t('daysShort', delay) : (isCompleted(a) && delay > 0 ? `<span style="color:var(--ink-faint)">+${delay}</span>` : '—')}</td>
               <td>${risk ? `<span class="badge ${risk.cls}">${risk.label}</span>` : (isMissed(a) ? `<span class="badge dark">${t('statusMissed')}</span>` : '—')}</td>
               <td>
                 <div class="row-actions">
                   ${isOpen(a) ? `<button class="row-btn" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}
+                  ${isOpen(a) && !isMeeting(a) ? `<button class="row-btn" onclick="showExtendDialog('${a.id}')">📅</button>` : ''}
+                  ${!isMeeting(a) && !a.parentId ? `<button class="row-btn" onclick="showActionForm(null,'${a.projectId}',null,'task',null,'${a.id}')">↳＋</button>` : ''}
                   <button class="row-btn" onclick="showActionForm('${a.id}')">${t('edit')}</button>
                   <button class="row-btn danger" onclick="deleteAction('${a.id}')">${t('delete')}</button>
                 </div>
@@ -7968,8 +8061,10 @@ function saveLink(projectId) {
   render(state.detailParam);
 }
 
-function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultType) {
+function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultType, defaultDate, parentId) {
   const editing = actionId ? state.actions.find(a => a.id === actionId) : null;
+  const parentTask = parentId ? state.actions.find(a => a.id === parentId) : (editing && editing.parentId ? state.actions.find(a => a.id === editing.parentId) : null);
+  window._pendingParentId = parentId || (editing ? editing.parentId : null) || null;
   if (state.projects.length === 0) {
     alert(t('alertNeedProjectFirst'));
     return;
@@ -7983,7 +8078,8 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     ? (editing.type === 'meeting' ? 'meeting' : (editing.isMilestone ? 'milestone' : 'task'))
     : (defaultType || 'task');
   const html = `
-    <div class="form-row">
+    ${parentTask ? `<div style="background:#f0e8d6;border:1px solid rgba(184,136,74,0.3);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px"><span style="color:var(--accent-warm);font-weight:500">↳ ${t('subtask')}</span> · ${t('parentTask')}: <strong>${escapeHtml(parentTask.title)}</strong></div>` : ''}
+    <div class="form-row" ${parentTask ? 'style="display:none"' : ''}>
       <label>${t('fieldActionType')}</label>
       <select id="f-type">
         <option value="task" ${currentType==='task'?'selected':''}>${t('typeTask')}</option>
@@ -8405,15 +8501,41 @@ function saveAction(id) {
 
   if (id) {
     const a = state.actions.find(x => x.id === id);
+    // Track extension if due date changed
+    const oldDue = a.dueDate;
     Object.assign(a, data);
-    storeActionBilingual(a);   // dual-language storage for title + note/meetingNotes
-    autoTranslateAction(a);    // fill the other language in the background
+    if (oldDue && data.dueDate && data.dueDate !== oldDue && !isMeeting(a)) {
+      if (!a.originalDueDate) a.originalDueDate = oldDue;
+      const driftDays = daysBetween(oldDue, data.dueDate);
+      a.extensions = a.extensions || [];
+      a.extensions.push({
+        id: 'ext_' + uid(), from: oldDue, to: data.dueDate,
+        days: driftDays > 0 ? driftDays : 0,
+        reason: '', date: new Date().toISOString(), source: 'manual', sourceId: null
+      });
+      if (a.parentId) {
+        const parent = state.actions.find(x => x.id === a.parentId);
+        if (parent && parent.dueDate && data.dueDate > parent.dueDate) {
+          extendTaskDueDate(parent.id, data.dueDate, t('parentAutoExtended'), a.id);
+        }
+      }
+    }
+    storeActionBilingual(a);
+    autoTranslateAction(a);
   } else {
-    const newA = { id: uid(), ...data, createdAt: todayDate() };
+    const newA = { id: uid(), ...data, parentId: window._pendingParentId || null, originalDueDate: data.dueDate || null, extensions: [], createdAt: todayDate() };
     storeActionBilingual(newA);
     state.actions.push(newA);
     autoTranslateAction(newA);
+    // If subtask's date exceeds parent's, auto-extend parent
+    if (newA.parentId) {
+      const parent = state.actions.find(x => x.id === newA.parentId);
+      if (parent && parent.dueDate && newA.dueDate > parent.dueDate) {
+        extendTaskDueDate(parent.id, newA.dueDate, t('parentAutoExtended'), newA.id);
+      }
+    }
   }
+  window._pendingParentId = null;
   saveState();
   toast(t('toastSaved'));
   closeModal();
@@ -8438,11 +8560,14 @@ async function deleteAction(id) {
     return;
   }
   if (!confirm(t('confirmDeleteAction', a.title))) return;
-  state.actions = state.actions.filter(x => x.id !== id);
+  // Cascade: also delete subtasks
+  const subtaskIds = getSubtasks(id).map(s => s.id);
+  const allIds = [id, ...subtaskIds];
+  state.actions = state.actions.filter(x => !allIds.includes(x.id));
   saveState();
   toast(t('toastDeleted'));
   render(state.detailParam);
-  await syncCloudDeletes({ actions: [id] });
+  await syncCloudDeletes({ actions: allIds });
 }
 
 async function confirmDeleteAction(id, scope) {
@@ -8637,6 +8762,35 @@ function buildReportHTML(title, bodyHTML, metadata) {
         color: #7a6a45; padding: 11px 16px; border-radius: 8px;
         font-size: 13px; margin-bottom: 16px; font-weight: 500;
         display: flex; align-items: center; gap: 8px;
+      }
+
+      /* Subtask hierarchy */
+      .subtask-progress-bar {
+        height: 5px; background: var(--line); border-radius: 3px;
+        overflow: hidden; margin-top: 8px; max-width: 200px;
+      }
+      .subtask-progress-fill { height: 100%; background: var(--green); border-radius: 3px; }
+      .subtask-item {
+        background: #fff; border: 1px solid var(--line);
+        border-inline-start: 3px solid var(--accent-warm);
+        border-radius: 5px; padding: 8px 12px; margin-top: 6px;
+        display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      }
+      .subtask-item.done { opacity: 0.65; }
+      .subtask-item.done .subtask-name { text-decoration: line-through; }
+      .subtask-name { font-size: 13px; font-weight: 500; }
+      .subtask-date { font-size: 11px; color: var(--ink-muted); }
+      /* Extension log */
+      .extension-log {
+        margin-top: 8px; padding: 8px 10px;
+        background: #fdf4d9; border-radius: 5px;
+        font-size: 11px; color: var(--ink-muted);
+      }
+      .extension-log-item { display: flex; gap: 8px; padding: 2px 0; flex-wrap: wrap; }
+      .drift-chip {
+        display: inline-block; padding: 1px 7px; border-radius: 8px;
+        font-size: 10px; background: #fae0de; color: var(--red);
+        font-family: 'Reem Kufi', serif;
       }
       .row-redflag { background: #fef2f0; }
       .row-redflag td { border-bottom-color: #f5b8b1; }
