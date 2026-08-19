@@ -4569,6 +4569,107 @@ function renderReportTaskLine(action, opts) {
     '</div>';
 }
 
+// ── Calendar View (Feature #6) ──
+views.calendar = () => {
+  const now = new Date();
+  const year = state.calendarYear != null ? state.calendarYear : now.getFullYear();
+  const month = state.calendarMonth != null ? state.calendarMonth : now.getMonth();
+  const selectedDate = state.calendarSelectedDate || null;
+  const today = todayDate();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startWeekday = firstDay.getDay();
+  const actionsByDate = {};
+  state.actions.forEach(a => { if (!a.dueDate) return; (actionsByDate[a.dueDate] = actionsByDate[a.dueDate] || []).push(a); });
+  const monthName = firstDay.toLocaleDateString(t('locale'), { year: 'numeric', month: 'long' });
+  const weekdayNames = [];
+  const wdRef = new Date(2024, 0, 7);
+  for (let i = 0; i < 7; i++) { const d = new Date(wdRef); d.setDate(wdRef.getDate() + i); weekdayNames.push(d.toLocaleDateString(t('locale'), { weekday: 'short' })); }
+  let cells = '';
+  for (let i = 0; i < startWeekday; i++) cells += '<div class="calendar-cell empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const dayActions = actionsByDate[dateStr] || [];
+    const openTasks = dayActions.filter(a => isOpen(a) && !isMeeting(a));
+    const delayed = openTasks.filter(a => getDelayDays(a) > 0);
+    const onTime = openTasks.filter(a => getDelayDays(a) === 0);
+    const completed = dayActions.filter(isCompleted);
+    const meetings = dayActions.filter(isMeeting);
+    const cls = ['calendar-cell'];
+    if (dateStr === today) cls.push('today');
+    if (dateStr === selectedDate) cls.push('selected');
+    cells += '<div class="' + cls.join(' ') + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
+      '<div class="calendar-day-num">' + d + '</div>' +
+      (dayActions.length > 0 ? '<div class="calendar-badges">' +
+        (delayed.length > 0 ? '<span class="cal-badge red">' + delayed.length + '</span>' : '') +
+        (onTime.length > 0 ? '<span class="cal-badge amber">' + onTime.length + '</span>' : '') +
+        (completed.length > 0 ? '<span class="cal-badge green">' + completed.length + '</span>' : '') +
+        (meetings.length > 0 ? '<span class="cal-badge blue">🗓 ' + meetings.length + '</span>' : '') +
+        '</div>' : '') + '</div>';
+  }
+  const selectedTasks = selectedDate ? (actionsByDate[selectedDate] || []) : [];
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">📅 ${t('calendarTitle')}</h1>
+        <div class="page-sub">${t('calendarSub')}</div>
+      </div>
+      <button class="btn ghost" onclick="calendarToday()">${t('calendarGoToday')}</button>
+    </div>
+    <div class="calendar-nav">
+      <button class="calendar-nav-btn" onclick="calendarPrevMonth()">${currentLang==='ar' ? '›' : '‹'}</button>
+      <div class="calendar-month-label">${monthName}</div>
+      <button class="calendar-nav-btn" onclick="calendarNextMonth()">${currentLang==='ar' ? '‹' : '›'}</button>
+    </div>
+    <div class="calendar-grid">
+      ${weekdayNames.map(w => '<div class="calendar-weekday">' + w + '</div>').join('')}
+      ${cells}
+    </div>
+    ${selectedDate ? `
+      <div class="section" style="margin-top:24px">
+        <div class="section-head">
+          <div class="section-title">${t('tasksOnDay', fmtDate(selectedDate))} (${selectedTasks.length})<span class="accent-line"></span></div>
+          <button class="btn sm" onclick="showActionForm(null, null, null, 'task', '${selectedDate}')">${t('addActionBtn')}</button>
+        </div>
+        ${selectedTasks.length === 0
+          ? '<div class="table-wrap"><div class="empty">' + t('noTasksOnDay') + '</div></div>'
+          : selectedTasks.sort((a,b) => {
+              const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
+              if (ao !== bo) return ao - bo;
+              return getDelayDays(b) - getDelayDays(a);
+            }).map(a => renderTaskNode(a, false)).join('')}
+      </div>
+    ` : '<div class="empty" style="margin-top:20px"><div class="empty-icon">👆</div>' + t('selectDayHint') + '</div>'}
+  `;
+};
+
+function selectCalendarDay(dateStr) {
+  state.calendarSelectedDate = dateStr;
+  const scrollY = window.scrollY;
+  render();
+  requestAnimationFrame(() => window.scrollTo(0, scrollY));
+}
+function calendarPrevMonth() {
+  const now = new Date();
+  let year = state.calendarYear != null ? state.calendarYear : now.getFullYear();
+  let month = state.calendarMonth != null ? state.calendarMonth : now.getMonth();
+  month--; if (month < 0) { month = 11; year--; }
+  state.calendarMonth = month; state.calendarYear = year; render();
+}
+function calendarNextMonth() {
+  const now = new Date();
+  let year = state.calendarYear != null ? state.calendarYear : now.getFullYear();
+  let month = state.calendarMonth != null ? state.calendarMonth : now.getMonth();
+  month++; if (month > 11) { month = 0; year++; }
+  state.calendarMonth = month; state.calendarYear = year; render();
+}
+function calendarToday() {
+  const now = new Date();
+  state.calendarYear = now.getFullYear(); state.calendarMonth = now.getMonth();
+  state.calendarSelectedDate = todayDate(); render();
+}
+
 // ── Report project header with health badge ──
 function renderReportProjectHead(project, extraMeta) {
   var drift = computeDriftAnalysis(project.id);
@@ -7697,6 +7798,8 @@ function render(param) {
   const view = state.currentView;
   if (view === 'partnerDetail') {
     main.innerHTML = views.partnerDetail(param || state.detailParam);
+  } else if (view === 'calendar') {
+    main.innerHTML = views.calendar();
   } else if (view === 'projectDetail') {
     main.innerHTML = views.projectDetail(param || state.detailParam);
     setupDragDrop(param || state.detailParam);
