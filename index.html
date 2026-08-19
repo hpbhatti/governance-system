@@ -2260,6 +2260,16 @@ const T = {
     extendReasonPlaceholder: 'سبب التمديد (اختياري)', confirmExtendBtn: 'تمديد',
     extendedFromTo: 'من {0} إلى {1}',
     parentAutoExtended: 'مُدّدت الرئيسية تلقائياً بسبب مهمة فرعية',
+    projectAnalytics: 'تحليلات المشروع',
+    sCurveTitle: 'منحنى التقدّم (S-Curve)', sCurveSubtitle: 'الإنجاز التراكمي المخطط مقابل الفعلي',
+    plannedProgress: 'المخطط', actualProgress: 'الفعلي',
+    driftAnalysisTitle: 'تحليل الانحرافات', driftAnalysisSubtitle: 'انحراف المهام عن مواعيدها الأصلية',
+    completionRate: 'نسبة الإنجاز', onTimeRate: 'نسبة الالتزام',
+    avgDrift: 'متوسط الانحراف', totalDrift: 'إجمالي الانحراف',
+    mostDelayed: 'الأكثر تأخراً',
+    healthScore: 'مؤشر الصحة', healthExcellent: 'ممتاز', healthGood: 'جيد',
+    healthWarning: 'يحتاج انتباه', healthCritical: 'حرج',
+    noAnalyticsData: 'لا توجد بيانات كافية للتحليل',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
@@ -2898,6 +2908,16 @@ const T = {
     extendReasonPlaceholder: 'Extension reason (optional)', confirmExtendBtn: 'Extend',
     extendedFromTo: 'from {0} to {1}',
     parentAutoExtended: 'Parent auto-extended due to a subtask',
+    projectAnalytics: 'Project Analytics',
+    sCurveTitle: 'Progress Curve (S-Curve)', sCurveSubtitle: 'Planned vs actual cumulative completion',
+    plannedProgress: 'Planned', actualProgress: 'Actual',
+    driftAnalysisTitle: 'Drift Analysis', driftAnalysisSubtitle: 'Task deviation from original due dates',
+    completionRate: 'Completion Rate', onTimeRate: 'On-Time Rate',
+    avgDrift: 'Avg Drift', totalDrift: 'Total Drift',
+    mostDelayed: 'Most Delayed',
+    healthScore: 'Health Score', healthExcellent: 'Excellent', healthGood: 'Good',
+    healthWarning: 'Needs Attention', healthCritical: 'Critical',
+    noAnalyticsData: 'Not enough data for analysis',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
@@ -4257,6 +4277,124 @@ function agreementWeight(project) {
 //  - importance: how much the project matters strategically (NOT lowered by poor execution)
 //  - health:     how well execution is going (milestones reached + partner commitment − delays)
 // Then focus = importance × risk, so important + struggling projects rise to the top.
+// ── Project Drift Analysis (Feature #4) ──
+function getProjectDrift(projectId) {
+  const tasks = state.actions.filter(a => a.projectId === projectId && !isMeeting(a));
+  return tasks.reduce((sum, a) => sum + getTaskDrift(a), 0);
+}
+
+function computeDriftAnalysis(projectId) {
+  const tasks = state.actions.filter(a => a.projectId === projectId && !isMeeting(a));
+  const total = tasks.length;
+  if (total === 0) {
+    return { total: 0, completed: 0, open: 0, onTime: 0, extended: 0,
+             totalDrift: 0, avgDrift: 0, onTimeRate: 0, completionRate: 0,
+             mostDelayed: null, health: 'good', healthScore: 100 };
+  }
+  const completed = tasks.filter(isCompleted);
+  const open = tasks.filter(isOpen);
+  const extended = tasks.filter(a => (a.extensions || []).length > 0);
+  const totalDrift = tasks.reduce((s, a) => s + getTaskDrift(a), 0);
+  const driftedTasks = tasks.filter(a => getTaskDrift(a) > 0);
+  const avgDrift = driftedTasks.length > 0 ? Math.round(totalDrift / driftedTasks.length) : 0;
+  const onTimeCompleted = completed.filter(a => {
+    if (!a.originalDueDate || !a.completedDate) return true;
+    return a.completedDate <= a.originalDueDate;
+  });
+  const onTimeRate = completed.length > 0 ? Math.round((onTimeCompleted.length / completed.length) * 100) : 0;
+  const completionRate = Math.round((completed.length / total) * 100);
+  let mostDelayed = null, maxDrift = 0;
+  tasks.forEach(a => { const d = getTaskDrift(a); if (d > maxDrift) { maxDrift = d; mostDelayed = a; } });
+  const openDelayed = open.filter(a => getDelayDays(a) > 0).length;
+  const delayPenalty = total > 0 ? Math.round((openDelayed / total) * 40) : 0;
+  let healthScore = Math.max(0, Math.min(100, Math.round((completionRate * 0.4) + (onTimeRate * 0.4) + 20 - delayPenalty)));
+  let health;
+  if (healthScore >= 80) health = 'excellent';
+  else if (healthScore >= 60) health = 'good';
+  else if (healthScore >= 40) health = 'warning';
+  else health = 'critical';
+  return { total, completed: completed.length, open: open.length,
+    onTime: onTimeCompleted.length, extended: extended.length,
+    totalDrift, avgDrift, onTimeRate, completionRate,
+    mostDelayed, maxDrift, health, healthScore, openDelayed };
+}
+
+// ── S-Curve Analytics (Feature #5) ──
+function computeSCurve(projectId) {
+  const tasks = state.actions.filter(a => a.projectId === projectId && !isMeeting(a));
+  if (tasks.length === 0) return { points: [], total: 0 };
+  const dates = new Set();
+  tasks.forEach(a => {
+    if (a.originalDueDate) dates.add(a.originalDueDate);
+    if (a.dueDate) dates.add(a.dueDate);
+    if (a.completedDate) dates.add(a.completedDate);
+  });
+  dates.add(todayDate());
+  const sortedDates = Array.from(dates).filter(Boolean).sort();
+  if (sortedDates.length === 0) return { points: [], total: tasks.length };
+  const total = tasks.length;
+  const points = sortedDates.map(date => {
+    const planned = tasks.filter(a => a.originalDueDate && a.originalDueDate <= date).length;
+    const actual = tasks.filter(a => isCompleted(a) && a.completedDate && a.completedDate <= date).length;
+    return { date, planned, actual,
+      plannedPct: total > 0 ? Math.round((planned / total) * 100) : 0,
+      actualPct: total > 0 ? Math.round((actual / total) * 100) : 0 };
+  });
+  return { points, total };
+}
+
+function renderSCurveSVG(sCurve) {
+  const pts = sCurve.points;
+  if (pts.length < 2) return '<div style="padding:30px;text-align:center;color:var(--ink-faint);font-size:13px">' + t('noAnalyticsData') + '</div>';
+  const W = 620, H = 240, padL = 40, padR = 20, padT = 20, padB = 40;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const n = pts.length;
+  const xAt = i => padL + (chartW * i / (n - 1));
+  const yAt = pct => padT + chartH - (chartH * pct / 100);
+  const plannedPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + xAt(i).toFixed(1) + ',' + yAt(p.plannedPct).toFixed(1)).join(' ');
+  const actualPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + xAt(i).toFixed(1) + ',' + yAt(p.actualPct).toFixed(1)).join(' ');
+  const gridlines = [0, 25, 50, 75, 100].map(pct =>
+    '<line x1="' + padL + '" y1="' + yAt(pct) + '" x2="' + (W - padR) + '" y2="' + yAt(pct) + '" stroke="#e8e2d4" stroke-width="1"/>' +
+    '<text x="' + (padL - 6) + '" y="' + (yAt(pct) + 3) + '" text-anchor="end" font-size="9" fill="#8a8478">' + pct + '%</text>'
+  ).join('');
+  const xLabels = [0, Math.floor(n / 2), n - 1].map(i => {
+    const short = new Date(pts[i].date).toLocaleDateString(t('locale'), { month: 'short', day: 'numeric' });
+    return '<text x="' + xAt(i) + '" y="' + (H - padB + 15) + '" text-anchor="middle" font-size="9" fill="#8a8478">' + short + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;height:auto" xmlns="http://www.w3.org/2000/svg">' +
+    gridlines + xLabels +
+    '<path d="' + plannedPath + '" fill="none" stroke="#b8884a" stroke-width="2" stroke-dasharray="5,4"/>' +
+    '<path d="' + actualPath + '" fill="none" stroke="#2c3e50" stroke-width="2.5"/>' +
+    pts.map((p, i) => '<circle cx="' + xAt(i) + '" cy="' + yAt(p.actualPct) + '" r="3" fill="#2c3e50"/>').join('') +
+    '</svg>' +
+    '<div style="display:flex;gap:20px;justify-content:center;margin-top:8px;font-size:11px">' +
+    '<span style="color:#2c3e50"><span style="display:inline-block;width:18px;height:2px;background:#2c3e50;vertical-align:middle"></span> ' + t('actualProgress') + '</span>' +
+    '<span style="color:#b8884a"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #b8884a;vertical-align:middle"></span> ' + t('plannedProgress') + '</span></div>';
+}
+
+function renderProjectAnalytics(projectId) {
+  const sCurve = computeSCurve(projectId);
+  const drift = computeDriftAnalysis(projectId);
+  if (drift.total === 0) {
+    return '<div class="table-wrap"><div class="empty">' + t('noAnalyticsData') + '</div></div>';
+  }
+  const healthLabels = {
+    excellent: t('healthExcellent'), good: t('healthGood'),
+    warning: t('healthWarning'), critical: t('healthCritical')
+  };
+  return '<div class="analytics-grid">' +
+    '<div class="analytics-card"><h3>' + t('sCurveTitle') + '</h3><div class="subtitle">' + t('sCurveSubtitle') + '</div>' + renderSCurveSVG(sCurve) + '</div>' +
+    '<div class="analytics-card"><h3>' + t('driftAnalysisTitle') + '</h3><div class="subtitle">' + t('driftAnalysisSubtitle') + '</div>' +
+    '<div style="text-align:center;margin:6px 0 16px"><div class="health-badge ' + drift.health + '">' + t('healthScore') + ': ' + drift.healthScore + ' · ' + healthLabels[drift.health] + '</div></div>' +
+    '<div class="metric-row"><span class="metric-label">' + t('completionRate') + '</span><span class="metric-value">' + drift.completionRate + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">' + t('onTimeRate') + '</span><span class="metric-value">' + drift.onTimeRate + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">' + t('avgDrift') + '</span><span class="metric-value">' + drift.avgDrift + ' ' + t('days') + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">' + t('totalDrift') + '</span><span class="metric-value">' + drift.totalDrift + ' ' + t('days') + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">' + t('extensionCount', drift.extended) + '</span><span class="metric-value">' + drift.extended + '/' + drift.total + '</span></div>' +
+    (drift.mostDelayed ? '<div class="metric-row"><span class="metric-label">' + t('mostDelayed') + '</span><span class="metric-value" style="font-size:11px;max-width:180px;text-align:end">' + escapeHtml(drift.mostDelayed.title) + ' (+' + drift.maxDrift + ')</span></div>' : '') +
+    '</div></div>';
+}
+
 // ── Subtask Hierarchy ──
 function getSubtasks(taskId) {
   return state.actions.filter(a => a.parentId === taskId);
@@ -6058,6 +6196,13 @@ views.projectDetail = (projectId) => {
         <div class="stat-label">${t('statCompletedActions')}</div>
         <div class="stat-value">${completed.length}/${tasks.length}</div>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">📊 ${t('projectAnalytics')}<span class="accent-line"></span></div>
+      </div>
+      ${renderProjectAnalytics(p.id)}
     </div>
 
     ${milestones.length > 0 ? `
@@ -8792,6 +8937,35 @@ function buildReportHTML(title, bodyHTML, metadata) {
         font-size: 10px; background: #fae0de; color: var(--red);
         font-family: 'Reem Kufi', serif;
       }
+
+      /* Analytics panel */
+      .analytics-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
+      }
+      @media (max-width: 900px) { .analytics-grid { grid-template-columns: 1fr; } }
+      .analytics-card {
+        background: var(--bg-card); border: 1px solid var(--line);
+        border-radius: 10px; padding: 18px;
+      }
+      .analytics-card h3 {
+        font-family: 'Reem Kufi', serif; font-size: 15px; color: var(--accent); margin: 0 0 3px;
+      }
+      .analytics-card .subtitle { font-size: 11px; color: var(--ink-faint); margin-bottom: 14px; }
+      .health-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 14px; border-radius: 16px; font-weight: 600; font-size: 13px;
+      }
+      .health-badge.excellent { background: #e3edd6; color: var(--green); }
+      .health-badge.good { background: #e6ecf2; color: var(--accent); }
+      .health-badge.warning { background: #fdf4d9; color: var(--amber); }
+      .health-badge.critical { background: #fae0de; color: var(--red); }
+      .metric-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+      }
+      .metric-row:last-child { border-bottom: none; }
+      .metric-label { color: var(--ink-muted); }
+      .metric-value { font-weight: 600; font-family: 'Reem Kufi', serif; color: var(--ink); }
       .row-redflag { background: #fef2f0; }
       .row-redflag td { border-bottom-color: #f5b8b1; }
       .redflag-cell { color: var(--red); font-weight: 600; }
