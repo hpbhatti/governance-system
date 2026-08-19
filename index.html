@@ -2250,6 +2250,9 @@ const T = {
     inTwoDays: 'بعد يومين',
     addPartnerBtn: 'إضافة الشريك', saveChanges: 'حفظ التعديلات',
     addProjectTitle: 'إضافة مشروع', editProjectTitle: 'تعديل مشروع',
+    suspendProject: '⏸ تعليق المشروع', resumeProject: '▶ استئناف المشروع',
+    suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
+    confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
     fieldPartnerHint: 'اختر شريكًا أو أكثر لهذا المشروع',
     fieldProjectTeam: 'فريق العمل الداخلي',
@@ -2876,6 +2879,9 @@ const T = {
     inTwoDays: 'In 2 days',
     addPartnerBtn: 'Add Partner', saveChanges: 'Save Changes',
     addProjectTitle: 'Add Project', editProjectTitle: 'Edit Project',
+    suspendProject: '⏸ Suspend Project', resumeProject: '▶ Resume Project',
+    suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
+    confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
     fieldPartnerHint: 'Select one or more partners for this project',
     fieldProjectTeam: 'Assigned Internal Team',
@@ -3382,9 +3388,10 @@ function applyDataMigrations() {
       state.partners.forEach(p => {
         if (!Array.isArray(p.team)) p.team = [];
       });
-      // Migration: ensure every project has attachments array
+      // Migration: ensure every project has attachments array and suspended flag
       state.projects.forEach(p => {
         if (!Array.isArray(p.attachments)) p.attachments = [];
+        if (p.suspended === undefined) p.suspended = false;
       });
       // Migration: move legacy partnership data from partner → projects
       // Any partner that has partnership data copies it to its projects (if not already set),
@@ -4228,6 +4235,25 @@ function agreementWeight(project) {
 //  - importance: how much the project matters strategically (NOT lowered by poor execution)
 //  - health:     how well execution is going (milestones reached + partner commitment − delays)
 // Then focus = importance × risk, so important + struggling projects rise to the top.
+// ── Project Suspend/Resume ──
+function isProjectSuspended(p) { return !!(p && p.suspended); }
+function getReportableProjects() { return state.projects.filter(p => !isProjectSuspended(p)); }
+
+function toggleProjectSuspend(projectId) {
+  const p = getProject(projectId);
+  if (!p) return;
+  if (!p.suspended) {
+    if (!confirm(t('confirmSuspend', p.name || p.name_ar || ''))) return;
+    p.suspended = true;
+    toast(t('projectSuspended'));
+  } else {
+    p.suspended = false;
+    toast(currentLang === 'ar' ? 'تم استئناف المشروع' : 'Project resumed');
+  }
+  saveState();
+  render();
+}
+
 function getProjectScore(projectId) {
   const project = getProject(projectId);
   if (!project) return null;
@@ -5849,9 +5875,9 @@ views.projects = () => {
             const completedActs = acts.filter(isCompleted).length;
             const attachCount = (p.attachments || []).length;
             return `
-            <tr>
+            <tr${isProjectSuspended(p) ? ' style="opacity:0.55"' : ''}>
               <td>
-                <div class="name" style="cursor:pointer;color:var(--accent)" onclick="viewProject('${p.id}')">${escapeHtml(p.name)}</div>
+                <div class="name" style="cursor:pointer;color:var(--accent)" onclick="viewProject('${p.id}')">${escapeHtml(p.name)} ${isProjectSuspended(p) ? `<span class="badge-suspended">⏸ ${t('suspendedBadge')}</span>` : ''}</div>
                 <div class="sub">${escapeHtml(p.description || '')}</div>
               </td>
               <td>
@@ -5872,6 +5898,7 @@ views.projects = () => {
                 <div class="row-actions">
                   <button class="row-btn" onclick="viewProject('${p.id}')">${t('view')}</button>
                   <button class="row-btn" onclick="showProjectForm('${p.id}')">${t('edit')}</button>
+                  <button class="row-btn" onclick="toggleProjectSuspend('${p.id}')">${isProjectSuspended(p) ? '▶' : '⏸'}</button>
                   <button class="row-btn danger" onclick="deleteProject('${p.id}')">${t('delete')}</button>
                 </div>
               </td>
@@ -5914,9 +5941,11 @@ views.projectDetail = (projectId) => {
         </div>
       </div>
       <button class="btn ghost" onclick="showProjectForm('${p.id}')">${t('editProject')}</button>
+      <button class="btn ghost" onclick="toggleProjectSuspend('${p.id}')" style="margin-inline-start:6px">${isProjectSuspended(p) ? t('resumeProject') : t('suspendProject')}</button>
       <button class="btn ghost" onclick="printProjectReport('${p.id}')" style="margin-inline-start:6px">${t('exportProjectReport')}</button>
       <button class="btn ghost" onclick="printProjectTasksReport('${p.id}')" style="margin-inline-start:6px">${t('exportTasksReport')}</button>
     </div>
+    ${isProjectSuspended(p) ? `<div class="suspended-banner">⏸ ${t('projectSuspended')}</div>` : ''}
 
     <div class="stats">
       <div class="stat" title="${t('importanceTooltip')}">
@@ -7750,7 +7779,7 @@ function saveProject(id) {
     ]).then(rs => { if (rs.some(Boolean)) saveState(); });
   } else {
     const newId = uid();
-    const newP = { id: newId, ...data, attachments: [] };
+    const newP = { id: newId, ...data, attachments: [], suspended: false };
     setBilingualField(newP, 'name', newP.name);
     if (newP.description) setBilingualField(newP, 'description', newP.description);
     state.projects.push(newP);
@@ -8594,6 +8623,21 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .badge-mini.amber { background: #fdf4d9; color: var(--amber); border-color: rgba(201,149,72,0.2); }
       .badge-mini.green { background: #e3edd6; color: var(--green); border-color: rgba(90,120,71,0.2); }
       .badge-mini.crit { background: #f5d5d0; color: var(--crit); border-color: rgba(138,44,32,0.3); }
+
+      /* Suspended project indicators */
+      .badge-suspended {
+        display: inline-block; padding: 2px 9px; border-radius: 10px;
+        font-size: 11px; font-weight: 500;
+        background: #f0ebe0; color: #8a7a5a;
+        border: 1px solid #d9cdb0; vertical-align: middle;
+        margin-inline-start: 6px;
+      }
+      .suspended-banner {
+        background: #f7f0e0; border: 1px solid #d9cdb0;
+        color: #7a6a45; padding: 11px 16px; border-radius: 8px;
+        font-size: 13px; margin-bottom: 16px; font-weight: 500;
+        display: flex; align-items: center; gap: 8px;
+      }
       .row-redflag { background: #fef2f0; }
       .row-redflag td { border-bottom-color: #f5b8b1; }
       .redflag-cell { color: var(--red); font-weight: 600; }
