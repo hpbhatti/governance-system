@@ -1364,6 +1364,76 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
     body.tl-printing .tl-container { max-height: none !important; overflow: visible !important; border: 0 !important; }
   }
   /* === END NEW Timeline CSS === */
+
+  /* === Analytics panel (project detail page) === */
+  .analytics-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
+  }
+  @media (max-width: 900px) { .analytics-grid { grid-template-columns: 1fr; } }
+  .analytics-card {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px;
+  }
+  .analytics-card h3 {
+    font-family: 'Reem Kufi', serif; font-size: 15px; color: var(--accent); margin: 0 0 3px;
+  }
+  .analytics-card .subtitle { font-size: 11px; color: var(--ink-faint); margin-bottom: 14px; }
+  .health-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px; border-radius: 16px; font-weight: 600; font-size: 13px;
+  }
+  .health-badge.excellent { background: #e3edd6; color: var(--green); }
+  .health-badge.good { background: #e6ecf2; color: var(--accent); }
+  .health-badge.warning { background: #fdf4d9; color: var(--amber); }
+  .health-badge.critical { background: #fae0de; color: var(--red); }
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { color: var(--ink-muted); }
+  .metric-value { font-weight: 600; font-family: 'Reem Kufi', serif; color: var(--ink); }
+
+  /* === Subtask & extension (project detail page) === */
+  .subtask-progress-bar {
+    height: 5px; background: var(--line); border-radius: 3px;
+    overflow: hidden; margin-top: 8px; max-width: 200px;
+  }
+  .subtask-progress-fill { height: 100%; background: var(--green); border-radius: 3px; }
+  .subtask-item {
+    background: #fff; border: 1px solid var(--line);
+    border-inline-start: 3px solid var(--accent-warm);
+    border-radius: 5px; padding: 8px 12px; margin-top: 6px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .subtask-item.done { opacity: 0.65; }
+  .subtask-item.done .subtask-name { text-decoration: line-through; }
+  .subtask-name { font-size: 13px; font-weight: 500; }
+  .subtask-date { font-size: 11px; color: var(--ink-muted); }
+  .extension-log {
+    margin-top: 8px; padding: 8px 10px;
+    background: #fdf4d9; border-radius: 5px;
+    font-size: 11px; color: var(--ink-muted);
+  }
+  .extension-log-item { display: flex; gap: 8px; padding: 2px 0; flex-wrap: wrap; }
+  .drift-chip {
+    display: inline-block; padding: 1px 7px; border-radius: 8px;
+    font-size: 10px; background: #fae0de; color: var(--red);
+    font-family: 'Reem Kufi', serif;
+  }
+  .badge-suspended {
+    display: inline-block; padding: 2px 9px; border-radius: 10px;
+    font-size: 11px; font-weight: 500;
+    background: #f0ebe0; color: #8a7a5a;
+    border: 1px solid #d9cdb0; vertical-align: middle;
+    margin-inline-start: 6px;
+  }
+  .suspended-banner {
+    background: #f7f0e0; border: 1px solid #d9cdb0;
+    color: #7a6a45; padding: 11px 16px; border-radius: 8px;
+    font-size: 13px; margin-bottom: 16px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+  }
 </style>
 <!-- Supabase client (Phase 1: public database, no auth/RLS). Pinned to a known
      stable v2 that supports both legacy and new (sb_publishable_) API keys. -->
@@ -2270,6 +2340,7 @@ const T = {
     healthScore: 'مؤشر الصحة', healthExcellent: 'ممتاز', healthGood: 'جيد',
     healthWarning: 'يحتاج انتباه', healthCritical: 'حرج',
     noAnalyticsData: 'لا توجد بيانات كافية للتحليل',
+    extensionCount: '{0} تمديد', extendedTasks: 'مهام مُدّدة',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
@@ -2918,6 +2989,7 @@ const T = {
     healthScore: 'Health Score', healthExcellent: 'Excellent', healthGood: 'Good',
     healthWarning: 'Needs Attention', healthCritical: 'Critical',
     noAnalyticsData: 'Not enough data for analysis',
+    extensionCount: '{0} extensions', extendedTasks: 'Extended Tasks',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
