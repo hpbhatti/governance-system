@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>نظام حوكمة الشركاء والمشاريع</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">a
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -2379,6 +2379,7 @@ const T = {
     noAnalyticsData: 'لا توجد بيانات كافية للتحليل',
     extensionCount: '{0} تمديد', extendedTasks: 'مهام مُدّدة',
     driftLabel: 'انحراف', dueLabel: 'الاستحقاق', meetingDateLabel: 'التاريخ',
+    reportProjectHeader: 'تفاصيل المهام', projectsCovered: 'يشمل {0} مشروع',
     sectionTracking: 'سجل المتابعة', analyticsTitle: 'التحليلات',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
@@ -3030,6 +3031,7 @@ const T = {
     noAnalyticsData: 'Not enough data for analysis',
     extensionCount: '{0} extensions', extendedTasks: 'Extended Tasks',
     driftLabel: 'Drift', dueLabel: 'Due', meetingDateLabel: 'Date',
+    reportProjectHeader: 'Task Details', projectsCovered: 'Covering {0} projects',
     sectionTracking: 'Tracking Log', analyticsTitle: 'Analytics',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
@@ -4475,7 +4477,9 @@ function renderTaskNodeBody(a, subtasks) {
 function toggleTaskNode(id) {
   if (!state.expandedTasks) state.expandedTasks = {};
   state.expandedTasks[id] = !state.expandedTasks[id];
-  render(undefined, { preserveScroll: true });
+  const scrollY = window.scrollY;
+  render(state.detailParam);
+  requestAnimationFrame(() => window.scrollTo(0, scrollY));
 }
 
 // ── Report rendering functions ──
@@ -4562,6 +4566,29 @@ function renderReportTaskLine(action, opts) {
           (sLate ? ' <span style="color:var(--red);font-weight:600"> · ' + t('daysShort', sDelay) + '</span>' : '') +
           ' ' + statusBadgeMini(sub.status) + '</span></div>';
       }).join('') + '</div>' : '') +
+    '</div>';
+}
+
+// ── Report project header with health badge ──
+function renderReportProjectHead(project, extraMeta) {
+  var drift = computeDriftAnalysis(project.id);
+  var partner = getPartner(project.partnerId);
+  var healthLabels = {
+    excellent: t('healthExcellent'), good: t('healthGood'),
+    warning: t('healthWarning'), critical: t('healthCritical')
+  };
+  var healthColors = { excellent: '#5a7847', good: '#7a9a5c', warning: '#c99548', critical: '#b94a3e' };
+  return '<div class="proj-report-head">' +
+    '<div style="flex:1">' +
+    '<div class="pr-title">📁 ' + escapeHtml(project.name) + '</div>' +
+    '<div class="pr-meta">' +
+    (partner ? escapeHtml(partner.name) : '') +
+    (project.partnershipValue ? ' · ' + escapeHtml(project.partnershipValue) : '') +
+    (extraMeta ? ' · ' + extraMeta : '') +
+    '</div>' +
+    (project.description ? '<div class="pr-meta" style="margin-top:3px">' + escapeHtml(project.description) + '</div>' : '') +
+    '</div>' +
+    (drift.total > 0 ? '<div class="pr-health" style="background:' + healthColors[drift.health] + '"><div class="hs">' + drift.healthScore + '</div><div class="hl">' + healthLabels[drift.health] + '</div></div>' : '') +
     '</div>';
 }
 
@@ -9195,6 +9222,41 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .rep-bar-track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
       .rep-bar-fill { height: 100%; border-radius: 3px; }
 
+      /* Project report cards */
+      .proj-report-card {
+        border: 1px solid var(--line-strong); border-radius: 10px;
+        margin: 22px 0; overflow: hidden; background: #fff;
+        page-break-inside: avoid;
+      }
+      .proj-report-head {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 16px; padding: 16px 20px; background: linear-gradient(135deg, #2c3e50 0%, #3a5068 100%);
+        color: #fff; flex-wrap: wrap;
+      }
+      .proj-report-head .pr-title { font-family: 'Reem Kufi', serif; font-size: 17px; margin: 0 0 3px; }
+      .proj-report-head .pr-meta { font-size: 11px; opacity: 0.85; }
+      .proj-report-head .pr-health {
+        text-align: center; padding: 6px 14px; border-radius: 8px;
+        background: rgba(255,255,255,0.15); min-width: 92px;
+      }
+      .proj-report-head .pr-health .hs { font-size: 24px; font-weight: 700; font-family: 'Reem Kufi', serif; line-height: 1; }
+      .proj-report-head .pr-health .hl { font-size: 10px; opacity: 0.9; margin-top: 3px; letter-spacing: 0.04em; }
+      .proj-report-body { padding: 18px 20px; }
+      .kpi-strip {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+        gap: 8px; margin-bottom: 18px;
+      }
+      .kpi {
+        text-align: center; padding: 10px 6px; border-radius: 7px;
+        background: #faf8f3; border: 1px solid var(--line);
+      }
+      .kpi .kv { font-size: 20px; font-weight: 600; font-family: 'Reem Kufi', serif; line-height: 1; }
+      .kpi .kl { font-size: 10px; color: var(--ink-faint); margin-top: 4px; letter-spacing: 0.03em; }
+      .kpi.k-green .kv { color: var(--green); }
+      .kpi.k-amber .kv { color: var(--amber); }
+      .kpi.k-red .kv { color: var(--red); }
+      .kpi.k-accent .kv { color: var(--accent); }
+
       /* Report task lines */
       .task-line {
         border: 1px solid var(--line); border-radius: 7px;
@@ -9611,7 +9673,7 @@ function renderReportTasksTable(tasks) {
 // Scheduled/postponed meetings further than 7 days in the future are excluded.
 function printAllTasksReport(existingEntry) {
   const entry = existingEntry || saveReportEntry('tasks-global', {}, t('globalReportTitle'));
-  const projects = state.projects;
+  const projects = getReportableProjects();
   const today = todayDate();
   const MEETING_LOOKAHEAD_DAYS = 7;
 
@@ -9689,69 +9751,26 @@ function printAllTasksReport(existingEntry) {
         const tasks = allFiltered.filter(a => !isMeeting(a));
         const projMeetings = allFiltered.filter(isMeeting);
         const meetingsCount = projMeetings.length;
-        const sorted = sortTasks(tasks);
         const partner = getPartner(p.partnerId);
         const compCount = tasks.filter(isCompleted).length;
         const openCount = tasks.filter(isOpen).length;
         const delayedCount = tasks.filter(a => isOpen(a) && getDelayDays(a) > 0).length;
+        const mainTasks = sortTasks(tasks.filter(a => !a.parentId));
         return `
-          <div style="margin-top:24px;padding:16px 18px;background:#faf8f3;border:1px solid var(--line);border-radius:8px">
-            <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap">
-              <div>
-                <h3 style="font-family:'Reem Kufi',serif;margin:0 0 4px;font-size:16px;color:var(--accent)">📁 ${escapeHtml(p.name)}</h3>
-                ${partner ? `<div style="font-size:11px;color:var(--ink-muted)">${escapeHtml(partner.name)} · ${escapeHtml(p.partnershipValue || '')}</div>` : ''}
-                ${p.description ? `<div style="font-size:11px;color:var(--ink-faint);margin-top:3px">${escapeHtml(p.description)}</div>` : ''}
+          <div class="proj-report-card">
+            ${renderReportProjectHead(p, meetingsCount > 0 ? '🗓 ' + meetingsCount + ' ' + t('statMeetingsTotal') : '')}
+            <div class="proj-report-body">
+              <div class="kpi-strip">
+                <div class="kpi k-accent"><div class="kv">${tasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+                <div class="kpi k-green"><div class="kv">${compCount}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+                <div class="kpi k-amber"><div class="kv">${openCount}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+                <div class="kpi k-red"><div class="kv">${delayedCount}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
               </div>
-              <div style="font-size:11px;color:var(--ink-muted);text-align:end">
-                ${t('projectSummaryLine', tasks.length, compCount, openCount, delayedCount)}
-                ${meetingsCount > 0 ? `<div style="margin-top:4px;color:var(--accent);font-weight:500">🗓 ${meetingsCount} ${t('statMeetingsTotal')}</div>` : ''}
-              </div>
+              ${renderReportProjectAnalytics(p.id)}
+              ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
+                sectionDivider(t('reportProjectHeader')) +
+                mainTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
             </div>
-            ${tasks.length === 0 ? `<div style="margin-top:12px;font-size:12px;color:var(--ink-faint);text-align:center;padding:14px;background:#fff;border-radius:6px">${t('reportNoData')}</div>` : `
-            <table class="rt" style="margin-top:12px;background:#fff">
-              <thead><tr>
-                <th>${t('colTitle')}</th>
-                <th>${t('taskOwnerCol')}</th>
-                <th>${t('colStakeholder')}</th>
-                <th>${t('colStatus')}</th>
-                <th>${t('colDate')}</th>
-                <th>${t('colDelay')}</th>
-              </tr></thead>
-              <tbody>
-                ${sorted.map(a => {
-                  const delay = getDelayDays(a);
-                  const isLate = isOpen(a) && delay > 0;
-                  const stakeholder = a.ownerKind === 'internal' ? t('stakeholderInternal') : a.ownerKind === 'partner' ? (() => { const pa = state.partners.find(pp => (pp.team||[]).some(m => m.id === a.ownerId)); return pa ? pa.name : '—'; })() : t('stakeholderUnassigned');
-                  return `<tr>
-                    <td><strong>${escapeHtml(a.title)}</strong></td>
-                    <td style="vertical-align:top"><div style="font-weight:500">${escapeHtml(getOwnerName(a)||'—')}</div><div style="font-size:10px;color:#888">${a.ownerKind==='internal'?t('ownerKindInternal'):a.ownerKind==='partner'?t('ownerKindPartner'):''}</div></td>
-                    <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${a.ownerKind==='internal'?'#e8f0e8':'#faf0e0'};color:${a.ownerKind==='internal'?'#4a7c59':'#c47e2a'}">${stakeholder}</span></td>
-                    <td>${statusPill(a)}</td>
-                    <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:#999;margin-bottom:2px">${t('taskStartDate')}: ${fmtDate(a.startDate)}</div>` : ''}${fmtDate(a.dueDate)}${isCompleted(a) && a.completedDate ? `<div style="font-size:10px;color:#888;margin-top:2px">${t('colCompletedDate')}: ${fmtDate(a.completedDate)}</div>` : ''}</td>
-                    <td>${(() => { const _r = (isOpen(a) && delay > 0) ? getRiskLevel(delay) : null; const _days = delay > 0 ? `<span style="color:${isLate && delay>DELAY_THRESHOLD_DAYS?'var(--red)':'var(--amber)'};font-weight:${isLate?'500':'normal'}">${t('daysShort', delay)}</span>` : '—'; const _badge = _r ? ` <span class="badge-mini ${_r.cls}">${_r.label}</span>` : ''; return _days + _badge; })()}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-            `}
-            ${projMeetings.length > 0 ? `
-            <div style="margin-top:14px;font-weight:500;color:var(--accent-warm);font-size:12px">🗓 ${t('statMeetingsTotal')} (${projMeetings.length})</div>
-            <table class="rt" style="margin-top:6px;background:#fff">
-              <thead><tr>
-                <th>${t('colAgenda')}</th>
-                <th>${t('colStakeholder')}</th>
-                <th>${t('colStatus')}</th>
-                <th>${t('colDate')}</th>
-              </tr></thead>
-              <tbody>
-                ${[...projMeetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => `<tr>
-                  <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
-                  <td>${escapeHtml(partner ? partner.name : '—')}</td>
-                  <td>${statusPill(m)}</td>
-                  <td>${fmtDate(m.dueDate)}${m.meetingTime ? ` · ${fmtTime(m.meetingTime)}` : ''}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>` : ''}
           </div>
         `;
       }).join('')
