@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>نظام حوكمة الشركاء والمشاريع</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">a
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -1394,6 +1394,43 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .metric-label { color: var(--ink-muted); }
   .metric-value { font-weight: 600; font-family: 'Reem Kufi', serif; color: var(--ink); }
 
+  /* === Task node cards (collapsible, project detail) === */
+  .task-node {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .task-node.risk-red { border-inline-start: 4px solid var(--red); }
+  .task-node.risk-amber { border-inline-start: 4px solid var(--amber); }
+  .task-node.risk-crit { border-inline-start: 4px solid var(--crit); }
+  .task-node.risk-green { border-inline-start: 4px solid var(--green); }
+  .task-node-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; padding: 12px 14px; cursor: pointer;
+  }
+  .task-node-head:hover { background: #faf8f3; }
+  .task-node-title {
+    font-weight: 600; color: var(--ink); font-size: 14px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .task-node-meta {
+    font-size: 12px; color: var(--ink-muted); margin-top: 5px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .task-node-meta .date-current { font-weight: 500; }
+  .task-node-meta .date-original {
+    text-decoration: line-through; color: var(--ink-faint); font-size: 11px;
+  }
+  .task-node-body {
+    border-top: 1px solid var(--line);
+    padding: 12px 14px; background: #faf8f3;
+  }
+  .task-node-actions {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+  }
+
   /* === Subtask & extension (project detail page) === */
   .subtask-progress-bar {
     height: 5px; background: var(--line); border-radius: 3px;
@@ -2341,6 +2378,8 @@ const T = {
     healthWarning: 'يحتاج انتباه', healthCritical: 'حرج',
     noAnalyticsData: 'لا توجد بيانات كافية للتحليل',
     extensionCount: '{0} تمديد', extendedTasks: 'مهام مُدّدة',
+    driftLabel: 'انحراف', dueLabel: 'الاستحقاق', meetingDateLabel: 'التاريخ',
+    sectionTracking: 'سجل المتابعة', analyticsTitle: 'التحليلات',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
     fieldProjectName: 'اسم المشروع *', fieldPartner: 'الشريك *',
@@ -2990,6 +3029,8 @@ const T = {
     healthWarning: 'Needs Attention', healthCritical: 'Critical',
     noAnalyticsData: 'Not enough data for analysis',
     extensionCount: '{0} extensions', extendedTasks: 'Extended Tasks',
+    driftLabel: 'Drift', dueLabel: 'Due', meetingDateLabel: 'Date',
+    sectionTracking: 'Tracking Log', analyticsTitle: 'Analytics',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
     fieldProjectName: 'Project Name *', fieldPartner: 'Partner *',
@@ -4349,6 +4390,181 @@ function agreementWeight(project) {
 //  - importance: how much the project matters strategically (NOT lowered by poor execution)
 //  - health:     how well execution is going (milestones reached + partner commitment − delays)
 // Then focus = importance × risk, so important + struggling projects rise to the top.
+// ── Task Node Cards (collapsible) ──
+function renderTaskNode(a, expanded) {
+  const delay = getDelayDays(a);
+  const risk = getRiskLevel(delay);
+  const partner = getPartner(a.partnerId);
+  const project = getProject(a.projectId);
+  const meeting = isMeeting(a);
+  const subtasks = getSubtasks(a.id);
+  const prog = getSubtaskProgress(a.id);
+  const drift = getTaskDrift(a);
+  const wasExtended = (a.extensions || []).length > 0;
+  const isExp = expanded || (state.expandedTasks && state.expandedTasks[a.id]);
+  const riskCls = isMissed(a) ? 'risk-crit' : (isOpen(a) && delay > 0 ? 'risk-' + risk.cls : (isCompleted(a) ? 'risk-green' : ''));
+  const dateDisplay = wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
+    ? '<span class="date-original">' + fmtDate(a.originalDueDate) + '</span> <span class="date-current">→ ' + fmtDate(a.dueDate) + '</span>'
+    : '<span class="date-current">' + fmtDate(a.dueDate) + '</span>';
+  return '<div class="task-node ' + riskCls + '">' +
+    '<div class="task-node-head" onclick="toggleTaskNode(\'' + a.id + '\')">' +
+    '<div style="flex:1">' +
+    '<div class="task-node-title">' +
+    '<span style="color:var(--ink-faint);font-size:11px">' + (isExp ? '▼' : '▶') + '</span> ' +
+    (meeting ? '🗓 ' : '') + escapeHtml(a.title) +
+    (prog.total > 0 ? ' <span class="badge neutral" style="font-size:10px">' + t('subtaskProgress', prog.done, prog.total) + '</span>' : '') +
+    (drift > 0 ? ' <span class="drift-chip">+' + drift + ' ' + t('days') + '</span>' : '') +
+    '</div>' +
+    '<div class="task-node-meta">' +
+    '<span>📁 ' + escapeHtml(project ? project.name : '—') + '</span>' +
+    '<span>' + (meeting ? t('meetingDateLabel') : t('dueLabel')) + ': ' + dateDisplay + '</span>' +
+    (isOpen(a) && delay > 0 ? '<span style="color:var(--red)">⏰ ' + delay + ' ' + t('days') + '</span>' : '') +
+    '</div>' +
+    (prog.total > 0 ? '<div class="subtask-progress-bar"><div class="subtask-progress-fill" style="width:' + Math.round(prog.done / prog.total * 100) + '%"></div></div>' : '') +
+    '</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
+    statusBadge(a.status) + ' ' + priorityBadge(a.priority) +
+    (isOpen(a) && delay > 0 ? ' <span class="badge ' + risk.cls + '">' + risk.label + '</span>' : '') +
+    '</div></div>' +
+    (isExp ? renderTaskNodeBody(a, subtasks) : '') +
+    '</div>';
+}
+
+function renderTaskNodeBody(a, subtasks) {
+  const meeting = isMeeting(a);
+  const tracking = trackingFullDisplay(a);
+  const extensions = a.extensions || [];
+  return '<div class="task-node-body">' +
+    ((a.tracking || []).length > 0 ? '<div style="font-size:11px;color:var(--accent-warm);font-weight:500;margin-bottom:4px">📋 ' + t('sectionTracking') + '</div><div style="margin-bottom:10px">' + tracking + '</div>' : '') +
+    (extensions.length > 0 ? '<div class="extension-log"><div style="font-weight:500;color:var(--accent-warm);margin-bottom:4px">📅 ' + t('dueDateHistory') + ' (' + extensions.length + ')</div>' +
+      extensions.map(function(e) {
+        return '<div class="extension-log-item"><span style="color:#999">' + fmtTrackingDate(e.date) + '</span>' +
+          '<span>' + t('extendedFromTo', e.from ? fmtDate(e.from) : '—', fmtDate(e.to)) + '</span>' +
+          (e.days > 0 ? '<span class="drift-chip">+' + e.days + '</span>' : '') +
+          (e.source === 'subtask' ? '<span style="color:var(--accent-warm)">↳ ' + t('subtask') + '</span>' : '') +
+          (e.reason ? '<span style="color:var(--ink-muted)">— ' + escapeHtml(e.reason) + '</span>' : '') +
+          '</div>';
+      }).join('') + '</div>' : '') +
+    (!meeting && !a.parentId ? '<div style="margin-top:10px"><div style="font-size:11px;color:var(--accent-warm);font-weight:500;margin-bottom:4px">' + t('subtasks') + ' (' + subtasks.length + ')</div>' +
+      (subtasks.length === 0 ? '<div style="font-size:12px;color:var(--ink-faint);font-style:italic">' + t('noSubtasks') + '</div>' :
+        subtasks.sort(function(x, y) { return (x.dueDate || '').localeCompare(y.dueDate || ''); }).map(function(sub) {
+          var sDelay = getDelayDays(sub);
+          var sDrift = getTaskDrift(sub);
+          return '<div class="subtask-item ' + (isCompleted(sub) ? 'done' : '') + '">' +
+            '<div style="flex:1"><div class="subtask-name">' + escapeHtml(sub.title) + '</div>' +
+            '<div class="subtask-date">' + fmtDate(sub.dueDate) +
+            (isOpen(sub) && sDelay > 0 ? ' · <span style="color:var(--red)">+' + sDelay + ' ' + t('days') + '</span>' : '') +
+            (sDrift > 0 ? ' · <span class="drift-chip">+' + sDrift + '</span>' : '') +
+            ' · ' + statusBadge(sub.status) + '</div></div>' +
+            '<div style="display:flex;gap:4px">' +
+            (isOpen(sub) ? '<button class="row-btn" onclick="event.stopPropagation();completeAction(\'' + sub.id + '\')">' + t('completeBtn') + '</button>' : '') +
+            (isOpen(sub) ? '<button class="row-btn" onclick="event.stopPropagation();showExtendDialog(\'' + sub.id + '\')">📅</button>' : '') +
+            '<button class="row-btn" onclick="event.stopPropagation();showActionForm(\'' + sub.id + '\')">' + t('edit') + '</button>' +
+            '<button class="row-btn danger" onclick="event.stopPropagation();deleteAction(\'' + sub.id + '\')">' + t('delete') + '</button>' +
+            '</div></div>';
+        }).join('')) + '</div>' : '') +
+    '<div class="task-node-actions">' +
+    (isOpen(a) ? '<button class="btn sm" onclick="event.stopPropagation();completeAction(\'' + a.id + '\')">✓ ' + t('completeBtn') + '</button>' : '') +
+    (isOpen(a) && !meeting ? '<button class="btn ghost sm" onclick="event.stopPropagation();showExtendDialog(\'' + a.id + '\')">📅 ' + t('extendDueDate') + '</button>' : '') +
+    (!meeting && !a.parentId ? '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(null,\'' + a.projectId + '\',null,\'task\',null,\'' + a.id + '\')">' + t('addSubtask') + '</button>' : '') +
+    '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(\'' + a.id + '\')">' + t('edit') + '</button>' +
+    '<button class="btn ghost sm" onclick="event.stopPropagation();deleteAction(\'' + a.id + '\')">' + t('delete') + '</button>' +
+    '</div></div>';
+}
+
+function toggleTaskNode(id) {
+  if (!state.expandedTasks) state.expandedTasks = {};
+  state.expandedTasks[id] = !state.expandedTasks[id];
+  render(undefined, { preserveScroll: true });
+}
+
+// ── Report rendering functions ──
+function sectionDivider(label) {
+  return '<div class="section-divider"><span class="sd-label">' + label + '</span><span class="sd-line"></span></div>';
+}
+
+function renderReportProjectAnalytics(projectId) {
+  var sCurve = computeSCurve(projectId);
+  var drift = computeDriftAnalysis(projectId);
+  if (drift.total === 0) return '';
+  var barColor = function(pct) { return pct >= 75 ? '#5a7847' : pct >= 50 ? '#c99548' : '#b94a3e'; };
+  return '<div class="rep-analytics">' +
+    '<div class="rep-panel"><h4>' + t('sCurveTitle') + '</h4><div class="psub">' + t('sCurveSubtitle') + '</div>' + renderSCurveSVG(sCurve) + '</div>' +
+    '<div class="rep-panel"><h4>' + t('driftAnalysisTitle') + '</h4><div class="psub">' + t('driftAnalysisSubtitle') + '</div>' +
+    '<div class="rep-metric"><span class="rm-label">' + t('completionRate') + '</span><span class="rm-value">' + drift.completionRate + '%</span></div>' +
+    '<div class="rep-bar-track"><div class="rep-bar-fill" style="width:' + drift.completionRate + '%;background:' + barColor(drift.completionRate) + '"></div></div>' +
+    '<div class="rep-metric" style="margin-top:8px"><span class="rm-label">' + t('onTimeRate') + '</span><span class="rm-value">' + drift.onTimeRate + '%</span></div>' +
+    '<div class="rep-bar-track"><div class="rep-bar-fill" style="width:' + drift.onTimeRate + '%;background:' + barColor(drift.onTimeRate) + '"></div></div>' +
+    '<div class="rep-metric" style="margin-top:8px"><span class="rm-label">' + t('avgDrift') + '</span><span class="rm-value">' + drift.avgDrift + ' ' + t('days') + '</span></div>' +
+    '<div class="rep-metric"><span class="rm-label">' + t('totalDrift') + '</span><span class="rm-value">' + drift.totalDrift + ' ' + t('days') + '</span></div>' +
+    '<div class="rep-metric"><span class="rm-label">' + t('extendedTasks') + '</span><span class="rm-value">' + drift.extended + '/' + drift.total + '</span></div>' +
+    (drift.mostDelayed ? '<div class="rep-metric"><span class="rm-label">' + t('mostDelayed') + '</span><span class="rm-value" style="font-size:10px;max-width:150px;text-align:end;font-weight:500">' + escapeHtml(drift.mostDelayed.title) + ' <span style="color:var(--red)">+' + drift.maxDrift + '</span></span></div>' : '') +
+    '</div></div>';
+}
+
+function renderReportTracking(action) {
+  var list = (action.tracking || []).slice().sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+  if (list.length === 0) return '';
+  return '<div class="tl-tracking">' +
+    list.map(function(e, i) {
+      return '<div class="tlt-item"><span class="tlt-num">' + (i + 1) + '.</span><span class="tlt-date">' + fmtTrackingDate(e.date) + '</span><span class="tlt-text">' + escapeHtml(e.text) + '</span></div>';
+    }).join('') + '</div>';
+}
+
+function renderReportExtensions(action) {
+  var exts = (action.extensions || []);
+  if (exts.length === 0) return '';
+  return '<div class="ext-log-inline">' +
+    exts.map(function(ex) {
+      return '<div class="eli-item">📅 ' + fmtDate(ex.from) + ' → ' + fmtDate(ex.to) + ' <span style="color:var(--red)">+' + ex.days + ' ' + t('days') + '</span>' + (ex.reason ? ' · ' + escapeHtml(ex.reason) : '') + '</div>';
+    }).join('') + '</div>';
+}
+
+function renderReportTaskLine(action, opts) {
+  opts = opts || {};
+  var delay = getDelayDays(action);
+  var isLate = isOpen(action) && delay > 0;
+  var done = isCompleted(action);
+  var hasExtension = (action.extensions || []).length > 0;
+  var classes = ['task-line'];
+  if (opts.isMain) classes.push('tl-main');
+  if (isLate) classes.push('tl-late');
+  else if (done) classes.push('tl-done');
+  var dateDisplay;
+  if (hasExtension && action.originalDueDate && action.originalDueDate !== action.dueDate) {
+    dateDisplay = '<span class="old-date">' + fmtDate(action.originalDueDate) + '</span><span class="new-date">' + fmtDate(action.dueDate) + '</span>';
+  } else {
+    dateDisplay = fmtDate(action.dueDate);
+  }
+  var prioMap = { high: t('priorityHigh'), medium: t('priorityMedium'), low: t('priorityLow') };
+  var prio = action.priority || 'medium';
+  var subtasks = getSubtasks(action.id);
+  if (opts.openOnly) subtasks = subtasks.filter(isOpen);
+  return '<div class="' + classes.join(' ') + '">' +
+    '<div class="task-line-head"><div style="flex:1">' +
+    '<div class="task-line-title">' + (isMeeting(action) ? '🗓 ' : '') + escapeHtml(action.title) + '</div>' +
+    '<div class="task-line-sub">' +
+    '<span class="tls-date">📅 ' + dateDisplay + '</span>' +
+    (!isMeeting(action) ? '<span class="prio-tag ' + prio + '">' + prioMap[prio] + '</span>' : '') +
+    (isLate ? '<span style="color:var(--red);font-weight:600">' + t('daysShort', delay) + '</span>' : '') +
+    (done && action.completedDate ? '<span style="color:var(--green)">✓ ' + fmtDate(action.completedDate) + '</span>' : '') +
+    (getTaskDrift(action) > 0 ? '<span style="color:var(--amber)">' + t('driftLabel') + ': +' + getTaskDrift(action) + '</span>' : '') +
+    '</div></div>' +
+    '<div>' + statusBadgeMini(action.status) + '</div></div>' +
+    renderReportExtensions(action) +
+    renderReportTracking(action) +
+    (subtasks.length > 0 ? '<div class="tl-subtasks">' +
+      subtasks.map(function(sub) {
+        var sDelay = getDelayDays(sub);
+        var sLate = isOpen(sub) && sDelay > 0;
+        return '<div class="tl-subtask"><span class="tls-title">' + (isCompleted(sub) ? '✓ ' : '◦ ') + escapeHtml(sub.title) + '</span>' +
+          '<span style="white-space:nowrap;color:var(--ink-faint)">' + fmtDate(sub.dueDate) +
+          (sLate ? ' <span style="color:var(--red);font-weight:600"> · ' + t('daysShort', sDelay) + '</span>' : '') +
+          ' ' + statusBadgeMini(sub.status) + '</span></div>';
+      }).join('') + '</div>' : '') +
+    '</div>';
+}
+
 // ── Project Drift Analysis (Feature #4) ──
 function getProjectDrift(projectId) {
   const tasks = state.actions.filter(a => a.projectId === projectId && !isMeeting(a));
@@ -6223,6 +6439,9 @@ views.projectDetail = (projectId) => {
   const projectMeetings = actions.filter(isMeeting);
   const open = tasks.filter(isOpen);
   const completed = tasks.filter(isCompleted);
+  const mainTasks = getProjectMainTasks(projectId);
+  const openMainTasks = mainTasks.filter(isOpen);
+  const completedMainTasks = mainTasks.filter(isCompleted);
   const attachments = p.attachments || [];
   const score = getProjectScore(projectId);
 
@@ -6357,34 +6576,19 @@ views.projectDetail = (projectId) => {
 
     <div class="section">
       <div class="section-head">
-        <div class="section-title">${t('sectionOpenActions')} (${open.length})<span class="accent-line"></span></div>
+        <div class="section-title">${t('sectionOpenActions')} (${openMainTasks.length})<span class="accent-line"></span></div>
         <button class="btn sm" onclick="showActionForm(null,'${p.id}')">${t('addAction')}</button>
       </div>
-      ${open.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
-        open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderActionCard(a, {showEdit:true})).join('')}
+      ${openMainTasks.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
+        openMainTasks.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderTaskNode(a, false)).join('')}
     </div>
 
-    ${completed.length > 0 ? `
+    ${completedMainTasks.length > 0 ? `
       <div class="section">
         <div class="section-head">
-          <div class="section-title">${t('sectionCompletedActions')} (${completed.length})<span class="accent-line"></span></div>
+          <div class="section-title">${t('sectionCompletedActions')} (${completedMainTasks.length})<span class="accent-line"></span></div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>${t('colAction')}</th><th>${t('colDate')}</th><th>${t('colCompletedDate')}</th><th>${t('colDelay')}</th></tr></thead>
-            <tbody>
-              ${completed.slice(0, 10).map(a => {
-                const d = getDelayDays(a);
-                return `<tr id="actcard-${a.id}" class="completed-row">
-                  <td><div class="name">${isMeeting(a) ? '🗓 ' : ''}${escapeHtml(a.title)}</div></td>
-                  <td>${!isMeeting(a) && a.startDate ? `<div style="font-size:10px;color:var(--ink-faint)">${t("taskStartDate")}: ${fmtDate(a.startDate)}</div>` : ""}${fmtDate(a.dueDate)}</td>
-                  <td>${fmtDate(a.completedDate)}</td>
-                  <td>${d > 0 ? `<span class="badge ${d>DELAY_THRESHOLD_DAYS?'amber':'neutral'}">${t('daysShort', d)}</span>` : `<span class="badge green">${t('onTime')}</span>`}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+        ${completedMainTasks.slice(0, 15).map(a => renderTaskNode(a, false)).join('')}
       </div>
     ` : ''}
 
@@ -8966,6 +9170,87 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .badge-mini.green { background: #e3edd6; color: var(--green); border-color: rgba(90,120,71,0.2); }
       .badge-mini.crit { background: #f5d5d0; color: var(--crit); border-color: rgba(138,44,32,0.3); }
 
+      /* Report analytics */
+      .rep-analytics {
+        display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px;
+        margin-bottom: 18px; align-items: start;
+      }
+      @media (max-width: 640px) { .rep-analytics { grid-template-columns: 1fr; } }
+      .rep-panel {
+        border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+        background: #fff;
+      }
+      .rep-panel h4 {
+        font-family: 'Reem Kufi', serif; font-size: 13px; color: var(--accent);
+        margin: 0 0 2px;
+      }
+      .rep-panel .psub { font-size: 10px; color: var(--ink-faint); margin-bottom: 10px; }
+      .rep-metric {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 12px;
+      }
+      .rep-metric:last-child { border-bottom: none; }
+      .rep-metric .rm-label { color: var(--ink-muted); }
+      .rep-metric .rm-value { font-weight: 600; font-family: 'Reem Kufi', serif; color: var(--accent); }
+      .rep-bar-track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+      .rep-bar-fill { height: 100%; border-radius: 3px; }
+
+      /* Report task lines */
+      .task-line {
+        border: 1px solid var(--line); border-radius: 7px;
+        padding: 11px 14px; margin-bottom: 8px; background: #fff;
+        page-break-inside: avoid;
+      }
+      .task-line.tl-main { border-inline-start: 3px solid var(--accent); }
+      .task-line.tl-late { background: #fdf3f1; border-color: #f0ccc6; }
+      .task-line.tl-done { background: #f4f8ef; }
+      .task-line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .task-line-title { font-weight: 600; font-size: 13px; color: var(--ink); }
+      .task-line-sub {
+        display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;
+        font-size: 11px; color: var(--ink-muted);
+      }
+      .task-line-sub .tls-date .old-date {
+        text-decoration: line-through; color: var(--ink-faint); margin-inline-end: 5px;
+      }
+      .task-line-sub .tls-date .new-date { color: var(--red); font-weight: 600; }
+      .tl-tracking {
+        margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line);
+      }
+      .tl-tracking .tlt-item {
+        display: flex; gap: 8px; padding: 3px 0; font-size: 11px; align-items: baseline;
+      }
+      .tl-tracking .tlt-num { font-family: 'Reem Kufi', serif; color: var(--accent-warm); font-size: 10px; min-width: 16px; }
+      .tl-tracking .tlt-date { color: var(--ink-faint); font-size: 10px; min-width: 76px; }
+      .tl-tracking .tlt-text { color: var(--ink); line-height: 1.5; }
+      .tl-subtasks { margin: 8px 0 0; padding-inline-start: 16px; border-inline-start: 2px solid var(--line); }
+      .tl-subtask {
+        padding: 6px 0; font-size: 11px; display: flex;
+        justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line);
+      }
+      .tl-subtask:last-child { border-bottom: none; }
+      .tl-subtask .tls-title { color: var(--ink); }
+      .ext-log-inline {
+        margin-top: 6px; font-size: 10px; color: var(--ink-faint);
+        background: #faf8f3; padding: 6px 10px; border-radius: 5px;
+      }
+      .ext-log-inline .eli-item { padding: 2px 0; }
+      .empty-note { color: var(--ink-faint); font-size: 12px; text-align: center; padding: 14px; font-style: italic; }
+      .section-divider {
+        display: flex; align-items: center; gap: 10px; margin: 20px 0 12px;
+      }
+      .section-divider .sd-label {
+        font-family: 'Reem Kufi', serif; font-size: 13px; color: var(--accent-warm);
+        white-space: nowrap; font-weight: 500;
+      }
+      .section-divider .sd-line { flex: 1; height: 1px; background: var(--line); }
+      .prio-tag {
+        display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 500;
+      }
+      .prio-tag.high { background: #fae0de; color: var(--red); }
+      .prio-tag.medium { background: #fdf4d9; color: var(--amber); }
+      .prio-tag.low { background: #eef1e9; color: var(--green); }
+
       /* Suspended project indicators */
       .badge-suspended {
         display: inline-block; padding: 2px 9px; border-radius: 10px;
@@ -9628,6 +9913,11 @@ function printProjectReport(projectId, existingEntry) {
       <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
       <div class="stat-cell"><div class="v" style="color:var(--red)">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
     </div>
+
+    ${renderReportProjectAnalytics(projectId) ? `
+      ${sectionDivider(t('analyticsTitle') || t('driftAnalysisTitle'))}
+      ${renderReportProjectAnalytics(projectId)}
+    ` : ''}
 
     <h2>${t('reportTasksByStatus')}</h2>
     ${tasks.length > 0 ? `
