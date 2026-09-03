@@ -1477,6 +1477,11 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
     font-size: 11px; color: var(--ink-muted);
   }
   .extension-log-item { display: flex; gap: 8px; padding: 2px 0; flex-wrap: wrap; }
+  .resp-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; color: var(--ink-muted);
+  }
+  .resp-team { color: var(--ink-faint); font-size: 10px; }
   .drift-chip {
     display: inline-block; padding: 1px 7px; border-radius: 8px;
     font-size: 10px; background: #fae0de; color: var(--red);
@@ -1977,6 +1982,7 @@ const T = {
     reportPeriodWeek: 'تقرير أسبوعي (آخر 7 أيام)',
     reportPeriodMonth: 'تقرير شهري (آخر 30 يوم)',
     reportPeriodAll: 'تقرير شامل',
+    reportPeriodOpenTasks: '📄 المهام المفتوحة الآن',
     reportRange: 'من {0} إلى {1}',
     statTotalInPeriod: 'إجمالي المهام',
     statCompletedInPeriod: 'منجزة',
@@ -2060,8 +2066,8 @@ const T = {
     stakeholderInternal: 'الفريق الداخلي',
     stakeholderPartner: 'شريك: {0}',
     stakeholderUnassigned: 'غير مُعيَّن',
-    internalReport: 'تقرير داخلي',
-    partnerFacingReport: 'تقرير للشريك',
+    internalReport: 'التقرير الداخلي (كامل)',
+    partnerFacingReport: 'ملخص للشريك',
     linkName: 'اسم الرابط',
     linkUrl: 'الرابط (URL)',
     linkDescription: 'وصف (اختياري)',
@@ -2151,6 +2157,10 @@ const T = {
     delayCauseLabel: 'سبب التأخير',
     onTrackLabel: 'على المسار',
     notRatedLabel: 'لم يُقيّم بعد',
+    trendImproving: 'في تحسّن', trendDeclining: 'في تراجع',
+    meetingReliabilityLabel: 'موثوقية الحضور',
+    scoreBreakdownTooltip: 'المهام: {0}/100 · الاجتماعات: {1}/100 (تشكل الاجتماعات 20٪ من النتيجة)',
+    scoreBreakdownTasksOnly: 'المهام: {0}/100 (لا توجد اجتماعات كافية بعد لحسابها)',
     colOwnerNote: 'المسؤول',
     optMilestone: '🎯 معلم رئيسي',
     milestoneBadge: '🎯 معلم',
@@ -2359,6 +2369,10 @@ const T = {
     reportCompletedTasks: 'المنجزة',
     reportOpenTasks: 'المفتوحة',
     reportDelayedTasks: 'المتأخرة',
+    reportMeetingsHeld: 'الاجتماعات المعقودة',
+    exportOpenTasksReport: '📄 تقرير المهام المفتوحة',
+    openTasksReportTitle: 'تقرير المهام المفتوحة',
+    priorityOrderedNote: 'مرتّبة حسب الأولوية والتأخر',
     reportMeetings: 'الاجتماعات',
     meetingsScheduled: 'اجتماعات مجدولة',
     meetingsConducted: 'اجتماعات منعقدة',
@@ -2386,6 +2400,7 @@ const T = {
     suspendProject: '⏸ تعليق المشروع', resumeProject: '▶ استئناف المشروع',
     subtasks: 'المهام الفرعية', subtask: 'مهمة فرعية', addSubtask: '＋ مهمة فرعية',
     parentTask: 'المهمة الأم', noSubtasks: 'لا توجد مهام فرعية',
+    subtasksOverdue: '{0} فرعية متأخرة',
     subtaskProgress: '{0} من {1} منجزة',
     originalDueDate: 'التاريخ الأصلي', currentDueDate: 'التاريخ الحالي',
     dueDateHistory: 'سجل التمديدات', extendDueDate: 'تمديد التاريخ',
@@ -2406,6 +2421,10 @@ const T = {
     extensionCount: '{0} تمديد', extendedTasks: 'مهام مُدّدة',
     driftLabel: 'انحراف', dueLabel: 'الاستحقاق', meetingDateLabel: 'التاريخ',
     reportProjectHeader: 'تفاصيل المهام', projectsCovered: 'يشمل {0} مشروع',
+    sectionOurTasks: 'مهامنا (الفريق الداخلي)', sectionPartnerTasks: 'مهام الشريك',
+    additionalComments: 'ملاحظات إضافية',
+    commentsEditableHint: 'يمكنك الكتابة هنا مباشرة قبل الطباعة',
+    commentsPlaceholder: 'اكتب ملاحظاتك هنا...',
     calendar: 'التقويم', calendarTitle: 'تقويم المهام', calendarSub: 'اضغط على أي يوم لعرض مهامه', calendarGoToday: '📍 اليوم', tasksOnDay: 'مهام يوم {0}', noTasksOnDay: 'لا توجد مهام في هذا اليوم', selectDayHint: 'اضغط على أي يوم في التقويم لعرض المهام',
     sectionTracking: 'سجل المتابعة', analyticsTitle: 'التحليلات',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
@@ -2437,6 +2456,7 @@ const T = {
     optMeetingPostpone: '⏭ تأجيل لتاريخ آخر',
     postponeMeeting: 'تأجيل الاجتماع', fieldNewDate: 'التاريخ الجديد *',
     fieldNewTime: 'الوقت الجديد', fieldPostponeReason: 'سبب التأجيل',
+    fieldPostponedBy: 'من قام بالتأجيل؟', postponedByPartner: 'الشريك', postponedByUs: 'نحن',
     confirmPostponeBtn: 'تأكيد التأجيل', backBtn: 'رجوع',
     optionalPlaceholder: 'اختياري...',
     // New meeting fields (participants / notes / link / linked deliverable)
@@ -2630,6 +2650,7 @@ const T = {
     reportPeriodWeek: 'Weekly Report (last 7 days)',
     reportPeriodMonth: 'Monthly Report (last 30 days)',
     reportPeriodAll: 'Comprehensive Report',
+    reportPeriodOpenTasks: '📄 Open Tasks (current)',
     reportRange: 'From {0} to {1}',
     statTotalInPeriod: 'Total Tasks',
     statCompletedInPeriod: 'Completed',
@@ -2713,8 +2734,8 @@ const T = {
     stakeholderInternal: 'Internal Team',
     stakeholderPartner: 'Partner: {0}',
     stakeholderUnassigned: 'Unassigned',
-    internalReport: 'Internal Report',
-    partnerFacingReport: 'Partner Report',
+    internalReport: 'Internal Report (Full)',
+    partnerFacingReport: 'Summary for Partner',
     linkName: 'Link Name',
     linkUrl: 'URL',
     linkDescription: 'Description (optional)',
@@ -2804,6 +2825,10 @@ const T = {
     delayCauseLabel: 'Delay cause',
     onTrackLabel: 'On track',
     notRatedLabel: 'Not rated yet',
+    trendImproving: 'Improving', trendDeclining: 'Declining',
+    meetingReliabilityLabel: 'Meeting Attendance',
+    scoreBreakdownTooltip: 'Tasks: {0}/100 · Meetings: {1}/100 (meetings count for 20% of the score)',
+    scoreBreakdownTasksOnly: 'Tasks: {0}/100 (not enough meetings yet to factor in)',
     colOwnerNote: 'Owner',
     optMilestone: '🎯 Milestone',
     milestoneBadge: '🎯 Milestone',
@@ -3012,6 +3037,10 @@ const T = {
     reportCompletedTasks: 'Completed',
     reportOpenTasks: 'Open',
     reportDelayedTasks: 'Delayed',
+    reportMeetingsHeld: 'Meetings Held',
+    exportOpenTasksReport: '📄 Open Tasks Report',
+    openTasksReportTitle: 'Open Tasks Report',
+    priorityOrderedNote: 'Ordered by priority then delay',
     reportMeetings: 'Meetings',
     meetingsScheduled: 'Meetings Scheduled',
     meetingsConducted: 'Meetings Conducted',
@@ -3039,6 +3068,7 @@ const T = {
     suspendProject: '⏸ Suspend Project', resumeProject: '▶ Resume Project',
     subtasks: 'Subtasks', subtask: 'Subtask', addSubtask: '＋ Subtask',
     parentTask: 'Parent Task', noSubtasks: 'No subtasks',
+    subtasksOverdue: '{0} subtasks overdue',
     subtaskProgress: '{0} of {1} done',
     originalDueDate: 'Original Date', currentDueDate: 'Current Date',
     dueDateHistory: 'Extension History', extendDueDate: 'Extend Date',
@@ -3059,6 +3089,10 @@ const T = {
     extensionCount: '{0} extensions', extendedTasks: 'Extended Tasks',
     driftLabel: 'Drift', dueLabel: 'Due', meetingDateLabel: 'Date',
     reportProjectHeader: 'Task Details', projectsCovered: 'Covering {0} projects',
+    sectionOurTasks: 'Our Tasks (Internal Team)', sectionPartnerTasks: 'Partner Tasks',
+    additionalComments: 'Additional Comments',
+    commentsEditableHint: 'Click and type here directly before printing',
+    commentsPlaceholder: 'Type your notes here...',
     calendar: 'Calendar', calendarTitle: 'Task Calendar', calendarSub: 'Click any day to see its tasks', calendarGoToday: '📍 Today', tasksOnDay: 'Tasks on {0}', noTasksOnDay: 'No tasks on this day', selectDayHint: 'Click any day in the calendar to see tasks',
     sectionTracking: 'Tracking Log', analyticsTitle: 'Analytics',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
@@ -3090,6 +3124,7 @@ const T = {
     optMeetingPostpone: '⏭ Postpone to another date',
     postponeMeeting: 'Postpone Meeting', fieldNewDate: 'New Date *',
     fieldNewTime: 'New Time', fieldPostponeReason: 'Postpone Reason',
+    fieldPostponedBy: 'Who postponed this?', postponedByPartner: 'Partner', postponedByUs: 'Us',
     confirmPostponeBtn: 'Confirm Postpone', backBtn: 'Back',
     optionalPlaceholder: 'Optional...',
     // New meeting fields (participants / notes / link / linked deliverable)
@@ -3538,6 +3573,9 @@ function applyDataMigrations() {
           if (a.parentId === undefined) a.parentId = null;
           if (a.originalDueDate === undefined) a.originalDueDate = a.dueDate || null;
           if (!Array.isArray(a.extensions)) a.extensions = [];
+          // Migration: meeting postponement attribution array (no historical guessing —
+          // meeting reliability scoring only applies to meetings from MEETING_RELIABILITY_START_DATE onward).
+          if (!Array.isArray(a.postponements)) a.postponements = [];
           // NEW: task startDate migration
           if (!a.startDate) {
             const proj = state.projects.find(pr => pr.id === a.projectId);
@@ -4105,6 +4143,57 @@ function getCriticalThreshold() {
 }
 
 // Calculate partner importance score
+// Meeting reliability = OBJECTIVE measure of whether the partner shows up for
+// scheduled meetings. A meeting we postponed is EXCLUDED (not the partner's fault).
+// A meeting the partner postponed gets partial credit — rescheduling isn't as
+// bad as ghosting, but it's not free either.
+// ONLY applies from this rollout date forward — we have no reliable "who postponed
+// this" attribution for meetings before this, so old meetings are never guessed at
+// and simply don't participate in this score at all (evaluated as if they don't exist).
+const MEETING_RELIABILITY_START_DATE = '2026-09-01';
+function getPartnerMeetingReliability(partnerId) {
+  const meetings = state.actions.filter(a =>
+    a.partnerId === partnerId && isMeeting(a) &&
+    (a.dueDate || '') >= MEETING_RELIABILITY_START_DATE);
+
+  function meetingPoints(m) {
+    if (isCompleted(m)) return 100;
+    if (isMissed(m)) return 0;
+    if (m.status === 'postponed') {
+      if (m.lastPostponedBy === 'us') return null; // never the partner's fault
+      if (!m.lastPostponedBy) return null; // no attribution recorded — don't guess, exclude
+      return 60; // postponed by partner — partial credit
+    }
+    return null; // still scheduled / not yet due — not evaluable
+  }
+
+  function resolvedDate(m) {
+    if (isCompleted(m) || isMissed(m)) return m.completedDate || m.dueDate || todayDate();
+    return todayDate();
+  }
+  function recencyWeight(m) {
+    const days = daysBetween(resolvedDate(m), todayDate());
+    if (days <= 30) return 3;
+    if (days <= 90) return 2;
+    if (days <= 180) return 1;
+    return 0.5;
+  }
+
+  const evaluable = meetings.filter(m => meetingPoints(m) !== null);
+  if (evaluable.length === 0) return { score: null, total: meetings.length };
+
+  const weightedSum = evaluable.reduce((s, m) => s + meetingPoints(m) * recencyWeight(m), 0);
+  const totalWeight = evaluable.reduce((s, m) => s + recencyWeight(m), 0);
+  const pct = Math.max(0, Math.min(100, Math.round(weightedSum / totalWeight)));
+
+  const recentEvaluable = evaluable.filter(m => daysBetween(resolvedDate(m), todayDate()) <= 90);
+  const recentPct = recentEvaluable.length >= 2
+    ? Math.round(recentEvaluable.reduce((s, m) => s + meetingPoints(m), 0) / recentEvaluable.length)
+    : null;
+
+  return { score: pct, recentScore: recentPct, total: meetings.length, evaluableCount: evaluable.length };
+}
+
 function getPartnerCommitment(partnerId) {
   // Commitment = an OBJECTIVE measure of how reliably the partner delivers on
   // tasks that have actually come DUE. Key principles:
@@ -4113,6 +4202,13 @@ function getPartnerCommitment(partnerId) {
   //   - Upcoming tasks (open, not yet past due) are NOT yet evaluable — they never
   //     count for or against the partner, so a brand-new upcoming task does not
   //     produce an arbitrary mid score.
+  //   - RECENCY WEIGHTED: recent behavior counts more than old history, so a
+  //     partner who has genuinely improved (or slipped) sees that reflected
+  //     within weeks rather than being stuck under a lifetime average forever.
+  //     The weight is anchored to the task's own resolved date (completedDate,
+  //     or "today" for a still-open overdue task) — NEVER to when the record
+  //     was edited in the system. Backdating a completion to its true date is
+  //     always respected exactly as entered.
   const relevant = state.actions.filter(a =>
     a.partnerId === partnerId && isTask(a) && !isInternalOwned(a));
 
@@ -4127,7 +4223,7 @@ function getPartnerCommitment(partnerId) {
   const lateItems = openDelayed.concat(completedLate);
   const avgDelay = lateItems.length ? Math.round(lateItems.reduce((s,a)=>s+getDelayDays(a),0)/lateItems.length) : 0;
 
-  // Objective weighted average over evaluable tasks. Per-task points (delay = BUSINESS days):
+  // Objective points per task (delay = BUSINESS days):
   //   on-time completion (≤0)        = 100
   //   late completion 1–3 days       = 70
   //   late completion 4–7 days       = 50
@@ -4152,18 +4248,60 @@ function getPartnerCommitment(partnerId) {
     return null;
   }
 
-  const evaluable = relevant.map(taskCommitmentPoints).filter(pts => pts !== null);
+  // The date a task should be judged "as of" — its own resolved date, never edit time.
+  function resolvedDate(a) {
+    if (isCompleted(a)) return a.completedDate || a.dueDate || todayDate();
+    return todayDate(); // still-open overdue task: judged as of today, every day, until resolved
+  }
 
-  if (evaluable.length === 0) {
+  // Recency weight: recent tasks influence the score far more than old ones.
+  function recencyWeight(a) {
+    const days = daysBetween(resolvedDate(a), todayDate());
+    if (days <= 30) return 3;
+    if (days <= 90) return 2;
+    if (days <= 180) return 1;
+    return 0.5;
+  }
+
+  const evaluableTasks = relevant.filter(a => taskCommitmentPoints(a) !== null);
+
+  if (evaluableTasks.length === 0) {
     // Nothing has come due yet → cannot fairly rate (e.g. only upcoming tasks).
-    return { score: null, level: 'na', label: t('notRatedLabel'),
+    return { score: null, level: 'na', label: t('notRatedLabel'), trend: null,
              completed: completed.length, completedOnTime: completedOnTime.length,
              open: open.length, delayed: openDelayed.length, missed: missed.length,
              avgDelay, total: relevant.length };
   }
 
-  let pct = Math.round(evaluable.reduce((s, p) => s + p, 0) / evaluable.length);
+  // Lifetime score: recency-weighted average over ALL evaluable tasks.
+  const weightedSum = evaluableTasks.reduce((s, a) => s + taskCommitmentPoints(a) * recencyWeight(a), 0);
+  const totalWeight = evaluableTasks.reduce((s, a) => s + recencyWeight(a), 0);
+  let taskPct = Math.round(weightedSum / totalWeight);
+  taskPct = Math.max(0, Math.min(100, taskPct));
+
+  // Blend in meeting reliability at 20% — only when the partner has evaluable meetings.
+  // Tasks remain the dominant signal (deliverables > attendance).
+  const meetingRel = getPartnerMeetingReliability(partnerId);
+  const MEETING_WEIGHT = 0.2;
+  let pct = (meetingRel.score !== null)
+    ? Math.round(taskPct * (1 - MEETING_WEIGHT) + meetingRel.score * MEETING_WEIGHT)
+    : taskPct;
   pct = Math.max(0, Math.min(100, pct));
+
+  // Trend: compare a "recent only" score (last 90 days) against the lifetime score.
+  // Needs a minimum sample size in the recent window to avoid noisy single-task swings.
+  const recentTasks = evaluableTasks.filter(a => daysBetween(resolvedDate(a), todayDate()) <= 90);
+  let trend = null;
+  if (recentTasks.length >= 2) {
+    let recentAvg = Math.round(recentTasks.reduce((s, a) => s + taskCommitmentPoints(a), 0) / recentTasks.length);
+    if (meetingRel.recentScore !== null) {
+      recentAvg = Math.round(recentAvg * (1 - MEETING_WEIGHT) + meetingRel.recentScore * MEETING_WEIGHT);
+    }
+    const diff = recentAvg - pct;
+    if (diff >= 8) trend = { dir: 'up', diff, recentAvg };
+    else if (diff <= -8) trend = { dir: 'down', diff, recentAvg };
+    else trend = { dir: 'flat', diff, recentAvg };
+  }
 
   let level, label;
   if (pct >= IMPORTANCE_CONFIG.commitment.highThreshold) { level = 'high'; label = t('importanceHigh'); }
@@ -4171,7 +4309,7 @@ function getPartnerCommitment(partnerId) {
   else { level = 'low'; label = t('importanceLow'); }
 
   return {
-    score: pct, rawScore: pct, level, label,
+    score: pct, rawScore: pct, level, label, trend, meetingReliability: meetingRel.score, taskScore: taskPct,
     total: relevant.length, completed: completed.length,
     completedOnTime: completedOnTime.length, open: open.length,
     delayed: openDelayed.length, missed: missed.length, avgDelay
@@ -4181,6 +4319,14 @@ function getPartnerCommitment(partnerId) {
 // Display helpers for the (possibly null) commitment score
 function commitmentScoreText(c) { return c.score === null ? '—' : (c.score + ''); }
 function commitmentBarWidth(c) { return c.score === null ? 0 : c.score; }
+function commitmentTrendTag(c) {
+  if (!c || !c.trend || c.trend.dir === 'flat') return '';
+  const up = c.trend.dir === 'up';
+  const color = up ? 'var(--green)' : 'var(--red)';
+  const arrow = up ? '↑' : '↓';
+  const label = up ? t('trendImproving') : t('trendDeclining');
+  return '<span style="color:' + color + ';font-size:11px;font-weight:600" title="' + escapeHtml(label) + '">' + arrow + ' ' + label + '</span>';
+}
 function commitmentBadgeClass(level) {
   return level === 'high' ? 'green' : level === 'mid' ? 'amber' : level === 'na' ? 'custom-type' : 'red';
 }
@@ -4416,6 +4562,27 @@ function agreementWeight(project) {
 //  - importance: how much the project matters strategically (NOT lowered by poor execution)
 //  - health:     how well execution is going (milestones reached + partner commitment − delays)
 // Then focus = importance × risk, so important + struggling projects rise to the top.
+// ── Responsible person + team tag (consistent across Tasks tab, cards, and reports) ──
+function responsibleTag(task) {
+  if (isMeeting(task)) return '';
+  const personName = getOwnerName(task);
+  const teamName = getTaskStakeholderName(task);
+  if (!personName && (!teamName || teamName === '—')) return '';
+  const icon = task.ownerKind === 'internal' ? '🧑‍💼' : '🤝';
+  if (personName) {
+    return '<span class="resp-tag">' + icon + ' ' + escapeHtml(personName) + ' <span class="resp-team">(' + escapeHtml(teamName) + ')</span></span>';
+  }
+  return '<span class="resp-tag">' + icon + ' ' + escapeHtml(teamName) + '</span>';
+}
+function responsibleTagPlain(task) {
+  if (isMeeting(task)) return '';
+  const personName = getOwnerName(task);
+  const teamName = getTaskStakeholderName(task);
+  if (!personName && (!teamName || teamName === '—')) return '';
+  const icon = task.ownerKind === 'internal' ? '🧑‍💼' : '🤝';
+  return personName ? (icon + ' ' + personName + ' (' + teamName + ')') : (icon + ' ' + teamName);
+}
+
 // ── Task Node Cards (collapsible) ──
 function renderTaskNode(a, expanded) {
   const delay = getDelayDays(a);
@@ -4428,7 +4595,14 @@ function renderTaskNode(a, expanded) {
   const drift = getTaskDrift(a);
   const wasExtended = (a.extensions || []).length > 0;
   const isExp = expanded || (state.expandedTasks && state.expandedTasks[a.id]);
-  const riskCls = isMissed(a) ? 'risk-crit' : (isOpen(a) && delay > 0 ? 'risk-' + risk.cls : (isCompleted(a) ? 'risk-green' : ''));
+  // Roll up subtask delay: even if the parent's own date hasn't passed, flag it if any open subtask is overdue.
+  const overdueSubtasks = subtasks.filter(s => isOpen(s) && getDelayDays(s) > 0);
+  const hasOverdueSubtask = overdueSubtasks.length > 0;
+  const ownDelayed = isOpen(a) && delay > 0;
+  const riskCls = isMissed(a) ? 'risk-crit'
+    : ownDelayed ? 'risk-' + risk.cls
+    : (isOpen(a) && hasOverdueSubtask) ? 'risk-amber'
+    : (isCompleted(a) ? 'risk-green' : '');
   const dateDisplay = wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
     ? '<span class="date-original">' + fmtDate(a.originalDueDate) + '</span> <span class="date-current">→ ' + fmtDate(a.dueDate) + '</span>'
     : '<span class="date-current">' + fmtDate(a.dueDate) + '</span>';
@@ -4440,17 +4614,19 @@ function renderTaskNode(a, expanded) {
     (meeting ? '🗓 ' : '') + escapeHtml(a.title) +
     (prog.total > 0 ? ' <span class="badge neutral" style="font-size:10px">' + t('subtaskProgress', prog.done, prog.total) + '</span>' : '') +
     (drift > 0 ? ' <span class="drift-chip">+' + drift + ' ' + t('days') + '</span>' : '') +
+    (!ownDelayed && hasOverdueSubtask ? ' <span class="badge amber" style="font-size:10px">⚠ ' + t('subtasksOverdue', overdueSubtasks.length) + '</span>' : '') +
     '</div>' +
     '<div class="task-node-meta">' +
     '<span>📁 ' + escapeHtml(project ? project.name : '—') + '</span>' +
+    (responsibleTag(a) ? '<span>' + responsibleTag(a) + '</span>' : '') +
     '<span>' + (meeting ? t('meetingDateLabel') : t('dueLabel')) + ': ' + dateDisplay + '</span>' +
-    (isOpen(a) && delay > 0 ? '<span style="color:var(--red)">⏰ ' + delay + ' ' + t('days') + '</span>' : '') +
+    (ownDelayed ? '<span style="color:var(--red)">⏰ ' + delay + ' ' + t('days') + '</span>' : '') +
     '</div>' +
     (prog.total > 0 ? '<div class="subtask-progress-bar"><div class="subtask-progress-fill" style="width:' + Math.round(prog.done / prog.total * 100) + '%"></div></div>' : '') +
     '</div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
     statusBadge(a.status) + ' ' + priorityBadge(a.priority) +
-    (isOpen(a) && delay > 0 ? ' <span class="badge ' + risk.cls + '">' + risk.label + '</span>' : '') +
+    (ownDelayed ? ' <span class="badge ' + risk.cls + '">' + risk.label + '</span>' : '') +
     '</div></div>' +
     (isExp ? renderTaskNodeBody(a, subtasks) : '') +
     '</div>';
@@ -4554,9 +4730,13 @@ function renderReportTaskLine(action, opts) {
   var isLate = isOpen(action) && delay > 0;
   var done = isCompleted(action);
   var hasExtension = (action.extensions || []).length > 0;
+  var subtasksAll = getSubtasks(action.id);
+  var overdueSubtasks = subtasksAll.filter(function(s) { return isOpen(s) && getDelayDays(s) > 0; });
+  var hasOverdueSubtask = overdueSubtasks.length > 0;
   var classes = ['task-line'];
   if (opts.isMain) classes.push('tl-main');
   if (isLate) classes.push('tl-late');
+  else if (!isMeeting(action) && hasOverdueSubtask) classes.push('tl-subtask-warn');
   else if (done) classes.push('tl-done');
   var dateDisplay;
   if (hasExtension && action.originalDueDate && action.originalDueDate !== action.dueDate) {
@@ -4566,13 +4746,16 @@ function renderReportTaskLine(action, opts) {
   }
   var prioMap = { high: t('priorityHigh'), medium: t('priorityMedium'), low: t('priorityLow') };
   var prio = action.priority || 'medium';
-  var subtasks = getSubtasks(action.id);
+  var subtasks = subtasksAll;
   if (opts.openOnly) subtasks = subtasks.filter(isOpen);
   return '<div class="' + classes.join(' ') + '">' +
     '<div class="task-line-head"><div style="flex:1">' +
-    '<div class="task-line-title">' + (isMeeting(action) ? '🗓 ' : '') + escapeHtml(action.title) + '</div>' +
+    '<div class="task-line-title">' + (isMeeting(action) ? '🗓 ' : '') + escapeHtml(action.title) +
+    (!isLate && hasOverdueSubtask ? ' <span class="prio-tag high">⚠ ' + t('subtasksOverdue', overdueSubtasks.length) + '</span>' : '') +
+    '</div>' +
     '<div class="task-line-sub">' +
     '<span class="tls-date">📅 ' + dateDisplay + '</span>' +
+    (responsibleTagPlain(action) ? '<span>' + responsibleTagPlain(action) + '</span>' : '') +
     (!isMeeting(action) ? '<span class="prio-tag ' + prio + '">' + prioMap[prio] + '</span>' : '') +
     (isLate ? '<span style="color:var(--red);font-weight:600">' + t('daysShort', delay) + '</span>' : '') +
     (done && action.completedDate ? '<span style="color:var(--green)">✓ ' + fmtDate(action.completedDate) + '</span>' : '') +
@@ -4591,6 +4774,17 @@ function renderReportTaskLine(action, opts) {
           ' ' + statusBadgeMini(sub.status) + '</span></div>';
       }).join('') + '</div>' : '') +
     '</div>';
+}
+
+// Sort tasks: pending delayed first, then pending on-time, then completed (newest first)
+function sortTasks(items) {
+  return [...items].sort((a, b) => {
+    const aPending = isOpen(a) || isMissed(a);
+    const bPending = isOpen(b) || isMissed(b);
+    if (aPending !== bPending) return aPending ? -1 : 1;
+    if (aPending) return getDelayDays(b) - getDelayDays(a);
+    return (b.completedDate || b.dueDate || '').localeCompare(a.completedDate || a.dueDate || '');
+  });
 }
 
 // ── Report project header with health badge ──
@@ -5726,6 +5920,70 @@ function renderActionCard(a, opts) {
 
 views.report = () => {
   const period = state.filters.reportPeriod || 'today';
+
+  // ── Open Tasks mode: completely separate layout, no period filtering ──
+  if (period === 'open-tasks') {
+    const priorityRank = { high: 0, medium: 1, low: 2 };
+    const openRows = getReportableProjects().map(p => {
+      const mainTasks = getProjectMainTasks(p.id).filter(isOpen);
+      mainTasks.sort((a, b) => {
+        const pr = (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1);
+        if (pr !== 0) return pr;
+        return getDelayDays(b) - getDelayDays(a);
+      });
+      return { p, mainTasks };
+    }).filter(x => x.mainTasks.length > 0);
+    openRows.sort((a, b) => Math.max(0, ...b.mainTasks.map(getDelayDays)) - Math.max(0, ...a.mainTasks.map(getDelayDays)));
+    const totalOpen = openRows.reduce((s, x) => s + x.mainTasks.length, 0);
+    const totalDelayed = openRows.reduce((s, x) => s + x.mainTasks.filter(a => getDelayDays(a) > 0).length, 0);
+    const prioLabels = { high: t('priorityHigh'), medium: t('priorityMedium'), low: t('priorityLow') };
+    return `
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">${t('reportSectionNav')}</h1>
+          <div class="page-sub">${t('reportPeriodOpenTasks')} · ${openRows.length} ${t('colProjects')}</div>
+        </div>
+        <button class="btn" onclick="printOpenTasksReport()">${t('exportOpenTasksReport')}</button>
+      </div>
+      <div class="filters no-print">
+        <select class="search-input" style="max-width:220px;min-width:180px" onchange="setReportPeriod(this.value)">
+          <option value="today">${t('reportPeriodToday')}</option>
+          <option value="week">${t('reportPeriodWeek')}</option>
+          <option value="month">${t('reportPeriodMonth')}</option>
+          <option value="range">${t('reportPeriodRange')}</option>
+          <option value="all">${t('reportPeriodAll')}</option>
+          <option disabled style="color:var(--line)">──────────</option>
+          <option value="open-tasks" selected>${t('reportPeriodOpenTasks')}</option>
+        </select>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">${t('colProjects')}</div><div class="stat-value">${openRows.length}</div></div>
+        <div class="stat warn"><div class="stat-label">${t('reportOpenTasks')}</div><div class="stat-value">${totalOpen}</div></div>
+        <div class="stat danger"><div class="stat-label">${t('reportDelayedTasks')}</div><div class="stat-value">${totalDelayed}</div></div>
+      </div>
+      ${openRows.length === 0
+        ? `<div class="table-wrap"><div class="empty"><div class="empty-icon">✓</div>${t('noOpenActions')}</div></div>`
+        : openRows.map(({p, mainTasks}) => {
+            const byPrio = { high: [], medium: [], low: [] };
+            mainTasks.forEach(a => (byPrio[a.priority] || byPrio.medium).push(a));
+            return `
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">📁 ${escapeHtml(p.name)}<span class="accent-line"></span></div>
+                  <div style="font-size:12px;color:var(--ink-faint)">${mainTasks.length} ${t('reportOpenTasks')} · ${mainTasks.filter(a=>getDelayDays(a)>0).length} ${t('reportDelayedTasks')}</div>
+                </div>
+                ${['high','medium','low'].filter(prio => byPrio[prio].length).map(prio => `
+                  <div style="font-size:11px;font-weight:600;color:var(--accent-warm);margin:10px 0 6px;padding-inline-start:4px">
+                    ${prioLabels[prio]} (${byPrio[prio].length})
+                  </div>
+                  ${byPrio[prio].map(a => renderTaskNode(a, false)).join('')}
+                `).join('')}
+              </div>
+            `;
+          }).join('')}
+    `;
+  }
+
   const reportDate = state.filters.reportDate || todayDate();
   const groupBy = state.filters.reportGroupBy || 'status';
   const range = getReportPeriodRange(period, reportDate);
@@ -5781,8 +6039,12 @@ views.report = () => {
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" onclick="exportCSV()">${t('exportCSV')}</button>
-        <button class="btn ghost" onclick="openDailyReportPopup()">${t('exportPDF')}</button>
-        <button class="btn" onclick="openDailyReportPopup()">${t('printReport')}</button>
+        <button class="btn ghost" onclick="${period==='open-tasks'?'printOpenTasksReport()':'openDailyReportPopup()'}">
+          ${period==='open-tasks'?t('exportOpenTasksReport'):t('exportPDF')}
+        </button>
+        <button class="btn" onclick="${period==='open-tasks'?'printOpenTasksReport()':'openDailyReportPopup()'}">
+          ${period==='open-tasks'?t('exportOpenTasksReport'):t('printReport')}
+        </button>
       </div>
     </div>
 
@@ -5793,6 +6055,8 @@ views.report = () => {
         <option value="month" ${period==='month'?'selected':''}>${t('reportPeriodMonth')}</option>
         <option value="range" ${period==='range'?'selected':''}>${t('reportPeriodRange')}</option>
         <option value="all" ${period==='all'?'selected':''}>${t('reportPeriodAll')}</option>
+        <option disabled style="color:var(--line)">──────────</option>
+        <option value="open-tasks" ${period==='open-tasks'?'selected':''}>${t('reportPeriodOpenTasks')}</option>
       </select>
       <select class="search-input" style="max-width:200px;min-width:160px" title="${t('reportGroupByLabel')}" onchange="setReportGroupBy(this.value)">
         <option value="status" ${groupBy==='status'?'selected':''}>${t('groupByStatus')}</option>
@@ -5805,10 +6069,10 @@ views.report = () => {
         <span style="font-size:12px;color:var(--ink-muted);align-self:center">${t('reportRangeTo')}</span>
         <input type="date" class="search-input" style="max-width:170px" value="${state.filters.reportRangeEnd || ''}" onchange="setReportRangeEnd(this.value)">
       ` : ''}
-      ${(period !== 'all' && period !== 'range') ? `
+      ${(period !== 'all' && period !== 'range' && period !== 'open-tasks') ? `
         <input type="date" class="search-input" style="max-width:180px" value="${reportDate}" onchange="setReportDate(this.value)">
       ` : ''}
-      ${period !== 'all' ? `
+      ${(period !== 'all' && period !== 'open-tasks') ? `
         <label class="toggle-chip ${includePrevious?'active':''}" title="${t('carriedOverHint')}">
           <input type="checkbox" ${includePrevious?'checked':''} onchange="toggleIncludePrevious(this.checked)">
           📌 ${t('includePrevious')}
@@ -5816,10 +6080,10 @@ views.report = () => {
       ` : ''}
     </div>
 
-    <div class="stats">
       <div class="stat">
         <div class="stat-label">${t('statTotalInPeriod')}</div>
-        <div class="stat-value">${tasksOnly.length}</div>
+        <div class="stat-value">${tasksOnly.length + carriedOver.length}</div>
+        ${carriedOver.length > 0 ? `<div class="stat-meta" style="font-size:10px;color:var(--ink-faint)">${tasksOnly.length} ${t('reportPeriodToday').toLowerCase()} + ${carriedOver.length} ${t('sectionCarriedOver').replace('📌 ','')}</div>` : ''}
       </div>
       <div class="stat good">
         <div class="stat-label">${t('statCompletedInPeriod')}</div>
@@ -5827,7 +6091,8 @@ views.report = () => {
       </div>
       <div class="stat warn">
         <div class="stat-label">${t('statOpenInPeriod')}</div>
-        <div class="stat-value">${openTasksAll.length}</div>
+        <div class="stat-value">${openTasksAll.length + carriedOver.length}</div>
+        ${carriedOver.length > 0 ? `<div class="stat-meta" style="font-size:10px;color:var(--red)">${carriedOver.length} ${t('sectionCarriedOver').replace('📌 ','')}</div>` : ''}
       </div>
       <div class="stat ${meetings.length>0?'':'good'}">
         <div class="stat-label">${t('statMeetingsConducted')}</div>
@@ -6313,7 +6578,7 @@ views.partners = () => {
                   <div class="imp-bar"><div class="imp-fill ${commitment.level}" style="width:${commitmentBarWidth(commitment)}%"></div></div>
                   <span style="font-size:12px;color:var(--ink-muted)">${commitmentScoreText(commitment)}</span>
                 </div>
-                <div class="sub" style="margin-top:2px"><span class="badge ${commitmentBadgeClass(commitment.level)}" style="font-size:10px">${commitment.label}</span></div>
+                <div class="sub" style="margin-top:2px"><span class="badge ${commitmentBadgeClass(commitment.level)}" style="font-size:10px">${commitment.label}</span> ${commitmentTrendTag(commitment)}</div>
               </td>
               <td>
                 <div class="row-actions">
@@ -6734,6 +6999,7 @@ views.actions = () => {
         <div class="page-sub">${t('actionsTotalCount', getTasks().length)}${periodLabel ? ` <span style="color:var(--accent-warm)">${periodLabel}</span>` : ''}</div>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="btn ghost" onclick="printOpenTasksReport()">${t('exportOpenTasksReport')}</button>
         <button class="btn ghost" onclick="printAllTasksReport()">${t('exportTasksReportGlobal')}</button>
         <button class="btn" onclick="showActionForm()">${t('addActionBtn')}</button>
       </div>
@@ -7192,9 +7458,10 @@ views.partnerDetail = (partnerId) => {
             <h3>${t('cardCommitment')}</h3>
             <div class="score-card-sub">${t('commitmentSubtitle')}</div>
             <div style="text-align:center;margin:10px 0">
-              <div style="font-size:42px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--accent)">${commitmentScoreText(commitment)}</div>
+              <div style="font-size:42px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--accent);cursor:help" title="${commitment.meetingReliability !== null && commitment.meetingReliability !== undefined ? escapeHtml(t('scoreBreakdownTooltip', commitment.taskScore, commitment.meetingReliability)) : escapeHtml(t('scoreBreakdownTasksOnly', commitment.taskScore))}">${commitmentScoreText(commitment)}</div>
               <div style="font-size:11px;color:var(--ink-faint)">${t('outOf100')}</div>
               <div style="margin-top:8px"><span class="badge ${commitmentBadgeClass(commitment.level)}" style="font-size:11px;padding:4px 12px">${commitment.label}</span></div>
+              ${commitmentTrendTag(commitment) ? `<div style="margin-top:6px">${commitmentTrendTag(commitment)}</div>` : ''}
             </div>
             <div class="kv"><span class="kv-label">${t('kvCompleted')}</span><span class="kv-value">${commitment.completed}</span></div>
             <div class="kv"><span class="kv-label">${t('kvOnTime')}</span><span class="kv-value">${commitment.completedOnTime}</span></div>
@@ -7762,7 +8029,10 @@ views.calendar = () => {
         <h1 class="page-title">📅 ${t('calendarTitle')}</h1>
         <div class="page-sub">${t('calendarSub')}</div>
       </div>
-      <button class="btn ghost" onclick="calendarToday()">${t('calendarGoToday')}</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" onclick="printOpenTasksReport()">${t('exportOpenTasksReport')}</button>
+        <button class="btn ghost" onclick="calendarToday()">${t('calendarGoToday')}</button>
+      </div>
     </div>
     <div class="calendar-nav">
       <button class="calendar-nav-btn" onclick="calendarPrevMonth()">${currentLang==='ar' ? '›' : '‹'}</button>
@@ -7818,6 +8088,57 @@ function calendarToday() {
 }
 
 
+
+// ── Open Tasks Report (all projects, grouped by priority) ──
+function printOpenTasksReport(existingEntry) {
+  const entry = existingEntry || saveReportEntry('open-tasks', {}, t('openTasksReportTitle'));
+  const priorityRank = { high: 0, medium: 1, low: 2 };
+  const rows = getReportableProjects().map(p => {
+    const mainTasks = getProjectMainTasks(p.id).filter(isOpen);
+    mainTasks.sort((a, b) => {
+      const pr = (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1);
+      if (pr !== 0) return pr;
+      return getDelayDays(b) - getDelayDays(a);
+    });
+    return { project: p, mainTasks };
+  }).filter(x => x.mainTasks.length > 0);
+  rows.sort((a, b) => {
+    const aMax = Math.max(0, ...a.mainTasks.map(getDelayDays));
+    const bMax = Math.max(0, ...b.mainTasks.map(getDelayDays));
+    return bMax - aMax;
+  });
+  const totalMain = rows.reduce((s, x) => s + x.mainTasks.length, 0);
+  const totalDelayed = rows.reduce((s, x) => s + x.mainTasks.filter(a => getDelayDays(a) > 0).length, 0);
+  const prioLabels = { high: t('priorityHigh'), medium: t('priorityMedium'), low: t('priorityLow') };
+  const body = `
+    <h1>📄 ${t('openTasksReportTitle')}</h1>
+    <div class="meta">${t('projectsCovered', rows.length)} · ${t('priorityOrderedNote')}</div>
+    <div class="kpi-strip">
+      <div class="kpi k-accent"><div class="kv">${rows.length}</div><div class="kl">${t('colProjects')}</div></div>
+      <div class="kpi k-amber"><div class="kv">${totalMain}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+      <div class="kpi k-red"><div class="kv">${totalDelayed}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+    </div>
+    ${rows.length === 0 ? `<div class="empty-note">${t('reportNoData')}</div>` :
+      rows.map(({project: p, mainTasks}) => {
+        const byPrio = { high: [], medium: [], low: [] };
+        mainTasks.forEach(a => { (byPrio[a.priority] || byPrio.medium).push(a); });
+        return `
+          <div class="proj-report-card">
+            ${renderReportProjectHead(p, mainTasks.length + ' ' + t('reportOpenTasks'))}
+            <div class="proj-report-body">
+              ${renderReportProjectAnalytics(p.id)}
+              ${['high','medium','low'].map(prio => {
+                if (!byPrio[prio].length) return '';
+                return sectionDivider(prioLabels[prio] + ' (' + byPrio[prio].length + ')') +
+                  byPrio[prio].map(a => renderReportTaskLine(a, { isMain: true, openOnly: true })).join('');
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+  `;
+  openReportWindow(t('openTasksReportTitle'), body, entry);
+}
 
 function render(param) {
   const main = document.getElementById('main-content');
@@ -8142,8 +8463,22 @@ async function deletePartner(id) {
   const memberIds = (p && Array.isArray(p.team)) ? p.team.map(m => m.id) : [];
   const beforeActions = state.actions.slice();
   const beforeProjects = state.projects.slice();
-  state.actions = state.actions.filter(a => a.partnerId !== id);
-  state.projects = state.projects.filter(p => p.partnerId !== id);
+  // Remove projects that are SOLELY linked to this partner.
+  // Multi-partner projects (partnerIds array) simply have this partner detached — they survive.
+  state.projects = state.projects.filter(pr => {
+    const ids = Array.isArray(pr.partnerIds) ? pr.partnerIds : [pr.partnerId].filter(Boolean);
+    const remaining = ids.filter(pid => pid !== id);
+    if (remaining.length === 0) return false; // sole partner — delete the project
+    // Multi-partner: detach this partner, keep the project
+    pr.partnerIds = remaining;
+    pr.partnerId = remaining[0]; // keep legacy field in sync
+    return true;
+  });
+  state.actions = state.actions.filter(a => {
+    // Only remove actions exclusively linked to this partner AND whose project was deleted
+    const projDeleted = !state.projects.find(pr => pr.id === a.projectId);
+    return !(a.partnerId === id && projDeleted);
+  });
   state.partners = state.partners.filter(p => p.id !== id);
   // Data integrity: any remaining task owned by a member of the deleted partner's
   // team loses its owner reference (so it never points at a deleted person).
@@ -9161,6 +9496,13 @@ function promptPostpone(id) {
       <label>${t('fieldPostponeReason')}</label>
       <textarea id="f-postreason" placeholder="${t('optionalPlaceholder')}"></textarea>
     </div>
+    <div class="form-row">
+      <label>${t('fieldPostponedBy')}</label>
+      <select id="f-postponedby">
+        <option value="partner">${t('postponedByPartner')}</option>
+        <option value="us">${t('postponedByUs')}</option>
+      </select>
+    </div>
   `;
   const foot = `
     <button class="btn" onclick="confirmPostpone('${id}')">${t('confirmPostponeBtn')}</button>
@@ -9177,9 +9519,14 @@ function confirmPostpone(id) {
   a.dueDate = newDate;
   a.meetingTime = document.getElementById('f-newtime').value || a.meetingTime;
   const postReason = document.getElementById('f-postreason').value.trim();
+  const postponedBy = document.getElementById('f-postponedby').value || 'partner';
+  a.lastPostponedBy = postponedBy; // 'partner' | 'us' — used for meeting reliability scoring
+  if (!Array.isArray(a.postponements)) a.postponements = [];
+  a.postponements.push({ id: 'pp_' + uid(), date: new Date().toISOString(), by: postponedBy, reason: postReason });
   // Add a tracking entry documenting the postponement
   if (!Array.isArray(a.tracking)) a.tracking = [];
-  const trackText = `⏰ ${t('postponeMeeting')} → ${fmtDate(newDate)}${postReason ? ` — ${postReason}` : ''}`;
+  const byLabel = postponedBy === 'us' ? t('postponedByUs') : t('postponedByPartner');
+  const trackText = `⏰ ${t('postponeMeeting')} → ${fmtDate(newDate)} (${byLabel})${postReason ? ` — ${postReason}` : ''}`;
   a.tracking.push({ id: 'tr_' + uid(), text: trackText, date: new Date().toISOString() });
   saveState();
   toast(t('toastMeetingPostponed'));
@@ -9317,6 +9664,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
       .kpi.k-green .kv { color: var(--green); }
       .kpi.k-amber .kv { color: var(--amber); }
       .kpi.k-red .kv { color: var(--red); }
+      .kpi.k-blue .kv { color: var(--accent); }
       .kpi.k-accent .kv { color: var(--accent); }
 
       /* Report task lines */
@@ -9327,6 +9675,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
       }
       .task-line.tl-main { border-inline-start: 3px solid var(--accent); }
       .task-line.tl-late { background: #fdf3f1; border-color: #f0ccc6; }
+      .task-line.tl-subtask-warn { background: #fdf6e8; border-color: #eeddb0; border-inline-start: 3px solid var(--amber); }
       .task-line.tl-done { background: #f4f8ef; }
       .task-line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
       .task-line-title { font-weight: 600; font-size: 13px; color: var(--ink); }
@@ -9413,6 +9762,11 @@ function buildReportHTML(title, bodyHTML, metadata) {
         font-size: 11px; color: var(--ink-muted);
       }
       .extension-log-item { display: flex; gap: 8px; padding: 2px 0; flex-wrap: wrap; }
+      .resp-tag {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 10px; color: var(--ink-muted);
+      }
+      .resp-team { color: var(--ink-faint); font-size: 9px; }
       .drift-chip {
         display: inline-block; padding: 1px 7px; border-radius: 8px;
         font-size: 10px; background: #fae0de; color: var(--red);
@@ -9522,6 +9876,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
         @page { size: A4 landscape; margin: 10mm; }
         body { background: #fff; }
         .report-toolbar { display: none; }
+        .noprint { display: none !important; }
         .no-print { display: none !important; }
         .report-page { box-shadow: none; padding: 12px; margin: 0; max-width: none; width: 100%; }
         .report-watermark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -9758,15 +10113,7 @@ function printAllTasksReport(existingEntry) {
   };
 
   // Sort tasks within a project: pending delayed first, then pending on-time, then completed (newest first)
-  function sortTasks(items) {
-    return [...items].sort((a, b) => {
-      const aPending = isOpen(a) || isMissed(a);
-      const bPending = isOpen(b) || isMissed(b);
-      if (aPending !== bPending) return aPending ? -1 : 1;
-      if (aPending) return getDelayDays(b) - getDelayDays(a);
-      return (b.completedDate || b.dueDate || '').localeCompare(a.completedDate || a.dueDate || '');
-    });
-  }
+  // (uses shared top-level sortTasks function)
 
   // Apply lookahead filter (existing rule), then split into tasks vs meetings
   const filteredActions = state.actions.filter(shouldInclude);
@@ -9827,6 +10174,7 @@ function printAllTasksReport(existingEntry) {
                 <div class="kpi k-green"><div class="kv">${compCount}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
                 <div class="kpi k-amber"><div class="kv">${openCount}</div><div class="kl">${t('reportOpenTasks')}</div></div>
                 <div class="kpi k-red"><div class="kv">${delayedCount}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+                ${meetingsCount > 0 ? `<div class="kpi k-blue"><div class="kv">${projMeetings.filter(isCompleted).length}/${meetingsCount}</div><div class="kl">${t('reportMeetingsHeld')}</div></div>` : ''}
               </div>
               ${renderReportProjectAnalytics(p.id)}
               ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
@@ -9984,13 +10332,13 @@ function printProjectReport(projectId, existingEntry) {
   const entry = existingEntry || saveReportEntry('project', { projectId }, p.name);
   const partner = getPartner(p.partnerId);
   const actions = getProjectActions(projectId);
-  // FIX: meetings excluded from ALL task counts and delay logic
   const meetings = actions.filter(isMeeting);
   const tasks = actions.filter(a => !isMeeting(a));
   const completed = tasks.filter(isCompleted);
   const open = tasks.filter(isOpen);
   const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
   const attachments = p.attachments || [];
+  const mainTasks = sortTasks(tasks.filter(a => !a.parentId));
 
   const body = `
     <h1>📁 ${escapeHtml(p.name)}</h1>
@@ -10007,30 +10355,42 @@ function printProjectReport(projectId, existingEntry) {
     </div>
     ${p.description ? `<div style="background:#faf8f3;padding:12px 16px;border-radius:6px;margin-bottom:14px;font-size:13px"><strong>${t('reportDescription')}:</strong> ${escapeHtml(p.description)}</div>` : ''}
 
-    <h2>${t('reportSummary')}</h2>
-    <div class="stats4">
-      <div class="stat-cell"><div class="v">${tasks.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
-      <div class="stat-cell"><div class="v">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
-      <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--red)">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
+    <div class="proj-report-card">
+      ${renderReportProjectHead(p, meetings.length > 0 ? '🗓 ' + meetings.length + ' ' + t('statMeetingsTotal') : '')}
+      <div class="proj-report-body">
+        <div class="kpi-strip">
+          <div class="kpi k-accent"><div class="kv">${tasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+          <div class="kpi k-green"><div class="kv">${completed.length}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+          <div class="kpi k-amber"><div class="kv">${open.length}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+          <div class="kpi k-red"><div class="kv">${delayed.length}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+          ${meetings.length > 0 ? `<div class="kpi k-blue"><div class="kv">${meetings.filter(isCompleted).length}/${meetings.length}</div><div class="kl">${t('reportMeetingsHeld')}</div></div>` : ''}
+        </div>
+        ${renderReportProjectAnalytics(projectId)}
+        ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
+          sectionDivider(t('reportProjectHeader')) +
+          mainTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
+        ${meetings.length > 0 ? `
+          ${sectionDivider('🗓 ' + t('statMeetingsTotal') + ' (' + meetings.length + ')')}
+          <table class="rt" style="background:#fff">
+            <thead><tr>
+              <th>${t('colAgenda')}</th>
+              <th>${t('colStatus')}</th>
+              <th>${t('colDate')}</th>
+            </tr></thead>
+            <tbody>
+              ${[...meetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => {
+                const mDelay = getDelayDays(m);
+                return `<tr>
+                  <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
+                  <td>${statusBadgeMini(m.status)}</td>
+                  <td>${fmtDate(m.dueDate)}${m.meetingTime ? ' · ' + fmtTime(m.meetingTime) : ''}${isOpen(m) && mDelay > 0 ? ' <span style="color:var(--red)">+' + mDelay + '</span>' : ''}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+      </div>
     </div>
-
-    ${renderReportProjectAnalytics(projectId) ? `
-      ${sectionDivider(t('analyticsTitle') || t('driftAnalysisTitle'))}
-      ${renderReportProjectAnalytics(projectId)}
-    ` : ''}
-
-    <h2>${t('reportTasksByStatus')}</h2>
-    ${tasks.length > 0 ? `
-      ${delayed.filter(a => !isMeeting(a)).length > 0 ? `<div class="group-label">⚠️ ${t('riskCriticalGroup')} / ${t('filterDelayed')}</div>${renderReportTasksTable(delayed.filter(a => !isMeeting(a)))}` : ''}
-      ${open.filter(a => !isMeeting(a) && getDelayDays(a) <= DELAY_THRESHOLD_DAYS).length > 0 ? `<div class="group-label">${t('statusOpen')}</div>${renderReportTasksTable(open.filter(a => !isMeeting(a) && getDelayDays(a) <= DELAY_THRESHOLD_DAYS))}` : ''}
-      ${completed.filter(a => !isMeeting(a)).length > 0 ? `<div class="group-label">✓ ${t('statusCompleted')}</div>${renderReportTasksTable(completed.filter(a => !isMeeting(a)))}` : ''}
-    ` : `<div style="color:var(--ink-faint);padding:10px">${t('reportNoData')}</div>`}
-
-    ${meetings.length > 0 ? `
-      <h2>🗓 ${t('reportMeetings')}</h2>
-      ${renderReportTasksTable(meetings.sort((a,b) => new Date(b.dueDate) - new Date(a.dueDate)))}
-    ` : ''}
 
     ${attachments.length > 0 ? `
       <h2>📎 ${t('reportAttachmentsList')}</h2>
@@ -10078,21 +10438,17 @@ function printPartnerReport(partnerId, existingEntry) {
     ${p.notes ? `<div style="background:#faf8f3;padding:12px 16px;border-radius:6px;margin-bottom:14px;font-size:13px"><strong>${t('fieldNotes')}:</strong> ${escapeHtml(p.notes)}</div>` : ''}
 
     <h2>${t('reportSummary')}</h2>
-    <div class="stats4">
-      <div class="stat-cell">
-        <div class="v">${importance.score === null ? t('notRatedLabel') : importance.score + '/100'}</div>
-        ${importance.score === null ? '' : `<div style="max-width:130px;margin:7px auto 5px;height:6px;background:#e8e4da;border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;width:${importance.score}%;background:${importance.score >= 70 ? 'var(--green)' : importance.score >= 40 ? 'var(--amber)' : 'var(--red)'}"></div></div><div><span class="badge-mini ${importance.level === 'high' ? 'green' : importance.level === 'mid' ? 'amber' : 'red'}">${importance.label}</span></div>`}
-        <div class="l">${t('cardImportance')}</div>
-      </div>
-      <div class="stat-cell"><div class="v">${commitmentScoreText(commitment)}${commitment.score===null?'':'/100'}</div><div class="l">${t('cardCommitment')}</div></div>
-      <div class="stat-cell"><div class="v">${importance.projectCount}</div><div class="l">${t('colProjects')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:${delayed.length>0?'var(--red)':'var(--green)'}">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
+    <div class="kpi-strip">
+      <div class="kpi k-accent"><div class="kv">${importance.score === null ? '—' : importance.score}</div><div class="kl">${t('cardImportance')}</div></div>
+      <div class="kpi ${commitment.level==='high'?'k-green':commitment.level==='mid'?'k-amber':commitment.level==='low'?'k-red':'k-accent'}"><div class="kv">${commitmentScoreText(commitment)}</div><div class="kl">${t('cardCommitment')}</div></div>
+      <div class="kpi k-blue"><div class="kv">${importance.projectCount}</div><div class="kl">${t('colProjects')}</div></div>
+      <div class="kpi k-red"><div class="kv">${delayed.length}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
     </div>
-    <div class="stats4" style="margin-top:10px">
-      <div class="stat-cell"><div class="v">${actions.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
-      <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:${avgDelay>0?'var(--amber)':'var(--green)'}">${avgDelay} ${t('daysUnit')}</div><div class="l">${t('avgDelayLabel')}</div></div>
+    <div class="kpi-strip" style="margin-top:10px">
+      <div class="kpi k-accent"><div class="kv">${actions.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+      <div class="kpi k-green"><div class="kv">${completed.length}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+      <div class="kpi k-amber"><div class="kv">${open.length}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+      <div class="kpi k-blue"><div class="kv">${avgDelay}</div><div class="kl">${t('avgDelayLabel')}</div></div>
     </div>
 
     <h2>${t('reportPartnerProjects')} (${projects.length})</h2>
@@ -10118,11 +10474,91 @@ function printPartnerReport(partnerId, existingEntry) {
       </table>
     `}
 
-    <h2>${t('reportPartnerTasks')}</h2>
-    ${renderPartnerTasksByProject(actions, projects)}
-    ${renderPartnerMeetingsSection(partnerId)}
+    ${renderPartnerProjectCards(partnerId, actions, projects)}
   `;
   openReportWindow(t('partnerReportTitle') + ' — ' + p.name, body, entry);
+}
+
+// Renders each of the partner's projects using the SAME card format as printProjectReport /
+// printAllTasksReport (health header, KPI strip, S-Curve + Drift analytics, task-line cards
+// with subtasks, meetings table) — scoped to this partner's tasks within each project.
+function renderPartnerProjectCards(partnerId, actions, projects) {
+  const projIds = new Set((projects || []).map(pr => pr.id));
+  let html = `<h2>${t('reportPartnerTasks')}</h2>`;
+  let any = false;
+
+  (projects || []).forEach(pr => {
+    const projTasks = actions.filter(a => a.projectId === pr.id && !isMeeting(a));
+    const projMeetings = actions.filter(a => a.projectId === pr.id && isMeeting(a));
+    if (!projTasks.length && !projMeetings.length) return;
+    any = true;
+    const completed = projTasks.filter(isCompleted);
+    const open = projTasks.filter(isOpen);
+    const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+    const mainTasks = sortTasks(projTasks.filter(a => !a.parentId));
+    const ourTasks = mainTasks.filter(a => a.ownerKind === 'internal');
+    const partnerTasksList = mainTasks.filter(a => a.ownerKind !== 'internal'); // partner-owned or unassigned
+
+    html += `
+      <div class="proj-report-card">
+        ${renderReportProjectHead(pr, projMeetings.length > 0 ? '🗓 ' + projMeetings.length + ' ' + t('statMeetingsTotal') : '')}
+        <div class="proj-report-body">
+          <div class="kpi-strip">
+            <div class="kpi k-accent"><div class="kv">${projTasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+            <div class="kpi k-green"><div class="kv">${completed.length}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+            <div class="kpi k-amber"><div class="kv">${open.length}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+            <div class="kpi k-red"><div class="kv">${delayed.length}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+            ${projMeetings.length > 0 ? `<div class="kpi k-blue"><div class="kv">${projMeetings.filter(isCompleted).length}/${projMeetings.length}</div><div class="kl">${t('reportMeetingsHeld')}</div></div>` : ''}
+          </div>
+          ${renderReportProjectAnalytics(pr.id)}
+          ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' : `
+            ${partnerTasksList.length > 0 ? sectionDivider('🤝 ' + t('sectionPartnerTasks') + ' (' + partnerTasksList.length + ')') +
+              partnerTasksList.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('') : ''}
+            ${ourTasks.length > 0 ? sectionDivider('🧑‍💼 ' + t('sectionOurTasks') + ' (' + ourTasks.length + ')') +
+              ourTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('') : ''}
+          `}
+          ${projMeetings.length > 0 ? `
+            ${sectionDivider('🗓 ' + t('statMeetingsTotal') + ' (' + projMeetings.length + ')')}
+            <table class="rt" style="background:#fff">
+              <thead><tr><th>${t('colAgenda')}</th><th>${t('colStatus')}</th><th>${t('colDate')}</th></tr></thead>
+              <tbody>
+                ${[...projMeetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => {
+                  const mDelay = getDelayDays(m);
+                  return `<tr>
+                    <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
+                    <td>${statusBadgeMini(m.status)}</td>
+                    <td>${fmtDate(m.dueDate)}${m.meetingTime ? ' · ' + fmtTime(m.meetingTime) : ''}${isOpen(m) && mDelay > 0 ? ' <span style="color:var(--red)">+' + mDelay + '</span>' : ''}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  // Tasks/meetings not linked to any of the partner's listed projects
+  const orphanTasks = actions.filter(a => !isMeeting(a) && !projIds.has(a.projectId));
+  const orphanMeetings = actions.filter(a => isMeeting(a) && !projIds.has(a.projectId));
+  if (orphanTasks.length || orphanMeetings.length) {
+    any = true;
+    const mainOrphans = sortTasks(orphanTasks.filter(a => !a.parentId));
+    html += `
+      <div class="proj-report-card">
+        <div class="proj-report-head" style="background:linear-gradient(135deg,#5a5040 0%,#6b5f4a 100%)">
+          <div><div class="pr-title">📁 ${t('reportTasksNoProject')}</div></div>
+        </div>
+        <div class="proj-report-body">
+          ${mainOrphans.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
+            mainOrphans.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (!any) html += `<div class="empty-note">${t('reportNoData')}</div>`;
+  return html;
 }
 
 // NEW: Partner-facing report — shows only partner-owned tasks (to share with partner)
@@ -10130,17 +10566,17 @@ function printPartnerFacingReport(partnerId) {
   const p = getPartner(partnerId);
   if (!p) return;
   const projects = getPartnerProjects(partnerId);
-  // Same comprehensive task set as the internal report (stakeholder OR owned by members)
-  const partnerTasks = getPartnerReportTasks(partnerId);
+  // Only the PARTNER's own tasks — internal-team tasks are excluded from this shareable version.
+  const allTasks = getPartnerReportTasks(partnerId);
+  const partnerTasks = allTasks.filter(a => a.ownerKind !== 'internal');
 
   const open = partnerTasks.filter(isOpen);
   const completed = partnerTasks.filter(isCompleted);
   const delayed = open.filter(a => getDelayDays(a) > 0);
-  const avgDelay = getAvgDelay(partnerTasks); // NEW
+  const avgDelay = getAvgDelay(partnerTasks);
 
   const entry = saveReportEntry('partner-facing', { partnerId }, t('partnerFacingReport') + ' — ' + p.name);
 
-  // FIX: mirror internal report format (header + info-grid + stats4) minus scores
   let body = `
     <h1>🤝 ${escapeHtml(p.name)}</h1>
     <div class="meta">${t('partnerFacingReport')} · ${getPartnerTypeLabel(p.type, p.customType)}</div>
@@ -10154,19 +10590,65 @@ function printPartnerFacingReport(partnerId) {
     </div>
 
     <h2>${t('reportSummary')}</h2>
-    <div class="stats4">
-      <div class="stat-cell"><div class="v">${partnerTasks.length}</div><div class="l">${t('reportTotalTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:var(--green)">${completed.length}</div><div class="l">${t('reportCompletedTasks')}</div></div>
-      <div class="stat-cell"><div class="v">${open.length}</div><div class="l">${t('reportOpenTasks')}</div></div>
-      <div class="stat-cell"><div class="v" style="color:${delayed.length>0?'var(--red)':'var(--green)'}">${delayed.length}</div><div class="l">${t('reportDelayedTasks')}</div></div>
-    </div>
-    <div class="stats4" style="margin-top:10px">
-      <div class="stat-cell"><div class="v" style="color:${avgDelay>0?'var(--amber)':'var(--green)'}">${avgDelay} ${t('daysUnit')}</div><div class="l">${t('avgDelayLabel')}</div></div>
+    <div class="kpi-strip">
+      <div class="kpi k-accent"><div class="kv">${partnerTasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+      <div class="kpi k-green"><div class="kv">${completed.length}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+      <div class="kpi k-amber"><div class="kv">${open.length}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+      <div class="kpi k-red"><div class="kv">${delayed.length}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
     </div>
 
     <h2>${t('reportPartnerTasks')}</h2>
-    ${renderPartnerTasksByProject(partnerTasks, projects)}
-    ${renderPartnerMeetingsSection(partnerId)}`;
+  `;
+
+  const projIds = new Set((projects || []).map(pr => pr.id));
+  let anyContent = false;
+  (projects || []).forEach(pr => {
+    const projTasks = partnerTasks.filter(a => a.projectId === pr.id && !isMeeting(a));
+    const projMeetings = allTasks.filter(a => a.projectId === pr.id && isMeeting(a));
+    if (!projTasks.length && !projMeetings.length) return;
+    anyContent = true;
+    const mainTasks = sortTasks(projTasks.filter(a => !a.parentId));
+    body += `
+      <div class="proj-report-card">
+        <div class="proj-report-head" style="background:linear-gradient(135deg,#2c3e50 0%,#3a5068 100%)">
+          <div><div class="pr-title">📁 ${escapeHtml(pr.name)}</div></div>
+        </div>
+        <div class="proj-report-body">
+          ${mainTasks.length === 0 ? '<div class="empty-note">' + t('reportNoData') + '</div>' :
+            mainTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
+          ${projMeetings.length > 0 ? `
+            ${sectionDivider('🗓 ' + t('statMeetingsTotal') + ' (' + projMeetings.length + ')')}
+            <table class="rt" style="background:#fff">
+              <thead><tr><th>${t('colAgenda')}</th><th>${t('colStatus')}</th><th>${t('colDate')}</th></tr></thead>
+              <tbody>
+                ${[...projMeetings].sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||'')).map(m => `<tr>
+                  <td><strong>🗓 ${escapeHtml(m.title)}</strong></td>
+                  <td>${statusBadgeMini(m.status)}</td>
+                  <td>${fmtDate(m.dueDate)}${m.meetingTime ? ' · ' + fmtTime(m.meetingTime) : ''}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  });
+  if (!anyContent) body += `<div class="empty-note">${t('reportNoData')}</div>`;
+
+  // Additional Comments — editable before printing. Uses contenteditable (not a
+  // <textarea>) so the typed content reliably shows up in the printed / PDF output
+  // across browsers, rather than sometimes being dropped by print rendering.
+  body += `
+    <h2>📝 ${t('additionalComments')}</h2>
+    <div class="noprint" style="font-size:11px;color:var(--ink-faint);margin-bottom:6px">${t('commentsEditableHint')}</div>
+    <div contenteditable="true" data-placeholder="${escapeHtml(t('commentsPlaceholder'))}"
+      style="border:1px solid var(--line);border-radius:8px;min-height:120px;padding:14px 16px;background:#fff;font-size:13px;line-height:1.7;outline:none;"
+      onfocus="this.classList.add('editing')" onblur="this.classList.remove('editing')"></div>
+    <style>
+      [contenteditable].editing { border-color: var(--accent-warm); box-shadow: 0 0 0 2px rgba(184,136,74,0.15); }
+      @media print { [contenteditable] { border-color: var(--line) !important; box-shadow: none !important; } }
+    </style>
+  `;
 
   openReportWindow(t('partnerFacingReport') + ' — ' + p.name, body, entry);
 }
@@ -10336,6 +10818,7 @@ function reprintReport(entryId) {
     case 'partner':       printPartnerReport(entry.params.partnerId, entry); break;
     case 'project-tasks': printProjectTasksReport(entry.params.projectId, entry); break;
     case 'tasks-global':  printAllTasksReport(entry); break;
+    case 'open-tasks':    printOpenTasksReport(entry); break;
   }
 }
 
@@ -10581,6 +11064,16 @@ function importData(file) {
     try {
       const data = JSON.parse(e.target.result);
       if (!confirm(t('confirmReplaceData'))) return;
+
+      // Capture the CURRENT (pre-import) state so we can work out exactly which
+      // records are being removed — imported data only UPSERTS by id, so without
+      // this diff, old Supabase rows that aren't in the new file would silently
+      // remain forever instead of being replaced.
+      const beforePartners = state.partners.slice();
+      const beforeProjects = state.projects.slice();
+      const beforeActions = state.actions.slice();
+      const beforeTeam = state.team.slice();
+
       state.partners = data.partners || [];
       state.projects = data.projects || [];
       state.actions = data.actions || [];
@@ -10596,6 +11089,21 @@ function importData(file) {
       if (typeof migrateProjectsToContributions === 'function') migrateProjectsToContributions();
       if (typeof migrateBilingualContent === 'function') migrateBilingualContent();
       saveState();
+
+      // Now delete from Supabase anything that existed BEFORE the import but is
+      // NOT present in the newly imported data — otherwise those old rows would
+      // survive in the cloud database untouched, even though they're gone locally.
+      const removed = {
+        partners: diffRemovedIds(beforePartners, state.partners),
+        projects: diffRemovedIds(beforeProjects, state.projects),
+        actions: diffRemovedIds(beforeActions, state.actions),
+        internal_team: diffRemovedIds(beforeTeam, state.team),
+      };
+      const removedCount = Object.values(removed).reduce((s, ids) => s + ids.length, 0);
+      if (removedCount > 0) {
+        syncCloudDeletes(removed);
+      }
+
       toast(t('toastDataImported'));
       render();
     } catch (err) {
@@ -11877,8 +12385,11 @@ async function refreshFromCloud(force) {
   if (!force && now - _lastCloudRefresh < 3000) return;   // throttle bursts
   _lastCloudRefresh = now;
   try {
+    // Flush any queued deletes FIRST before loading from cloud — otherwise deleted
+    // records briefly reappear because Supabase still has them when we fetch.
+    if (hasPendingDeletes()) await flushWrites();
     await loadState(force);   // tiny stamp check → pulls only changed tables
-    flushWrites();            // also push anything still queued
+    flushWrites();            // push any remaining dirty (upsert) writes
     _cloudFailUntil = 0;
     setSyncOnline(true);
     render(state.detailParam);
