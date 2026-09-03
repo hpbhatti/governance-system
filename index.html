@@ -12388,7 +12388,8 @@ async function refreshFromCloud(force) {
     // Flush any queued deletes FIRST before loading from cloud — otherwise deleted
     // records briefly reappear because Supabase still has them when we fetch.
     if (hasPendingDeletes()) await flushWrites();
-    await loadState(force);   // tiny stamp check → pulls only changed tables
+    await loadState(force);   // row-level fetch → only changed rows
+    subscribeToRealtime();    // live push: other users' changes appear instantly
     flushWrites();            // push any remaining dirty (upsert) writes
     _cloudFailUntil = 0;
     setSyncOnline(true);
