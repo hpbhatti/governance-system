@@ -1504,6 +1504,7 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
 <!-- Supabase client (Phase 1: public database, no auth/RLS). Pinned to a known
      stable v2 that supports both legacy and new (sb_publishable_) API keys. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwRjIyMzUiLz48bGluZSB4MT0iMzIiIHkxPSIxMCIgeDI9IjMyIiB5Mj0iNTQiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9IjAuMyIvPjxsaW5lIHgxPSIxMCIgeTE9IjMyIiB4Mj0iNTQiIHkyPSIzMiIgc3Ryb2tlPSIjQzlBODRDIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC4zIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyLjUiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSI5IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOUE4NEMiIHN0cm9rZS13aWR0aD0iMS44IiBvcGFjaXR5PSIwLjY1Ii8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMy41IiBmaWxsPSIjQzlBODRDIi8+PC9zdmc+">
 </head>
 <body>
 
@@ -1608,17 +1609,39 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
     <span class="auth-icon-label">Scoring</span>
   </div>
 
+  <!-- Background watermark crosshair -->
+  <div style="position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+    <svg width="520" height="520" viewBox="0 0 64 64" style="opacity:0.035;">
+      <line x1="32" y1="0" x2="32" y2="64" stroke="#C9A84C" stroke-width="1.5"/>
+      <line x1="0" y1="32" x2="64" y2="32" stroke="#C9A84C" stroke-width="1.5"/>
+      <circle cx="32" cy="32" r="28" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+      <circle cx="32" cy="32" r="18" fill="none" stroke="#C9A84C" stroke-width="1"/>
+      <circle cx="32" cy="32" r="8" fill="none" stroke="#C9A84C" stroke-width="1"/>
+      <circle cx="32" cy="32" r="2.5" fill="#C9A84C"/>
+    </svg>
+  </div>
+
   <!-- Login card -->
-  <div style="position:relative; z-index:1; background:rgba(255,255,255,0.05); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:44px 40px 36px; width:90%; max-width:400px; text-align:center; box-shadow:0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);">
+  <div style="position:relative; z-index:1; background:rgba(19,39,68,0.75); backdrop-filter:blur(20px); border:1px solid rgba(201,168,76,0.18); border-radius:20px; padding:44px 40px 36px; width:90%; max-width:400px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.6), 0 1px 0 rgba(201,168,76,0.1) inset;">
     <div style="margin-bottom:28px;">
-      <img id="auth-logo" style="height:80px; margin-bottom:14px; opacity:0.92; filter:drop-shadow(0 2px 8px rgba(201,168,76,0.2));" alt="SOE">
-      <h2 style="color:#e8dcc8; margin:0 0 6px 0; font-size:24px; font-weight:600; letter-spacing:0.5px;">SOE Governance</h2>
-      <p style="color:rgba(232,220,200,0.45); margin:0; font-size:13px; letter-spacing:1px; text-transform:uppercase;">Authorized Access Only</p>
+      <!-- Crosshair icon (Option G) -->
+      <div style="display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+        <svg width="52" height="52" viewBox="0 0 64 64" style="filter:drop-shadow(0 0 12px rgba(201,168,76,0.35));">
+          <line x1="32" y1="10" x2="32" y2="54" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+          <line x1="10" y1="32" x2="54" y2="32" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+          <circle cx="32" cy="32" r="18" fill="none" stroke="#C9A84C" stroke-width="2.5"/>
+          <circle cx="32" cy="32" r="9.5" fill="none" stroke="#C9A84C" stroke-width="1.8" opacity="0.6"/>
+          <circle cx="32" cy="32" r="3.5" fill="#C9A84C"/>
+        </svg>
+      </div>
+      <img id="auth-logo" style="height:72px; margin-bottom:14px; opacity:0.92; filter:drop-shadow(0 2px 8px rgba(201,168,76,0.25));" alt="SOE">
+      <h2 style="color:#e8dcc8; margin:0 0 6px 0; font-size:22px; font-weight:600; letter-spacing:0.5px; font-family:'Reem Kufi',serif;">SOE Governance</h2>
+      <p style="color:rgba(201,168,76,0.5); margin:0; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;">Authorized Access Only</p>
     </div>
     <div id="auth-error" style="display:none; background:rgba(220,60,60,0.15); border:1px solid rgba(220,60,60,0.3); color:#ff9494; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px;"></div>
-    <input id="auth-email" type="email" placeholder="Email" autocomplete="email" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.05); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
-    <input id="auth-password" type="password" placeholder="Password" autocomplete="current-password" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:22px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.05); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
-    <button id="auth-login-btn" onclick="handleAuthLogin()" style="width:100%; padding:13px; border:none; border-radius:10px; background:linear-gradient(135deg,#c9a84c,#b8942f); color:#0a1628; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.2s; letter-spacing:0.3px;">Sign In</button>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="email" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:12px; border:1px solid rgba(201,168,76,0.2); border-radius:10px; background:rgba(10,22,40,0.5); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
+    <input id="auth-password" type="password" placeholder="Password" autocomplete="current-password" style="width:100%; box-sizing:border-box; padding:13px 16px; margin-bottom:22px; border:1px solid rgba(201,168,76,0.2); border-radius:10px; background:rgba(10,22,40,0.5); color:#e8dcc8; font-size:15px; outline:none; font-family:inherit; transition:border-color 0.2s, box-shadow 0.2s;" />
+    <button id="auth-login-btn" onclick="handleAuthLogin()" style="width:100%; padding:13px; border:none; border-radius:10px; background:linear-gradient(135deg,#c9a84c 0%,#b8942f 100%); color:#0a1628; font-size:15px; font-weight:700; cursor:pointer; font-family:'Reem Kufi',serif; transition:all 0.2s; letter-spacing:0.5px;">Sign In</button>
   </div>
 
   <!-- Footer -->
@@ -1673,13 +1696,34 @@ const STORE_KEY = 'governance_data_v1';
    stamp changed. Unchanged tables reuse the local cache => zero egress. Writes
    upsert ONLY the tables flagged dirty. */
 const SYNC_META_ID = 'sync_meta';            // row id inside the existing `config` table
-const SYNC_LOCAL_KEY = 'governance_sync_v2'; // local mirror of stamps / hashes / offline queue
+const SYNC_LOCAL_KEY = 'governance_sync_v3'; // local mirror of stamps / hashes / offline queue
 
-function _defaultSyncMeta(){ return { everSynced:false, tableTs:{}, cloudTs:{}, syncedHash:{}, dirty:[], pendingDeletes:{} }; }
-let syncMeta = (function(){ try { const raw = localStorage.getItem(SYNC_LOCAL_KEY); if (raw){ return Object.assign(_defaultSyncMeta(), JSON.parse(raw)); } } catch(e){} return _defaultSyncMeta(); })();
+function _defaultSyncMeta(){ return { everSynced:false, tableTs:{}, cloudTs:{}, syncedHash:{}, dirty:[], dirtyRows:{}, pendingDeletes:{}, rowVersions:{} }; }
+let syncMeta = (function(){
+  try {
+    const raw = localStorage.getItem(SYNC_LOCAL_KEY);
+    if (raw) {
+      const m = Object.assign(_defaultSyncMeta(), JSON.parse(raw));
+      if (m.dirtyRows) Object.keys(m.dirtyRows).forEach(t => { m.dirtyRows[t] = new Set(m.dirtyRows[t]||[]); });
+      return m;
+    }
+  } catch(e){}
+  return _defaultSyncMeta();
+})();
 let dirtyTables = new Set(Array.isArray(syncMeta.dirty) ? syncMeta.dirty : []);
+if (!syncMeta.dirtyRows) syncMeta.dirtyRows = {};
+Object.keys(syncMeta.dirtyRows).forEach(t => { if (!(syncMeta.dirtyRows[t] instanceof Set)) syncMeta.dirtyRows[t] = new Set(syncMeta.dirtyRows[t]||[]); });
+if (!syncMeta.rowVersions) syncMeta.rowVersions = {};
 let pendingDeletes = syncMeta.pendingDeletes || {};
-function persistSyncMeta(){ syncMeta.dirty = Array.from(dirtyTables); syncMeta.pendingDeletes = pendingDeletes; try { localStorage.setItem(SYNC_LOCAL_KEY, JSON.stringify(syncMeta)); } catch(e){} }
+
+function persistSyncMeta(){
+  syncMeta.dirty = Array.from(dirtyTables); syncMeta.pendingDeletes = pendingDeletes;
+  const dr = {}; Object.keys(syncMeta.dirtyRows||{}).forEach(t => { dr[t] = Array.from(syncMeta.dirtyRows[t]||[]); });
+  try { localStorage.setItem(SYNC_LOCAL_KEY, JSON.stringify(Object.assign({}, syncMeta, {dirtyRows:dr}))); } catch(e){}
+}
+function markRowDirty(table, id) { dirtyTables.add(table); if (!syncMeta.dirtyRows[table]) syncMeta.dirtyRows[table]=new Set(); syncMeta.dirtyRows[table].add(id); }
+function clearDirtyTable(table) { dirtyTables.delete(table); syncMeta.dirtyRows[table]=new Set(); }
+function getDirtyRowIds(table) { const r=syncMeta.dirtyRows[table]; return (!r||r.size===0)?null:Array.from(r); }
 // Tiny stable content hash (djb2-xor) used to detect which tables changed locally.
 function quickHash(str){ let h = 5381; for (let i=0;i<str.length;i++){ h = ((h<<5)+h) ^ str.charCodeAt(i); } return (h>>>0).toString(36) + ':' + str.length; }
 function tableKeyOf(tableName){ const t = SUPABASE_TABLES.find(x=>x.table===tableName); return t ? t.key : tableName; }
@@ -3468,9 +3512,12 @@ async function _loadStateInner(force) {
 
   const results = await Promise.all(toFetch.map(async t => {
     try {
-      const { data, error } = await withRequestTimeout(supabaseClient.from(t.table).select('id, data'));
+      const lastSeen = syncMeta.tableTs[t.table];
+      let query = supabaseClient.from(t.table).select('id, data, updated_at, version');
+      if (lastSeen && syncMeta.everSynced) query = query.gt('updated_at', new Date(lastSeen).toISOString());
+      const { data, error } = await withRequestTimeout(query);
       if (error) return { t, error };
-      return { t, rows: data || [] };
+      return { t, rows: data||[], incremental: !!(lastSeen && syncMeta.everSynced) };
     } catch (e) { return { t, error: e }; }
   }));
 
@@ -3483,12 +3530,21 @@ async function _loadStateInner(force) {
     return loadStateFromLocalStorage();
   }
 
-  // Cloud wins for each table that loaded; record its stamp + content hash.
   ok.forEach(r => {
-    state[r.t.key] = (r.rows || []).map(row => row.data).filter(Boolean);
-    syncMeta.tableTs[r.t.table] = cloudTs[r.t.table] || 0;
-    syncMeta.syncedHash[r.t.table] = quickHash(JSON.stringify(state[r.t.key] || []));
-    dirtyTables.delete(r.t.table);
+    if (!syncMeta.rowVersions[r.t.table]) syncMeta.rowVersions[r.t.table]={};
+    if (r.incremental && r.rows.length===0) { /* nothing changed */ }
+    else if (r.incremental) {
+      const inc={}; (r.rows||[]).forEach(row=>{if(row.data)inc[row.id]=row;});
+      const exist=state[r.t.key]||[]; const existIds=new Set(exist.map(x=>x.id));
+      const merged=exist.map(item=>{ const i=inc[item.id]; if(!i)return item; if((i.version||1)>(syncMeta.rowVersions[r.t.table][item.id]||0)){syncMeta.rowVersions[r.t.table][item.id]=i.version||1;return i.data;} return item; });
+      Object.keys(inc).forEach(id=>{ if(!existIds.has(id)){syncMeta.rowVersions[r.t.table][id]=inc[id].version||1;merged.push(inc[id].data);} });
+      state[r.t.key]=merged.filter(Boolean);
+    } else {
+      state[r.t.key]=(r.rows||[]).map(row=>{ if(row.data&&row.version)syncMeta.rowVersions[r.t.table][row.id]=row.version; return row.data; }).filter(Boolean);
+    }
+    syncMeta.tableTs[r.t.table]=cloudTs[r.t.table]||0;
+    syncMeta.syncedHash[r.t.table]=quickHash(JSON.stringify(state[r.t.key]||[]));
+    clearDirtyTable(r.t.table);
   });
   // Make sure no table key is left undefined (use cache for anything not in memory).
   SUPABASE_TABLES.forEach(t => { if (!Array.isArray(state[t.key])) state[t.key] = Array.isArray(cache[t.key]) ? cache[t.key] : []; });
@@ -3692,8 +3748,11 @@ async function _flushWritesInner() {
   try {
     const jobs = [];
     dirtyList.forEach(table => {
-      const rows = (state[tableKeyOf(table)] || []).map(o => ({ id: o.id, data: o }));
-      if (rows.length) jobs.push(withRequestTimeout(supabaseClient.from(table).upsert(rows, { onConflict: 'id' })));
+      const dirtyIds = getDirtyRowIds(table);
+      const allRows = state[tableKeyOf(table)] || [];
+      const rowsToUpload = dirtyIds ? allRows.filter(o => o && dirtyIds.includes(o.id)) : allRows;
+      if (!rowsToUpload.length) return;
+      jobs.push(withRequestTimeout(supabaseClient.from(table).upsert(rowsToUpload.map(o=>({id:o.id,data:o})),{onConflict:'id'})));
     });
     delTables.forEach(table => {
       const ids = (pendingDeletes[table]||[]).filter(Boolean);
@@ -3709,7 +3768,7 @@ async function _flushWritesInner() {
     const changed = Array.from(new Set([...dirtyList, ...delTables]));
     if (changed.length) await bumpCloudTimestamps(changed);
     // Record the new synced snapshot and clear the queues.
-    dirtyList.forEach(table => { syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || [])); dirtyTables.delete(table); });
+    dirtyList.forEach(table => { syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || [])); clearDirtyTable(table); });
     pendingDeletes = {};
     syncMeta.everSynced = true; // a successful upload + stamp read means we're in sync → next load can go incremental
     persistSyncMeta();
@@ -4669,7 +4728,9 @@ function renderTaskNodeBody(a, subtasks) {
     (isOpen(a) ? '<button class="btn sm" onclick="event.stopPropagation();completeAction(\'' + a.id + '\')">✓ ' + t('completeBtn') + '</button>' : '') +
     (isOpen(a) && !meeting ? '<button class="btn ghost sm" onclick="event.stopPropagation();showExtendDialog(\'' + a.id + '\')">📅 ' + t('extendDueDate') + '</button>' : '') +
     (!meeting && !a.parentId ? '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(null,\'' + a.projectId + '\',null,\'task\',null,\'' + a.id + '\')">' + t('addSubtask') + '</button>' : '') +
-    '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(\'' + a.id + '\')">' + t('edit') + '</button>' +
+    (isLockedByOther('actions', a.id) ?
+      '<button class="btn ghost sm" disabled style="opacity:0.45;cursor:not-allowed" title="' + escapeHtml(t('editLockWait', (getEditLock('actions',a.id)||{}).user||'...')) + '">' + t('edit') + '</button>' :
+      '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(\'' + a.id + '\')">' + t('edit') + '</button>') +
     '<button class="btn ghost sm" onclick="event.stopPropagation();deleteAction(\'' + a.id + '\')">' + t('delete') + '</button>' +
     '</div></div>';
 }
@@ -6080,23 +6141,26 @@ views.report = () => {
       ` : ''}
     </div>
 
-      <div class="stat">
-        <div class="stat-label">${t('statTotalInPeriod')}</div>
-        <div class="stat-value">${tasksOnly.length + carriedOver.length}</div>
-        ${carriedOver.length > 0 ? `<div class="stat-meta" style="font-size:10px;color:var(--ink-faint)">${tasksOnly.length} ${t('reportPeriodToday').toLowerCase()} + ${carriedOver.length} ${t('sectionCarriedOver').replace('📌 ','')}</div>` : ''}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+      <div style="background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">${t('statTotalInPeriod')}</div>
+        <div style="font-size:28px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--ink);line-height:1">${tasksOnly.length + carriedOver.length}</div>
+        ${carriedOver.length > 0 ? `<div style="font-size:10px;color:var(--ink-faint);margin-top:5px">${tasksOnly.length} period + <span style="color:var(--accent-warm)">${carriedOver.length} carried over</span></div>` : `<div style="height:15px"></div>`}
       </div>
-      <div class="stat good">
-        <div class="stat-label">${t('statCompletedInPeriod')}</div>
-        <div class="stat-value">${completedTasks.length}</div>
+      <div style="background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--green);border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">${t('statCompletedInPeriod')}</div>
+        <div style="font-size:28px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--green);line-height:1">${completedTasks.length}</div>
+        <div style="font-size:10px;color:var(--ink-faint);margin-top:5px">${(tasksOnly.length + carriedOver.length) > 0 ? Math.round(completedTasks.length/Math.max(tasksOnly.length+carriedOver.length,1)*100)+'% completion' : '\u2014'}</div>
       </div>
-      <div class="stat warn">
-        <div class="stat-label">${t('statOpenInPeriod')}</div>
-        <div class="stat-value">${openTasksAll.length + carriedOver.length}</div>
-        ${carriedOver.length > 0 ? `<div class="stat-meta" style="font-size:10px;color:var(--red)">${carriedOver.length} ${t('sectionCarriedOver').replace('📌 ','')}</div>` : ''}
+      <div style="background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--amber);border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">${t('statOpenInPeriod')}</div>
+        <div style="font-size:28px;font-weight:600;font-family:'Reem Kufi',serif;color:var(--amber);line-height:1">${openTasksAll.length + carriedOver.length}</div>
+        ${carriedOver.length > 0 ? `<div style="font-size:10px;color:var(--red);margin-top:5px">${carriedOver.length} carried over</div>` : `<div style="height:15px"></div>`}
       </div>
-      <div class="stat ${meetings.length>0?'':'good'}">
-        <div class="stat-label">${t('statMeetingsConducted')}</div>
-        <div class="stat-value">${meetings.length}</div>
+      <div style="background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">${t('statMeetingsConducted')}</div>
+        <div style="font-size:28px;font-weight:600;font-family:'Reem Kufi',serif;color:${meetings.filter(isCompleted).length>0?'var(--accent)':'var(--ink-muted)'};line-height:1">${meetings.filter(isCompleted).length}/${meetings.length}</div>
+        <div style="font-size:10px;color:var(--ink-faint);margin-top:5px">${meetings.length > 0 ? Math.round(meetings.filter(isCompleted).length/meetings.length*100)+'% held' : '\u2014'}</div>
       </div>
     </div>
 
@@ -8140,6 +8204,90 @@ function printOpenTasksReport(existingEntry) {
   openReportWindow(t('openTasksReportTitle'), body, entry);
 }
 
+// ── Supabase Realtime: live push from other users ──
+let _realtimeChannel = null;
+function subscribeToRealtime() {
+  if (!supabaseClient || _realtimeChannel) return;
+  _realtimeChannel = supabaseClient
+    .channel('soe-governance-live')
+    .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+      const { table, eventType, new: newRow, old: oldRow } = payload;
+      const tableEntry = SUPABASE_TABLES.find(t => t.table === table);
+      if (!tableEntry) return;
+      const key = tableEntry.key;
+      if (eventType === 'DELETE') {
+        const deletedId = oldRow && oldRow.id;
+        if (!deletedId) return;
+        state[key] = (state[key] || []).filter(r => r.id !== deletedId);
+        if (syncMeta.rowVersions[table]) delete syncMeta.rowVersions[table][deletedId];
+        saveStateToLocalStorage(); try { render(state.detailParam); } catch(e){}
+      } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        const incomingData = newRow && newRow.data; const incomingId = newRow && newRow.id;
+        const incomingVersion = (newRow && newRow.version) || 1;
+        if (!incomingData || !incomingId) return;
+        const isDirtyLocally = syncMeta.dirtyRows[table] instanceof Set && syncMeta.dirtyRows[table].has(incomingId);
+        const cachedVersion = (syncMeta.rowVersions[table] || {})[incomingId] || 0;
+        if (isDirtyLocally && incomingVersion > cachedVersion + 1) {
+          if (typeof toast === 'function') toast('⚠ ' + (currentLang === 'ar' ? 'تعارض: تم تعديل هذا السجل من جهاز آخر' : 'Conflict: record edited from another device'));
+        }
+        const existing = state[key] || [];
+        const idx = existing.findIndex(r => r.id === incomingId);
+        if (idx >= 0) { existing[idx] = incomingData; } else { existing.push(incomingData); }
+        state[key] = existing;
+        if (!syncMeta.rowVersions[table]) syncMeta.rowVersions[table] = {};
+        syncMeta.rowVersions[table][incomingId] = incomingVersion;
+        saveStateToLocalStorage(); try { render(state.detailParam); } catch(e){}
+      }
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') { console.log('Realtime: live sync active'); subscribeBroadcast(); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('Realtime:', status); _realtimeChannel = null; setTimeout(subscribeToRealtime, 5000);
+      }
+    });
+}
+// ── Edit Lock System ──
+const _editLocks = {};
+const LOCK_TTL_MS = 60000;
+function acquireEditLock(table, id) {
+  if (!supabaseClient || !_authUser) return;
+  const key = table + '/' + id;
+  const payload = { type:'edit-lock', action:'acquire', table, id, key,
+    email: _authUser.email, user: (_authUser.email||'').split('@')[0], ts: Date.now() };
+  _editLocks[key] = payload;
+  if (_realtimeChannel) _realtimeChannel.send({ type:'broadcast', event:'edit-lock', payload });
+  setTimeout(() => releaseEditLock(table, id), LOCK_TTL_MS);
+}
+function releaseEditLock(table, id) {
+  if (!supabaseClient || !_authUser) return;
+  const key = table + '/' + id;
+  if (!_editLocks[key] || _editLocks[key].email !== _authUser.email) return;
+  delete _editLocks[key];
+  const payload = { type:'edit-lock', action:'release', table, id, key, email: _authUser.email };
+  if (_realtimeChannel) _realtimeChannel.send({ type:'broadcast', event:'edit-lock', payload });
+  try { render(state.detailParam); } catch(e){}
+}
+function getEditLock(table, id) {
+  const lock = _editLocks[table + '/' + id];
+  if (!lock) return null;
+  if (Date.now() - lock.ts > LOCK_TTL_MS) { delete _editLocks[table+'/'+id]; return null; }
+  if (_authUser && lock.email === _authUser.email) return null;
+  return lock;
+}
+function isLockedByOther(table, id) { return !!getEditLock(table, id); }
+function editLockBadge(table, id) {
+  const lock = getEditLock(table, id);
+  return lock ? '<span class="edit-lock-badge">🔒 ' + escapeHtml(lock.user) + ' ' + t('editLockTitle').toLowerCase() + '</span>' : '';
+}
+function subscribeBroadcast() {
+  if (!_realtimeChannel) return;
+  _realtimeChannel.on('broadcast', { event:'edit-lock' }, ({ payload }) => {
+    if (!payload || !payload.key) return;
+    if (payload.action === 'acquire') _editLocks[payload.key] = payload;
+    else if (payload.action === 'release') delete _editLocks[payload.key];
+    try { render(state.detailParam); } catch(e){}
+  });
+}
 function render(param) {
   const main = document.getElementById('main-content');
   const view = state.currentView;
@@ -12390,7 +12538,8 @@ async function refreshFromCloud(force) {
     if (hasPendingDeletes()) await flushWrites();
     await loadState(force);   // row-level fetch → only changed rows
     subscribeToRealtime();    // live push: other users' changes appear instantly
-    flushWrites();            // push any remaining dirty (upsert) writes
+    flushWrites();
+    subscribeToRealtime();
     _cloudFailUntil = 0;
     setSyncOnline(true);
     render(state.detailParam);
