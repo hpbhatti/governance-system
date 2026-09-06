@@ -400,12 +400,7 @@
   .search-input:focus { outline: none; border-color: var(--accent); }
 
   /* Action card list (for daily report) */
-  .drill-shell { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
-.drill-shell:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,31,46,.08); }
-.drill-shell:active { transform: translateY(0); }
-.drill-shell .action-card { pointer-events: none; } /* let the shell take the click */
-.drill-shell .action-card .btn { pointer-events: auto; } /* but keep buttons usable */
-.drill-shell .action-card .badge { pointer-events: auto; }
+  /* .drill-shell rules removed — no longer used; task cards expand in place via renderTaskNode */
 .action-card.flash-target,
 tr.flash-target { animation: flashTarget 1.6s ease-out; outline: 2px solid var(--accent-warm); outline-offset: 2px; }
 tr.flash-target > td { background: rgba(201,169,110,.18) !important; }
@@ -2445,6 +2440,8 @@ const T = {
     subtasks: 'المهام الفرعية', subtask: 'مهمة فرعية', addSubtask: '＋ مهمة فرعية',
     parentTask: 'المهمة الأم', noSubtasks: 'لا توجد مهام فرعية',
     subtasksOverdue: '{0} فرعية متأخرة',
+    openInProject: 'فتح في المشروع',
+    teamMemberReportBtn: '📄 تقرير الأداء', teamMemberReportTitle: 'تقرير عضو الفريق',
     subtaskProgress: '{0} من {1} منجزة',
     originalDueDate: 'التاريخ الأصلي', currentDueDate: 'التاريخ الحالي',
     dueDateHistory: 'سجل التمديدات', extendDueDate: 'تمديد التاريخ',
@@ -3113,6 +3110,8 @@ const T = {
     subtasks: 'Subtasks', subtask: 'Subtask', addSubtask: '＋ Subtask',
     parentTask: 'Parent Task', noSubtasks: 'No subtasks',
     subtasksOverdue: '{0} subtasks overdue',
+    openInProject: 'Open in Project',
+    teamMemberReportBtn: '📄 Performance Report', teamMemberReportTitle: 'Team Member Report',
     subtaskProgress: '{0} of {1} done',
     originalDueDate: 'Original Date', currentDueDate: 'Current Date',
     dueDateHistory: 'Extension History', extendDueDate: 'Extend Date',
@@ -4732,6 +4731,7 @@ function renderTaskNodeBody(a, subtasks) {
       '<button class="btn ghost sm" disabled style="opacity:0.45;cursor:not-allowed" title="' + escapeHtml(t('editLockWait', (getEditLock('actions',a.id)||{}).user||'...')) + '">' + t('edit') + '</button>' :
       '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(\'' + a.id + '\')">' + t('edit') + '</button>') +
     '<button class="btn ghost sm" onclick="event.stopPropagation();deleteAction(\'' + a.id + '\')">' + t('delete') + '</button>' +
+    (a.projectId ? '<button class="btn ghost sm" onclick="event.stopPropagation();navigate(\'projectDetail\',\'' + a.projectId + '\')">📁 ' + t('openInProject') + '</button>' : '') +
     '</div></div>';
 }
 
@@ -5592,7 +5592,16 @@ function openModal(title, bodyHtml, footHtml) {
   document.getElementById('modal-foot').innerHTML = footHtml || '';
   document.getElementById('modal').classList.add('active');
 }
-function closeModal() { document.getElementById('modal').classList.remove('active'); }
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  window._pendingDefaultOwnerId = null;
+  Object.keys(_editLocks).forEach(key => {
+    if (_authUser && _editLocks[key] && _editLocks[key].email === _authUser.email) {
+      const parts = key.split('/');
+      if (parts.length >= 2) releaseEditLock(parts[0], parts.slice(1).join('/'));
+    }
+  });
+}
 // Inline form validation message (replaces blocking alert() for field errors).
 function formError(msg) {
   const body = document.getElementById('modal-body');
@@ -5667,6 +5676,7 @@ views.teamMemberDetail = (memberId) => {
         <h1 class="page-title">${escapeHtml(m.name)}</h1>
         <div class="page-sub">${escapeHtml(m.role || '')}${m.role && m.email ? ' · ' : ''}${escapeHtml(m.email || '')} — ${t('teamMemberDetailSub')}</div>
       </div>
+      <button class="btn ghost" onclick="printTeamMemberReport('${memberId}')">📄 ${t('teamMemberReportBtn')}</button>
     </div>
     <div class="stats">
       <div class="stat"><div class="stat-label">${t('totalAssignedLabel')}</div><div class="stat-value">${tasks.length}</div></div>
@@ -5683,28 +5693,9 @@ views.teamMemberDetail = (memberId) => {
           <div class="section">
             <div class="section-head">
               <div class="section-title">📁 ${escapeHtml(pr ? pr.name : '—')}<span class="accent-line"></span></div>
+              <button class="btn sm" onclick="showActionForm(null,'${pid}',null,'task',null,null,'${memberId}')">${t('addAction')}</button>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>${t('fieldActionTitle')}</th><th>${t('colStatus')}</th><th>${t('colDate')}</th><th>${t('delayCauseLabel')}</th></tr></thead>
-                <tbody>
-                  ${items.map(a => {
-                    const cause = getTaskDelayCause(a);
-                    let causeHtml;
-                    if (isCompleted(a)) causeHtml = `<span class="cause-chip ok">✓ ${t('filterCompleted')}</span>`;
-                    else if (cause.key === 'dep') causeHtml = `<span class="cause-chip dep">⛓ ${escapeHtml(cause.label)}</span>`;
-                    else if (cause.key === 'other') causeHtml = `<span class="cause-chip other">${escapeHtml(cause.label)}</span>`;
-                    else causeHtml = `<span class="cause-chip ok">${t('onTrackLabel')}</span>`;
-                    return `<tr id="actcard-${a.id}" class="team-task-row drillable" onclick="openActionFromTeamMember('${a.id}','${memberId}')" title="${t('drillTaskHint')}">
-                      <td><div class="name">${escapeHtml(a.title)}</div></td>
-                      <td>${statusBadge(a.status)}</td>
-                      <td>${fmtDate(a.dueDate)}${isOpen(a)&&getDelayDays(a)>0?`<div class="sub" style="color:var(--crit)">+${getDelayDays(a)} ${t('days')}</div>`:''}</td>
-                      <td>${causeHtml}</td>
-                    </tr>`;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
+            ${items.map(a => renderTaskNode(a, false)).join('')}
           </div>`;
       }).join('')}
   `;
@@ -5884,7 +5875,7 @@ views.dashboard = () => {
         <button class="btn ghost sm" onclick="goToTasksFiltered('delayed')">${t('viewFullReport')}</button>
       </div>
       ${recentDelayed.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noDelayed')}</div></div>` :
-        recentDelayed.map(a => `<div class="drill-shell" onclick="openActionFromDashboard('${a.id}')" title="${t('drillTaskHint')}">${renderActionCard(a)}</div>`).join('')}
+        recentDelayed.map(a => renderTaskNode(a, false)).join('')}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
@@ -6456,7 +6447,7 @@ views.agenda = () => {
       </div>
       ${filteredTasks.length === 0
         ? `<div class="empty" style="padding:24px"><div class="empty-icon">✅</div>${t('agendaNoTasks')}</div>`
-        : `<div class="card-list">${filteredTasks.map(a => `<div class="drill-shell" onclick="openActionFromAgenda('${a.id}')" title="${t('drillTaskHint')}">${renderActionCard(a)}</div>`).join('')}</div>`
+        : `<div class="card-list">${filteredTasks.map(a => renderTaskNode(a, false)).join('')}</div>`
       }
     </div>
 
@@ -6467,7 +6458,7 @@ views.agenda = () => {
       </div>
       ${filteredMeetings.length === 0
         ? `<div class="empty" style="padding:24px"><div class="empty-icon">📅</div>${t('agendaNoMeetings')}</div>`
-        : `<div class="card-list">${filteredMeetings.map(a => `<div class="drill-shell" onclick="openActionFromAgenda('${a.id}')" title="${t('drillMeetingHint')}">${renderActionCard(a)}</div>`).join('')}</div>`
+        : `<div class="card-list">${filteredMeetings.map(a => renderTaskNode(a, false)).join('')}</div>`
       }
     </div>
   `;
@@ -7133,43 +7124,8 @@ views.actions = () => {
           <option value="dateDesc" ${state.filters.meetingSort==='dateDesc'?'selected':''}>📅 ${t('meetingSortDateDesc')}</option>
         </select>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>${t('colAgenda')}</th><th>${t('colPartnerProject')}</th><th>${t('colStatus')}</th>
-            <th>${t('colPriority')}</th><th>${t('colDate')}</th><th>${t('colDelay')}</th><th>${t('colRisk')}</th><th></th>
-          </tr></thead>
-          <tbody>
-            ${[...list.filter(isMeeting)].sort((a,b)=>{const _d=(a.dueDate||'').localeCompare(b.dueDate||''); return state.filters.meetingSort==='dateDesc' ? -_d : _d;}).map(a => {
-              const project = getProject(a.projectId);
-              const delay = getDelayDays(a);
-              const risk = isOpen(a) ? getRiskLevel(delay) : null;
-              return `
-              <tr ondblclick="openActionFromTasks('${a.id}')" class="actions-tab-row" title="${t('drillDblClickHint')}">
-                <td>
-                  <div class="name">🗓 ${escapeHtml(a.title)}</div>
-                  ${a.meetingTime ? `<div class="sub">⏰ ${fmtTime(a.meetingTime)}</div>` : ''}
-                </td>
-                <td>
-                  <div style="font-size:12px;font-weight:500">${escapeHtml(getTaskStakeholderName(a))}</div>
-                  <div class="sub">${escapeHtml(project ? project.name : '—')}</div>
-                </td>
-                <td>${statusBadge(a.status)}</td>
-                <td>${priorityBadge(a.priority)}</td>
-                <td>${fmtDate(a.dueDate)}</td>
-                <td>${delay > 0 && !isCompleted(a) ? t('daysShort', delay) : (isCompleted(a) && delay > 0 ? `<span style="color:var(--ink-faint)">+${delay}</span>` : '—')}</td>
-                <td>${risk ? `<span class="badge ${risk.cls}">${risk.label}</span>` : (isMissed(a) ? `<span class="badge dark">${t('statusMissed')}</span>` : '—')}</td>
-                <td>
-                  <div class="row-actions">
-                    ${isOpen(a) ? `<button class="row-btn" onclick="completeAction('${a.id}')">${t('completeBtn')}</button>` : ''}
-                    <button class="row-btn" onclick="showActionForm('${a.id}')">${t('edit')}</button>
-                    <button class="row-btn danger" onclick="deleteAction('${a.id}')">${t('delete')}</button>
-                  </div>
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
+      <div>
+        ${[...list.filter(isMeeting)].sort((a,b)=>{const _d=(a.dueDate||'').localeCompare(b.dueDate||''); return state.filters.meetingSort==='dateDesc' ? -_d : _d;}).map(a => renderTaskNode(a, false)).join('')}
       </div>
     </div>` : ''}
   `;
@@ -7721,12 +7677,10 @@ function _openActionInProject(actionId, origin, originParam) {
   render(state.detailParam);
   try { _consumeScrollTarget(); } catch(e) {}
 }
-window.openActionFromDashboard = function(actionId) { _openActionInProject(actionId, 'dashboard'); };
-window.openActionFromAgenda = function(actionId) { _openActionInProject(actionId, 'agenda'); };
-// NEW: Tasks tab double-click drill-down. Same flow as Agenda/Dashboard rows —
-// jumps to the task's project, scrolls + flashes, and shows a Back-to-Tasks pill.
-window.openActionFromTasks = function(actionId) { _openActionInProject(actionId, 'tasks'); };
-window.openActionFromTeamMember = function(actionId, memberId) { _openActionInProject(actionId, 'teamMember', memberId); };
+// NOTE: openActionFromDashboard/Agenda/Tasks/TeamMember wrappers were removed —
+// those views now use renderTaskNode's expand-in-place cards instead of
+// click-to-navigate. _openActionInProject() itself is kept since other flows
+// still rely on state.navOrigin / the "Back to X" pill it powers.
 
 // After any render, if state.scrollToActionId is set, find the card and flash it.
 function _consumeScrollTarget() {
@@ -9054,7 +9008,9 @@ function saveLink(projectId) {
   render(state.detailParam);
 }
 
-function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultType, defaultDate, parentId) {
+function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultType, defaultDate, parentId, defaultOwnerId) {
+  window._pendingDefaultOwnerId = defaultOwnerId || null;
+  if (actionId) acquireEditLock('actions', actionId);
   const editing = actionId ? state.actions.find(a => a.id === actionId) : null;
   const parentTask = parentId ? state.actions.find(a => a.id === parentId) : (editing && editing.parentId ? state.actions.find(a => a.id === editing.parentId) : null);
   window._pendingParentId = parentId || (editing ? editing.parentId : null) || null;
@@ -9219,14 +9175,15 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     if (!sel) return;
     const pid = projectEl.value;
     const proj = getProject(pid);
-    const cur = editing?.ownerId || '';
+    const cur = editing?.ownerId || window._pendingDefaultOwnerId || '';
+    const curKind = editing?.ownerKind || (window._pendingDefaultOwnerId ? 'internal' : '');
     let html = `<option value="">${t('ownerNone')}</option>`;
     // Only internal members explicitly assigned to THIS project may own its tasks.
     const projTeamIds = Array.isArray(proj?.teamMemberIds) ? proj.teamMemberIds : [];
     const internal = (state.team || []).filter(m => projTeamIds.includes(m.id));
     if (internal.length) {
       html += `<optgroup label="${t('ownerInternalGroup')}">` +
-        internal.map(m => `<option value="i:${m.id}" ${cur===m.id && editing?.ownerKind==='internal'?'selected':''}>${escapeHtml(m.name)}</option>`).join('') +
+        internal.map(m => `<option value="i:${m.id}" ${cur===m.id && curKind==='internal'?'selected':''}>${escapeHtml(m.name)}</option>`).join('') +
         `</optgroup>`;
     }
     // FIX #1: iterate ALL project partners for team members
@@ -10630,6 +10587,64 @@ function printPartnerReport(partnerId, existingEntry) {
 // Renders each of the partner's projects using the SAME card format as printProjectReport /
 // printAllTasksReport (health header, KPI strip, S-Curve + Drift analytics, task-line cards
 // with subtasks, meetings table) — scoped to this partner's tasks within each project.
+// ── Team Member Report — same card format as Project/Partner reports ──
+function printTeamMemberReport(memberId, existingEntry) {
+  const m = getTeamMember(memberId);
+  if (!m) return;
+  const entry = existingEntry || saveReportEntry('team-member', { memberId }, m.name);
+  const tasks = state.actions.filter(a => isTask(a) && a.ownerKind === 'internal' && a.ownerId === memberId);
+  const completed = tasks.filter(isCompleted);
+  const open = tasks.filter(isOpen);
+  const delayed = open.filter(a => getDelayDays(a) > DELAY_THRESHOLD_DAYS);
+  const rate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
+  const byProject = {};
+  tasks.forEach(a => { (byProject[a.projectId] = byProject[a.projectId] || []).push(a); });
+
+  const body = `
+    <h1>🧑‍💼 ${escapeHtml(m.name)}</h1>
+    <div class="meta">${t('teamMemberReportTitle')} · ${escapeHtml(m.role || '')}${m.role && m.email ? ' · ' : ''}${escapeHtml(m.email || '')}</div>
+
+    <h2>${t('reportSummary')}</h2>
+    <div class="kpi-strip">
+      <div class="kpi k-accent"><div class="kv">${tasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+      <div class="kpi k-green"><div class="kv">${completed.length}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+      <div class="kpi k-amber"><div class="kv">${open.length}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+      <div class="kpi k-red"><div class="kv">${delayed.length}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+    </div>
+    <div class="kpi-strip" style="margin-top:10px">
+      <div class="kpi k-blue"><div class="kv">${tasks.length ? rate + '%' : '—'}</div><div class="kl">${t('closingRateLabel')}</div></div>
+      <div class="kpi k-accent"><div class="kv">${Object.keys(byProject).length}</div><div class="kl">${t('colProjectsInvolved')}</div></div>
+    </div>
+
+    <h2>${t('reportPartnerTasks')}</h2>
+    ${Object.keys(byProject).length === 0 ? `<div class="empty-note">${t('reportNoData')}</div>` :
+      Object.keys(byProject).map(pid => {
+        const pr = getProject(pid);
+        const projTasks = byProject[pid];
+        const mainTasks = sortTasks(projTasks.filter(a => !a.parentId));
+        const completedP = projTasks.filter(isCompleted).length;
+        const openP = projTasks.filter(isOpen).length;
+        const delayedP = projTasks.filter(a => isOpen(a) && getDelayDays(a) > DELAY_THRESHOLD_DAYS).length;
+        return `
+          <div class="proj-report-card">
+            <div class="proj-report-head" style="background:linear-gradient(135deg,#2c3e50 0%,#3a5068 100%)"><div><div class="pr-title">📁 ${escapeHtml(pr ? pr.name : t('reportTasksNoProject'))}</div></div></div>
+            <div class="proj-report-body">
+              <div class="kpi-strip">
+                <div class="kpi k-accent"><div class="kv">${projTasks.length}</div><div class="kl">${t('reportTotalTasks')}</div></div>
+                <div class="kpi k-green"><div class="kv">${completedP}</div><div class="kl">${t('reportCompletedTasks')}</div></div>
+                <div class="kpi k-amber"><div class="kv">${openP}</div><div class="kl">${t('reportOpenTasks')}</div></div>
+                <div class="kpi k-red"><div class="kv">${delayedP}</div><div class="kl">${t('reportDelayedTasks')}</div></div>
+              </div>
+              ${mainTasks.length === 0 ? `<div class="empty-note">${t('reportNoData')}</div>` :
+                mainTasks.map(a => renderReportTaskLine(a, { isMain: !!getSubtasks(a.id).length })).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+  `;
+  openReportWindow(t('teamMemberReportTitle') + ' — ' + m.name, body, entry);
+}
+
 function renderPartnerProjectCards(partnerId, actions, projects) {
   const projIds = new Set((projects || []).map(pr => pr.id));
   let html = `<h2>${t('reportPartnerTasks')}</h2>`;
@@ -10967,6 +10982,7 @@ function reprintReport(entryId) {
     case 'project-tasks': printProjectTasksReport(entry.params.projectId, entry); break;
     case 'tasks-global':  printAllTasksReport(entry); break;
     case 'open-tasks':    printOpenTasksReport(entry); break;
+    case 'team-member':   printTeamMemberReport(entry.params.memberId, entry); break;
   }
 }
 
