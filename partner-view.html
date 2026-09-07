@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOE — My Tasks</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwRjIyMzUiLz48bGluZSB4MT0iMzIiIHkxPSIxMCIgeDI9IjMyIiB5Mj0iNTQiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9IjAuMyIvPjxsaW5lIHgxPSIxMCIgeTE9IjMyIiB4Mj0iNTQiIHkyPSIzMiIgc3Ryb2tlPSIjQzlBODRDIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC4zIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyLjUiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSI5IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOUE4NEMiIHN0cm9rZS13aWR0aD0iMS44IiBvcGFjaXR5PSIwLjY1Ii8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMy41IiBmaWxsPSIjQzlBODRDIi8+PC9zdmc+">
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --bg-card: #ffffff;
+    --ink: #1a1f2e;
+    --ink-muted: #5a6478;
+    --ink-faint: #8a92a3;
+    --line: #e4e0d6;
+    --line-strong: #c8c2b0;
+    --accent: #1a3a52;
+    --accent-warm: #b8884a;
+    --gold: #c9a96e;
+    --green: #4a7c59;
+    --amber: #c47e2a;
+    --red: #b04540;
+    --green-bg: #e8f0e8;
+    --amber-bg: #faf0e0;
+    --red-bg: #f5e0de;
+    --shadow: 0 1px 2px rgba(26,31,46,0.04), 0 4px 12px rgba(26,31,46,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'IBM Plex Sans Arabic', 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+
+  .header {
+    background: linear-gradient(135deg, #0a1628 0%, #132744 100%);
+    border-radius: 14px;
+    padding: 28px 26px;
+    margin-bottom: 24px;
+    color: #e8dcc8;
+    box-shadow: var(--shadow);
+  }
+  .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .crosshair-icon { flex-shrink: 0; }
+  .header-title { font-size: 20px; font-weight: 600; letter-spacing: 0.3px; }
+  .header-sub { font-size: 12px; color: rgba(232,220,200,0.55); letter-spacing: 0.5px; text-transform: uppercase; margin-top: 4px; }
+  .header-partner { font-size: 26px; font-weight: 700; margin-top: 14px; color: #f5f0e6; }
+  .header-meta { font-size: 12px; color: rgba(232,220,200,0.45); margin-top: 6px; }
+
+  .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+  .kpi { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi-label { font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .kpi.k-total .kpi-value { color: var(--accent); }
+  .kpi.k-done .kpi-value { color: var(--green); }
+  .kpi.k-open .kpi-value { color: var(--amber); }
+
+  .project-section { margin-bottom: 20px; }
+  .project-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 4px; font-size: 15px; font-weight: 600; color: var(--accent);
+    border-bottom: 2px solid var(--accent-warm); margin-bottom: 10px;
+  }
+
+  .task-card {
+    background: var(--bg-card); border: 1px solid var(--line); border-inline-start: 4px solid var(--line-strong);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow);
+  }
+  .task-card.st-completed { border-inline-start-color: var(--green); }
+  .task-card.st-open { border-inline-start-color: var(--amber); }
+  .task-card.st-overdue { border-inline-start-color: var(--red); background: var(--red-bg); }
+  .task-card.st-missed { border-inline-start-color: var(--red); }
+
+  .task-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .task-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-muted); align-items: center; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 500; border: 1px solid transparent; }
+  .badge.completed { background: var(--green-bg); color: var(--green); border-color: rgba(74,124,89,0.25); }
+  .badge.open { background: var(--amber-bg); color: var(--amber); border-color: rgba(196,126,42,0.25); }
+  .badge.overdue { background: var(--red-bg); color: var(--red); border-color: rgba(176,69,64,0.25); }
+  .badge.missed { background: var(--red-bg); color: var(--red); border-color: rgba(176,69,64,0.25); }
+  .badge.high { background: var(--red-bg); color: var(--red); }
+  .badge.medium { background: var(--amber-bg); color: var(--amber); }
+  .badge.low { background: #eef0f4; color: var(--ink-muted); }
+
+  .subtask { padding: 6px 0 6px 16px; font-size: 12.5px; color: var(--ink-muted); border-top: 1px dashed var(--line); margin-top: 8px; }
+  .subtask:first-of-type { margin-top: 10px; padding-top: 10px; }
+
+  .state-box { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
+  .state-box .icon { font-size: 40px; margin-bottom: 12px; }
+  .state-box .msg { font-size: 15px; }
+
+  .footer-note { text-align: center; font-size: 11px; color: var(--ink-faint); margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+  @media (max-width: 480px) {
+    .kpi-strip { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .kpi-value { font-size: 20px; }
+    .header-partner { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="state-box"><div class="icon">⏳</div><div class="msg">Loading your tasks…</div></div>
+  </div>
+
+<script>
+const SUPABASE_URL = 'https://ibjwoaitvpsjnyiedwkz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_hj_03RWGQXf7VFDKIrOuSg_82urnuLd';
+const FUNCTION_URL = SUPABASE_URL + '/functions/v1/partner-view';
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function daysBetween(a, b) {
+  const d1 = new Date(a + 'T00:00:00'), d2 = new Date(b + 'T00:00:00');
+  return Math.round((d2 - d1) / 86400000);
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function taskStatusClass(task) {
+  if (task.status === 'completed') return 'completed';
+  if (task.status === 'missed') return 'missed';
+  if (task.dueDate && task.dueDate < todayStr()) return 'overdue';
+  return 'open';
+}
+
+function statusBadge(task) {
+  const cls = taskStatusClass(task);
+  const labels = { completed: '✓ Completed', open: 'Open', overdue: 'Overdue', missed: 'Missed' };
+  return `<span class="badge ${cls}">${labels[cls]}</span>`;
+}
+
+function priorityBadge(p) {
+  if (!p) return '';
+  const labels = { high: 'High', medium: 'Medium', low: 'Low' };
+  return `<span class="badge ${p}">${labels[p] || p}</span>`;
+}
+
+function renderCrosshairIcon(size) {
+  return `<svg class="crosshair-icon" width="${size}" height="${size}" viewBox="0 0 64 64">
+    <line x1="32" y1="10" x2="32" y2="54" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+    <line x1="10" y1="32" x2="54" y2="32" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+    <circle cx="32" cy="32" r="17" fill="none" stroke="#C9A84C" stroke-width="2.5"/>
+    <circle cx="32" cy="32" r="9" fill="none" stroke="#C9A84C" stroke-width="1.8" opacity="0.65"/>
+    <circle cx="32" cy="32" r="3.5" fill="#C9A84C"/>
+  </svg>`;
+}
+
+function renderTaskCard(task) {
+  const cls = taskStatusClass(task);
+  const delay = task.dueDate ? daysBetween(task.dueDate, todayStr()) : 0;
+  return `
+    <div class="task-card st-${cls}">
+      <div class="task-title">${escapeHtml(task.title)}</div>
+      <div class="task-meta">
+        ${statusBadge(task)}
+        ${priorityBadge(task.priority)}
+        <span>📅 Due: ${fmtDate(task.dueDate)}</span>
+        ${cls === 'overdue' && delay > 0 ? `<span style="color:var(--red);font-weight:600">⏰ ${delay} day${delay>1?'s':''} overdue</span>` : ''}
+        ${cls === 'completed' && task.completedDate ? `<span style="color:var(--green)">✓ Completed ${fmtDate(task.completedDate)}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function loadPartnerView() {
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+
+  if (!token) {
+    app.innerHTML = `<div class="state-box"><div class="icon">🔒</div><div class="msg">No access link provided.<br>Please use the full link you were given.</div></div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(FUNCTION_URL + '?token=' + encodeURIComponent(token), {
+      headers: {
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY,
+      }
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      app.innerHTML = `<div class="state-box"><div class="icon">🔒</div><div class="msg">${escapeHtml(err.error || 'This link is invalid or has been revoked.')}<br>Please contact SOE for a new link.</div></div>`;
+      return;
+    }
+
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    app.innerHTML = `<div class="state-box"><div class="icon">⚠️</div><div class="msg">Could not load your tasks right now.<br>Please try again in a moment.</div></div>`;
+  }
+}
+
+function render(data) {
+  const app = document.getElementById('app');
+  const tasks = data.tasks || [];
+  const projects = data.projects || [];
+  const mainTasks = tasks.filter(t => !t.parentId);
+  const completed = mainTasks.filter(t => t.status === 'completed').length;
+  const open = mainTasks.filter(t => t.status !== 'completed' && t.status !== 'missed').length;
+
+  const byProject = {};
+  mainTasks.forEach(t => { (byProject[t.projectId] = byProject[t.projectId] || []).push(t); });
+
+  const projectSections = projects
+    .filter(p => (byProject[p.id] || []).length > 0)
+    .map(p => {
+      const items = byProject[p.id].slice().sort((a, b) => {
+        const rank = { open: 0, overdue: 0, completed: 1, missed: 1 };
+        const ac = taskStatusClass(a), bc = taskStatusClass(b);
+        if (ac === 'overdue' && bc !== 'overdue') return -1;
+        if (bc === 'overdue' && ac !== 'overdue') return 1;
+        return (rank[ac] ?? 1) - (rank[bc] ?? 1);
+      });
+      return `
+        <div class="project-section">
+          <div class="project-head">📁 ${escapeHtml(p.name)}</div>
+          ${items.map(t => {
+            const subtasks = tasks.filter(st => st.parentId === t.id);
+            return renderTaskCard(t) + subtasks.map(st => `<div class="subtask">◦ ${escapeHtml(st.title)} — ${statusBadge(st)}</div>`).join('');
+          }).join('')}
+        </div>
+      `;
+    }).join('');
+
+  app.innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        ${renderCrosshairIcon(28)}
+        <div>
+          <div class="header-title">SOE Governance</div>
+          <div class="header-sub">My Tasks — View Only</div>
+        </div>
+      </div>
+      <div class="header-partner">${escapeHtml(data.partner.name)}</div>
+      <div class="header-meta">Last updated: ${new Date(data.generatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi k-total"><div class="kpi-label">Total Tasks</div><div class="kpi-value">${mainTasks.length}</div></div>
+      <div class="kpi k-done"><div class="kpi-label">Completed</div><div class="kpi-value">${completed}</div></div>
+      <div class="kpi k-open"><div class="kpi-label">Open</div><div class="kpi-value">${open}</div></div>
+    </div>
+
+    ${mainTasks.length === 0
+      ? `<div class="state-box"><div class="icon">✅</div><div class="msg">No tasks assigned right now.</div></div>`
+      : projectSections}
+
+    <div class="footer-note">This is a read-only view shared by SOE. Refresh this page anytime to see the latest status.</div>
+  `;
+}
+
+loadPartnerView();
+</script>
+</body>
+</html>
