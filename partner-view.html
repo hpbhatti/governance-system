@@ -205,8 +205,29 @@ function ensureTitlesForLang(data, lang) {
       jobs.push(translateText(tk.titleAr, 'ar', 'en').then(function(en) { tk.titleEn = en; }));
     }
   });
+  // Partner names have no separate bilingual fields in the main system — translate
+  // on the fly here too, same rule: only when the current display doesn't already
+  // match the requested language.
+  if (data.partner && data.partner.name) {
+    var nameIsArabic = detectIsArabic(data.partner.name);
+    if (lang === 'ar' && !nameIsArabic) {
+      if (!data.partner.nameAr) {
+        jobs.push(translateText(data.partner.name, 'en', 'ar').then(function(ar) { data.partner.nameAr = ar; }));
+      }
+    } else if (lang === 'en' && nameIsArabic) {
+      if (!data.partner.nameEn) {
+        jobs.push(translateText(data.partner.name, 'ar', 'en').then(function(en) { data.partner.nameEn = en; }));
+      }
+    }
+  }
   if (!jobs.length) return Promise.resolve();
   return Promise.all(jobs);
+}
+
+function partnerDisplayName(partner) {
+  var isArabic = detectIsArabic(partner.name);
+  if (currentLang === 'ar') return (isArabic ? partner.name : partner.nameAr) || partner.name;
+  return (!isArabic ? partner.name : partner.nameEn) || partner.name;
 }
 
 function t(key) {
@@ -418,7 +439,7 @@ function render(data) {
       '</div>' +
       '<div class="header-divider"></div>' +
       '<div class="header-partner-label">' + t('partnerLabel') + '</div>' +
-      '<div class="header-partner">' + escapeHtml(data.partner.name) + '</div>' +
+      '<div class="header-partner">' + escapeHtml(partnerDisplayName(data.partner)) + '</div>' +
       '<div class="header-meta">' + t('lastUpdated') + ': ' + fmtDate(data.generatedAt.slice(0,10)) + '</div>' +
     '</div>' +
     '<div class="kpi-strip">' +
