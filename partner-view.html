@@ -151,6 +151,21 @@ const STR = {
   }
 };
 
+function detectIsArabic(text) {
+  return /[\u0600-\u06FF]/.test(text || '');
+}
+
+// Resolve a task's raw/legacy title into the correct language slot if the
+// explicit slots are empty. Mirrors the same "detect then slot" logic the
+// main app uses, so a task authored in Arabic (before bilingual splitting
+// existed) is treated as Arabic text, not accidentally shown as English.
+function normalizeTaskTitles(task) {
+  if (!task.titleEn && !task.titleAr && task.titleRaw) {
+    if (detectIsArabic(task.titleRaw)) task.titleAr = task.titleRaw;
+    else task.titleEn = task.titleRaw;
+  }
+}
+
 var currentLang = localStorage.getItem('partnerViewLang') || 'en';
 var lastData = null;
 var translationCache = JSON.parse(localStorage.getItem('partnerViewTranslations') || '{}');
@@ -158,10 +173,11 @@ var translationCache = JSON.parse(localStorage.getItem('partnerViewTranslations'
 // Uses the SAME free translation endpoint the main governance app uses,
 // so a title translated once here matches what the main system would show.
 // Cached in localStorage so repeat visits don't re-translate.
-function translateToArabic(text) {
+function translateText(text, from, to) {
   if (!text || !text.trim()) return Promise.resolve(text);
-  if (translationCache[text]) return Promise.resolve(translationCache[text]);
-  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=' + encodeURIComponent(text);
+  var cacheKey = from + '|' + to + '|' + text;
+  if (translationCache[cacheKey]) return Promise.resolve(translationCache[cacheKey]);
+  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + from + '&tl=' + to + '&dt=t&q=' + encodeURIComponent(text);
   return fetch(url).then(function(res) {
     if (!res.ok) throw new Error('translate failed');
     return res.json();
@@ -169,7 +185,7 @@ function translateToArabic(text) {
     if (Array.isArray(data) && Array.isArray(data[0])) {
       var out = data[0].map(function(seg){ return (seg && seg[0]) ? seg[0] : ''; }).join('').trim();
       if (out) {
-        translationCache[text] = out;
+        translationCache[cacheKey] = out;
         localStorage.setItem('partnerViewTranslations', JSON.stringify(translationCache));
         return out;
       }
@@ -178,12 +194,15 @@ function translateToArabic(text) {
   }).catch(function() { return text; });
 }
 
-// Walk all tasks, translate any missing Arabic titles, then re-render.
-function ensureArabicTitles(data) {
+// Walk all tasks, fill in whichever language slot is missing, then re-render.
+function ensureTitlesForLang(data, lang) {
   var jobs = [];
   (data.tasks || []).forEach(function(tk) {
-    if (!tk.titleAr && tk.title) {
-      jobs.push(translateToArabic(tk.title).then(function(ar) { tk.titleAr = ar; }));
+    normalizeTaskTitles(tk);
+    if (lang === 'ar' && !tk.titleAr && tk.titleEn) {
+      jobs.push(translateText(tk.titleEn, 'en', 'ar').then(function(ar) { tk.titleAr = ar; }));
+    } else if (lang === 'en' && !tk.titleEn && tk.titleAr) {
+      jobs.push(translateText(tk.titleAr, 'ar', 'en').then(function(en) { tk.titleEn = en; }));
     }
   });
   if (!jobs.length) return Promise.resolve();
@@ -208,13 +227,11 @@ function setLang(lang) {
   document.getElementById('btn-lang-ar').classList.toggle('active', lang === 'ar');
   document.getElementById('loading-msg').textContent = lang === 'ar' ? 'جارٍ تحميل مهامك…' : 'Loading your tasks…';
   if (!lastData) return;
-  if (lang === 'ar') {
-    // Show current data immediately, then upgrade titles to Arabic as they arrive.
-    render(lastData);
-    ensureArabicTitles(lastData).then(function() { render(lastData); });
-  } else {
-    render(lastData);
-  }
+  // Show current data immediately, then upgrade any missing titles for this
+  // language in the background (translation or slot-detection), re-rendering
+  // once they arrive. Works the same way switching to either language.
+  render(lastData);
+  ensureTitlesForLang(lastData, lang).then(function() { render(lastData); });
 }
 
 function escapeHtml(s) {
@@ -254,8 +271,10 @@ function taskStatusClass(task) {
 }
 
 function taskTitle(task) {
-  if (currentLang === 'ar' && task.titleAr) return task.titleAr;
-  return task.title || task.titleAr || '';
+  if (currentLang === 'ar') {
+    return task.titleAr || task.titleRaw || task.titleEn || '';
+  }
+  return task.titleEn || task.titleRaw || task.titleAr || '';
 }
 
 function statusBadge(task) {
@@ -344,7 +363,10 @@ function loadPartnerView() {
   }).then(function(data) {
     if (!data) return;
     lastData = data;
+    (data.tasks || []).forEach(normalizeTaskTitles);
     render(data);
+    // Fill in whichever slot is missing for the current language, in the background.
+    ensureTitlesForLang(data, currentLang).then(function() { render(data); });
   }).catch(function() {
     app.innerHTML = '<div class="state-box"><div class="icon">⚠️</div><div class="msg">' + t('loadError') + '<br>' + t('tryAgain') + '</div></div>';
   });
