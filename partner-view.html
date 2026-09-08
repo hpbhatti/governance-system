@@ -59,6 +59,7 @@
   .task-card.st-missed { border-inline-start-color: var(--red); }
 
   .task-title { font-size: 14.5px; font-weight: 600; margin-bottom: 8px; unicode-bidi: plaintext; }
+  .untranslated-note { font-size: 10.5px; font-weight: 400; color: var(--ink-faint); font-style: italic; }
   .task-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--ink-muted); align-items: center; unicode-bidi: isolate; }
   .task-meta > * { unicode-bidi: isolate; }
   .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 500; border: 1px solid transparent; }
@@ -126,6 +127,7 @@ const STR = {
     due: 'Due', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
     projectFiles: 'Project Files', footer: 'This is a read-only view shared by SOE. Refresh this page anytime to see the latest status.',
+    originalLanguageNote: '(shown in original language)',
     delayImpactOne: 'One of your tasks is currently overdue, delaying this project\'s timeline.',
     delayImpactMany: function(n){ return n + ' of your tasks are currently overdue, delaying this project\'s timeline.'; },
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
@@ -141,6 +143,7 @@ const STR = {
     due: 'الاستحقاق', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
     projectFiles: 'ملفات المشروع', footer: 'هذا عرض للاطلاع فقط تمت مشاركته من قبل SOE. أعد تحميل الصفحة في أي وقت لرؤية آخر تحديث.',
+    originalLanguageNote: '(معروضة باللغة الأصلية)',
     delayImpactOne: 'إحدى مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.',
     delayImpactMany: function(n){ return n + ' من مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.'; },
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
@@ -168,66 +171,22 @@ function normalizeTaskTitles(task) {
 
 var currentLang = localStorage.getItem('partnerViewLang') || 'en';
 var lastData = null;
-var translationCache = JSON.parse(localStorage.getItem('partnerViewTranslations') || '{}');
 
-// Uses the SAME free translation endpoint the main governance app uses,
-// so a title translated once here matches what the main system would show.
-// Cached in localStorage so repeat visits don't re-translate.
-function translateText(text, from, to) {
-  if (!text || !text.trim()) return Promise.resolve(text);
-  var cacheKey = from + '|' + to + '|' + text;
-  if (translationCache[cacheKey]) return Promise.resolve(translationCache[cacheKey]);
-  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + from + '&tl=' + to + '&dt=t&q=' + encodeURIComponent(text);
-  return fetch(url).then(function(res) {
-    if (!res.ok) throw new Error('translate failed');
-    return res.json();
-  }).then(function(data) {
-    if (Array.isArray(data) && Array.isArray(data[0])) {
-      var out = data[0].map(function(seg){ return (seg && seg[0]) ? seg[0] : ''; }).join('').trim();
-      if (out) {
-        translationCache[cacheKey] = out;
-        localStorage.setItem('partnerViewTranslations', JSON.stringify(translationCache));
-        return out;
-      }
-    }
-    return text;
-  }).catch(function() { return text; });
-}
-
-// Walk all tasks, fill in whichever language slot is missing, then re-render.
+// No third-party translation. This page shows ONLY what the main governance
+// system itself has already translated (titleEn/titleAr). If a task was
+// never opened in the other language inside the main app, there's genuinely
+// no translation to show — rather than faking one with an unreliable
+// external call, we show what IS available with a small language-mismatch
+// note, which is more honest than a translation that might silently fail.
 function ensureTitlesForLang(data, lang) {
-  var jobs = [];
-  (data.tasks || []).forEach(function(tk) {
-    normalizeTaskTitles(tk);
-    if (lang === 'ar' && !tk.titleAr && tk.titleEn) {
-      jobs.push(translateText(tk.titleEn, 'en', 'ar').then(function(ar) { tk.titleAr = ar; }));
-    } else if (lang === 'en' && !tk.titleEn && tk.titleAr) {
-      jobs.push(translateText(tk.titleAr, 'ar', 'en').then(function(en) { tk.titleEn = en; }));
-    }
-  });
-  // Partner names have no separate bilingual fields in the main system — translate
-  // on the fly here too, same rule: only when the current display doesn't already
-  // match the requested language.
-  if (data.partner && data.partner.name) {
-    var nameIsArabic = detectIsArabic(data.partner.name);
-    if (lang === 'ar' && !nameIsArabic) {
-      if (!data.partner.nameAr) {
-        jobs.push(translateText(data.partner.name, 'en', 'ar').then(function(ar) { data.partner.nameAr = ar; }));
-      }
-    } else if (lang === 'en' && nameIsArabic) {
-      if (!data.partner.nameEn) {
-        jobs.push(translateText(data.partner.name, 'ar', 'en').then(function(en) { data.partner.nameEn = en; }));
-      }
-    }
-  }
-  if (!jobs.length) return Promise.resolve();
-  return Promise.all(jobs);
+  (data.tasks || []).forEach(normalizeTaskTitles);
+  return Promise.resolve(); // nothing async needed — system data is already loaded
 }
 
 function partnerDisplayName(partner) {
-  var isArabic = detectIsArabic(partner.name);
-  if (currentLang === 'ar') return (isArabic ? partner.name : partner.nameAr) || partner.name;
-  return (!isArabic ? partner.name : partner.nameEn) || partner.name;
+  // Partners have no separate bilingual name field in the main system —
+  // shown exactly as stored, in whichever language it was entered.
+  return partner.name;
 }
 
 function t(key) {
@@ -298,6 +257,13 @@ function taskTitle(task) {
   return task.titleEn || task.titleRaw || task.titleAr || '';
 }
 
+// True when the title actually being shown is NOT in the currently selected
+// language (i.e. the system genuinely has no translation for this task yet).
+function isTitleUntranslated(task) {
+  if (currentLang === 'ar') return !task.titleAr;
+  return !task.titleEn;
+}
+
 function statusBadge(task) {
   var cls = taskStatusClass(task);
   var labels = { completed: t('stCompleted'), open: t('stOpen'), overdue: t('stOverdue'), missed: t('stMissed') };
@@ -337,8 +303,9 @@ function renderSubtasks(subtasks) {
 function renderTaskCard(task, subtasks) {
   var cls = taskStatusClass(task);
   var delay = task.dueDate ? daysBetween(task.dueDate, todayStr()) : 0;
+  var untranslated = isTitleUntranslated(task);
   return '<div class="task-card st-' + cls + '">' +
-    '<div class="task-title">' + escapeHtml(taskTitle(task)) + '</div>' +
+    '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
