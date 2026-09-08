@@ -1477,6 +1477,7 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
     font-size: 11px; color: var(--ink-muted);
   }
   .resp-team { color: var(--ink-faint); font-size: 10px; }
+  .resp-tag-unassigned { color: var(--amber); font-weight: 500; background: var(--amber-bg); border: 1px solid rgba(196,126,42,0.3); border-radius: 8px; padding: 1px 8px; }
   .drift-chip {
     display: inline-block; padding: 1px 7px; border-radius: 8px;
     font-size: 10px; background: #fae0de; color: var(--red);
@@ -1964,6 +1965,7 @@ const T = {
     toastReportDeleted: 'تم حذف التقرير من السجل',
     issuedOn: 'صدر بتاريخ',
     translateContent: '🌐 ترجمة المحتوى للإنجليزية',
+    translateContentToArabic: '🌐 ترجمة المحتوى للعربية',
     translatingContent: 'جاري ترجمة المحتوى... ({0}/{1})',
     translationDone: 'تمت ترجمة {0} عنصر',
     translationNothingToDo: 'لا يوجد محتوى بحاجة ترجمة',
@@ -2442,6 +2444,18 @@ const T = {
     subtasksOverdue: '{0} فرعية متأخرة',
     openInProject: 'فتح في المشروع',
     teamMemberReportBtn: '📄 تقرير الأداء', teamMemberReportTitle: 'تقرير عضو الفريق',
+    partnerLinkBtn: 'رابط الشريك', partnerLinkModalTitle: 'رابط عرض الشريك (للاطلاع فقط)',
+    partnerLinkNewHint: 'تم إنشاء رابط جديد لهذا الشريك. شاركه معه — يبقى صالحاً حتى تقوم بإلغائه.',
+    partnerLinkExistingHint: 'يمتلك هذا الشريك رابطاً نشطاً بالفعل. شاركه مرة أخرى أو انسخه أدناه.',
+    partnerLinkNote: 'أي شخص يملك هذا الرابط يمكنه رؤية مهام {0} فقط — للعرض فقط، بدون تسجيل دخول، وبدون الوصول لأي بيانات أخرى.',
+    copyLink: '📋 نسخ', revokeLink: 'إلغاء هذا الرابط',
+    toastLinkCopied: 'تم نسخ الرابط', toastLinkRevoked: 'تم إلغاء الرابط — لن يعمل بعد الآن',
+    confirmRevokeLink: 'إلغاء رابط هذا الشريك؟ لن يتمكن من رؤية مهامه حتى تنشئ رابطاً جديداً.',
+    partnerLinkError: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
+    loadingEllipsis: 'جارِ التحميل…',
+    alertOfflineFeature: 'هذه الميزة تتطلب اتصالاً بالإنترنت.',
+    fixNow: 'تصحيح الآن',
+    ownerNeedsAssignment: 'يحتاج تعيين مسؤول',
     subtaskProgress: '{0} من {1} منجزة',
     originalDueDate: 'التاريخ الأصلي', currentDueDate: 'التاريخ الحالي',
     dueDateHistory: 'سجل التمديدات', extendDueDate: 'تمديد التاريخ',
@@ -2634,6 +2648,7 @@ const T = {
     toastReportDeleted: 'Report removed from archive',
     issuedOn: 'Issued on',
     translateContent: '🌐 Translate Content to English',
+    translateContentToArabic: '🌐 Translate Content to Arabic',
     translatingContent: 'Translating content... ({0}/{1})',
     translationDone: 'Translated {0} items',
     translationNothingToDo: 'No content needs translation',
@@ -3112,6 +3127,18 @@ const T = {
     subtasksOverdue: '{0} subtasks overdue',
     openInProject: 'Open in Project',
     teamMemberReportBtn: '📄 Performance Report', teamMemberReportTitle: 'Team Member Report',
+    partnerLinkBtn: 'Partner Link', partnerLinkModalTitle: 'Partner View-Only Link',
+    partnerLinkNewHint: 'A new link has been created for this partner. Share it with them — it stays valid until you revoke it.',
+    partnerLinkExistingHint: 'This partner already has an active link. Share it again or copy it below.',
+    partnerLinkNote: 'Anyone with this link can view {0}\'s own tasks only — read-only, no login required, no access to any other data.',
+    copyLink: '📋 Copy', revokeLink: 'Revoke This Link',
+    toastLinkCopied: 'Link copied to clipboard', toastLinkRevoked: 'Link revoked — it no longer works',
+    confirmRevokeLink: 'Revoke this partner\'s link? They will no longer be able to view their tasks until you generate a new one.',
+    partnerLinkError: 'Something went wrong. Please try again.',
+    loadingEllipsis: 'Loading…',
+    alertOfflineFeature: 'This feature requires an internet connection.',
+    fixNow: 'Fix Now',
+    ownerNeedsAssignment: 'Owner needs assignment',
     subtaskProgress: '{0} of {1} done',
     originalDueDate: 'Original Date', currentDueDate: 'Current Date',
     dueDateHistory: 'Extension History', extendDueDate: 'Extend Date',
@@ -3384,6 +3411,7 @@ function renderSidebar() {
         t('enableNotifications')
       }</button>
       ${currentLang === 'en' ? `<button class="sb-btn" onclick="translateAllUserContent(false)">${t('translateContent')}</button>` : ''}
+      ${currentLang === 'ar' ? `<button class="sb-btn" onclick="translateAllUserContentToArabic(false)">${t('translateContentToArabic')}</button>` : ''}
       <div style="display:flex;gap:8px;align-items:center">
         <button class="sb-btn" id="sync-now-btn" style="flex:1;margin:0" onclick="syncNow()">${t('syncNowBtn')}</button>
         <span id="sync-indicator" style="font-size:13px" title=""></span>
@@ -3604,6 +3632,41 @@ function loadStateFromLocalStorage() {
 
 // Apply all data migrations to the already-populated state (runs after loading from any source).
 function applyDataMigrations() {
+      // REPAIR: fix any titles/names/descriptions/notes that got permanently
+      // stuck as a bare "—" placeholder by a past translation-failure bug
+      // (the real content is still safe in titleEn/titleAr — this just
+      // restores the display-mirror field from whichever language slot
+      // actually has real text). Repaired records are tracked and pushed
+      // back to Supabase — a local-only fix would just get overwritten by
+      // the next cloud sync, which is exactly why this kept reappearing.
+      const _repairedActions = [];
+      const _repairedProjects = [];
+      function repairDashField(obj, baseKey, repairedList) {
+        if (obj[baseKey] === '—' || obj[baseKey] === '') {
+          const restored = obj[baseKey + 'En'] || obj[baseKey + 'Ar'];
+          if (restored) {
+            obj[baseKey] = restored;
+            if (repairedList && repairedList.indexOf(obj) === -1) repairedList.push(obj);
+          }
+        }
+      }
+      state.actions.forEach(a => {
+        repairDashField(a, 'title', _repairedActions);
+        if (a.type === 'meeting') repairDashField(a, 'meetingNotes', _repairedActions);
+        else repairDashField(a, 'note', _repairedActions);
+      });
+      state.projects.forEach(p => {
+        repairDashField(p, 'name', _repairedProjects);
+        repairDashField(p, 'description', _repairedProjects);
+      });
+      if (_repairedActions.length || _repairedProjects.length) {
+        // Push the fix back to Supabase so it doesn't get silently reverted
+        // by the next incremental sync. Deferred slightly so this runs after
+        // the rest of init (state/table wiring) has fully settled.
+        setTimeout(() => {
+          try { saveState({ actions: _repairedActions, projects: _repairedProjects }); } catch (e) {}
+        }, 0);
+      }
       // Migration: ensure every action has a type
       state.actions.forEach(a => {
         if (!a.type) a.type = 'task';
@@ -4624,21 +4687,27 @@ function agreementWeight(project) {
 function responsibleTag(task) {
   if (isMeeting(task)) return '';
   const personName = getOwnerName(task);
-  const teamName = getTaskStakeholderName(task);
-  if (!personName && (!teamName || teamName === '—')) return '';
   const icon = task.ownerKind === 'internal' ? '🧑‍💼' : '🤝';
   if (personName) {
+    const teamName = getTaskStakeholderName(task);
     return '<span class="resp-tag">' + icon + ' ' + escapeHtml(personName) + ' <span class="resp-team">(' + escapeHtml(teamName) + ')</span></span>';
   }
-  return '<span class="resp-tag">' + icon + ' ' + escapeHtml(teamName) + '</span>';
+  // No real person resolved (blank ownerKind, or a partner-kind task whose
+  // ownerId doesn't match any real team member) — say so plainly instead of
+  // silently borrowing the partner's name, which looks like a real assignment.
+  if (task.ownerKind === 'internal') return ''; // internal with no id — nothing to flag here
+  return '<span class="resp-tag resp-tag-unassigned">⚠ ' + escapeHtml(t('ownerNeedsAssignment')) + '</span>';
 }
 function responsibleTagPlain(task) {
   if (isMeeting(task)) return '';
   const personName = getOwnerName(task);
-  const teamName = getTaskStakeholderName(task);
-  if (!personName && (!teamName || teamName === '—')) return '';
   const icon = task.ownerKind === 'internal' ? '🧑‍💼' : '🤝';
-  return personName ? (icon + ' ' + personName + ' (' + teamName + ')') : (icon + ' ' + teamName);
+  if (personName) {
+    const teamName = getTaskStakeholderName(task);
+    return icon + ' ' + personName + ' (' + teamName + ')';
+  }
+  if (task.ownerKind === 'internal') return '';
+  return '⚠ ' + t('ownerNeedsAssignment');
 }
 
 // ── Task Node Cards (collapsible) ──
@@ -4731,7 +4800,7 @@ function renderTaskNodeBody(a, subtasks) {
       '<button class="btn ghost sm" disabled style="opacity:0.45;cursor:not-allowed" title="' + escapeHtml(t('editLockWait', (getEditLock('actions',a.id)||{}).user||'...')) + '">' + t('edit') + '</button>' :
       '<button class="btn ghost sm" onclick="event.stopPropagation();showActionForm(\'' + a.id + '\')">' + t('edit') + '</button>') +
     '<button class="btn ghost sm" onclick="event.stopPropagation();deleteAction(\'' + a.id + '\')">' + t('delete') + '</button>' +
-    (a.projectId ? '<button class="btn ghost sm" onclick="event.stopPropagation();navigate(\'projectDetail\',\'' + a.projectId + '\')">📁 ' + t('openInProject') + '</button>' : '') +
+    (a.projectId && !(state.currentView === 'projectDetail' && state.detailParam === a.projectId) ? '<button class="btn ghost sm" onclick="event.stopPropagation();navigate(\'projectDetail\',\'' + a.projectId + '\')">📁 ' + t('openInProject') + '</button>' : '') +
     '</div></div>';
 }
 
@@ -5269,8 +5338,15 @@ function fmtTime(time) {
 function escapeHtml(s) {
   if (s == null) return '';
   let text = String(s);
-  // Auto-apply translation in English mode if a cached translation exists
+  // Auto-apply cached bulk translation, in EITHER direction — English mode
+  // substitutes a cached Arabic→English result; Arabic mode substitutes a
+  // cached English→Arabic result. Both directions must work equally, since
+  // both Hassan's and Karim's "Translate Content" buttons write to this
+  // same cache.
   if (currentLang === 'en' && containsArabic(text)) {
+    const cached = (state.translationCache || {})[text];
+    if (cached) text = cached;
+  } else if (currentLang === 'ar' && isEnglishOnly(text)) {
     const cached = (state.translationCache || {})[text];
     if (cached) text = cached;
   }
@@ -5280,6 +5356,11 @@ function escapeHtml(s) {
 /* ========== USER-CONTENT TRANSLATION ========== */
 function containsArabic(text) {
   return /[\u0600-\u06FF]/.test(text || '');
+}
+// True for text that's in Latin script with no Arabic — i.e. genuinely English
+// content that would need translating INTO Arabic (mirrors containsArabic).
+function isEnglishOnly(text) {
+  return !!(text && /[a-zA-Z]/.test(text) && !containsArabic(text));
 }
 
 /* ========== TASK TRACKING HELPERS ========== */
@@ -5364,7 +5445,31 @@ function renderTrackingList() {
 // Translate a single string via the free MyMemory API
 async function translateText(text, from, to) {
   if (!text || !text.trim()) return text;
-  // Primary: Google's free translate endpoint — far more accurate than community memories.
+  // Primary: DeepL, via our own Supabase Edge Function (deepl-translate). The
+  // Edge Function holds the real API key server-side — the browser never sees
+  // it, and this also sidesteps DeepL's CORS restriction on direct browser calls.
+  // Generally produces more natural output than the free fallbacks below,
+  // especially for business phrasing — matters here since a first-pass
+  // translation is often what gets manually reviewed/locked afterward.
+  if (supabaseClient) {
+    try {
+      const res = await fetch(SUPABASE_URL + '/functions/v1/deepl-translate', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, from, to }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.translated && data.translated.trim()) return data.translated;
+      }
+    } catch (e) { /* fall through to free fallbacks below */ }
+  }
+  // Fallback: Google's free translate endpoint — used only if DeepL is
+  // unavailable (Edge Function down, quota exhausted, etc).
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
     const res = await fetch(url);
@@ -5375,8 +5480,8 @@ async function translateText(text, from, to) {
         if (out) return out;
       }
     }
-  } catch (e) { /* fall through to fallback */ }
-  // Fallback: MyMemory — but reject junk/low-quality community matches that cause bad results.
+  } catch (e) { /* fall through to next fallback */ }
+  // Final fallback: MyMemory — but reject junk/low-quality community matches that cause bad results.
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
     const res = await fetch(url);
@@ -5436,6 +5541,63 @@ async function translateAllUserContent(silent) {
     } catch (e) {
       failures++;
       // If many consecutive failures, bail
+      if (failures >= 3 && count === 0) {
+        isTranslating = false;
+        toast(t('translationOffline'));
+        return;
+      }
+    }
+  }
+  saveState();
+  isTranslating = false;
+  toast(t('translationDone', count));
+  render();
+}
+
+// ── Mirror of the above, for Arabic-UI users (Karim) — finds ENGLISH content
+// missing an Arabic version and bulk-translates it. Same fields, same cache,
+// same safety behavior — just the reverse direction, so both of you have
+// equal tooling regardless of which language you work in day to day. ──
+function collectUntranslatedStringsToArabic() {
+  const seen = new Set();
+  const cache = state.translationCache || {};
+  function maybeAdd(text) {
+    if (isEnglishOnly(text) && !cache[text]) seen.add(text);
+  }
+  state.partners.forEach(p => {
+    maybeAdd(p.name); maybeAdd(p.contact); maybeAdd(p.notes);
+  });
+  state.projects.forEach(p => {
+    maybeAdd(p.name); maybeAdd(p.description); maybeAdd(p.partnershipValue);
+  });
+  state.actions.forEach(a => {
+    maybeAdd(a.title); maybeAdd(a.reason);
+    (a.tracking || []).forEach(e => maybeAdd(e.text));
+  });
+  return Array.from(seen);
+}
+
+async function translateAllUserContentToArabic(silent) {
+  if (isTranslating) return;
+  const items = collectUntranslatedStringsToArabic();
+  if (items.length === 0) {
+    if (!silent) toast(t('translationNothingToDo'));
+    return;
+  }
+  isTranslating = true;
+  if (!state.translationCache) state.translationCache = {};
+  let count = 0, failures = 0;
+  for (const text of items) {
+    try {
+      const translated = await translateText(text, 'en', 'ar');
+      state.translationCache[text] = translated;
+      count++;
+      if (count % 3 === 0 || count === items.length) {
+        toast(t('translatingContent', count, items.length));
+      }
+      await new Promise(r => setTimeout(r, 150));
+    } catch (e) {
+      failures++;
       if (failures >= 3 && count === 0) {
         isTranslating = false;
         toast(t('translationOffline'));
@@ -5570,7 +5732,18 @@ async function applyContentLanguage(lang) {
   let changed = false;
   for (const m of missing) {
     const ok = await ensureBilingual(m.obj, m.key, lang, m.force);
-    if (ok) { m.obj[m.key] = m.obj[m.key + cap]; changed = true; }
+    if (ok) {
+      m.obj[m.key] = m.obj[m.key + cap];
+      changed = true;
+    } else if (m.obj[m.key] === '—' || m.obj[m.key] === '') {
+      // Translation failed for this item — NEVER leave/save a meaningless
+      // dash as the canonical value (that would silently overwrite real
+      // content). Fall back to showing the other language's real text
+      // instead, which is honest and fully recoverable — better than losing
+      // the mirror field to a placeholder that then gets persisted.
+      const otherCap2 = cap === 'En' ? 'Ar' : 'En';
+      if (m.obj[m.key + otherCap2]) { m.obj[m.key] = m.obj[m.key + otherCap2]; changed = true; }
+    }
     await new Promise(r => setTimeout(r, 120)); // be gentle with the free API
   }
   isApplyingContentLang = false;
@@ -7442,6 +7615,7 @@ views.partnerDetail = (partnerId) => {
       <div style="display:flex;gap:8px">
         <button class="btn ghost" onclick="printPartnerReport('${p.id}')">${t('internalReport')}</button>
         <button class="btn ghost" onclick="printPartnerFacingReport('${p.id}')">${t('partnerFacingReport')}</button>
+        <button class="btn ghost" onclick="managePartnerLink('${p.id}')">🔗 ${t('partnerLinkBtn')}</button>
         <button class="btn ghost" onclick="showPartnerForm('${p.id}')">${t('edit')}</button>
       </div>
     </div>
@@ -8174,7 +8348,7 @@ function subscribeToRealtime() {
         if (!deletedId) return;
         state[key] = (state[key] || []).filter(r => r.id !== deletedId);
         if (syncMeta.rowVersions[table]) delete syncMeta.rowVersions[table][deletedId];
-        saveStateToLocalStorage(); try { render(state.detailParam); } catch(e){}
+        saveStateToLocalStorage(); renderPreserveScroll();
       } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
         const incomingData = newRow && newRow.data; const incomingId = newRow && newRow.id;
         const incomingVersion = (newRow && newRow.version) || 1;
@@ -8190,7 +8364,7 @@ function subscribeToRealtime() {
         state[key] = existing;
         if (!syncMeta.rowVersions[table]) syncMeta.rowVersions[table] = {};
         syncMeta.rowVersions[table][incomingId] = incomingVersion;
-        saveStateToLocalStorage(); try { render(state.detailParam); } catch(e){}
+        saveStateToLocalStorage(); renderPreserveScroll();
       }
     })
     .subscribe((status) => {
@@ -8219,7 +8393,7 @@ function releaseEditLock(table, id) {
   delete _editLocks[key];
   const payload = { type:'edit-lock', action:'release', table, id, key, email: _authUser.email };
   if (_realtimeChannel) _realtimeChannel.send({ type:'broadcast', event:'edit-lock', payload });
-  try { render(state.detailParam); } catch(e){}
+  renderPreserveScroll();
 }
 function getEditLock(table, id) {
   const lock = _editLocks[table + '/' + id];
@@ -8239,9 +8413,22 @@ function subscribeBroadcast() {
     if (!payload || !payload.key) return;
     if (payload.action === 'acquire') _editLocks[payload.key] = payload;
     else if (payload.action === 'release') delete _editLocks[payload.key];
-    try { render(state.detailParam); } catch(e){}
+    renderPreserveScroll();
   });
 }
+// Re-renders the current view WITHOUT resetting scroll position — used for
+// background-triggered updates (Realtime pushes, edit-lock broadcasts from
+// other users) where the person may be mid-scroll reading a long list and
+// shouldn't get silently snapped back to the top every time unrelated data
+// changes underneath them. User-initiated navigation still uses plain
+// render(), which correctly does reset scroll — this wrapper is only for
+// updates that happen WHILE they're already looking at the same view.
+function renderPreserveScroll(param) {
+  const scrollY = window.scrollY;
+  try { render(param !== undefined ? param : state.detailParam); } catch(e) {}
+  requestAnimationFrame(() => window.scrollTo(0, scrollY));
+}
+
 function render(param) {
   const main = document.getElementById('main-content');
   const view = state.currentView;
@@ -10514,6 +10701,107 @@ function printProjectReport(projectId, existingEntry) {
   openReportWindow(t('projectReportTitle') + ' — ' + p.name, body, entry);
 }
 
+// ── Partner View-Only Link management ──
+// Generates (or shows the existing) unique token for a partner's read-only
+// task view. One stable link per partner — reused every time unless
+// explicitly revoked. Uses the isolated `partner_links` table only;
+// never touches partners/projects/actions or their RLS policies.
+const PARTNER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/partner-view.html';
+
+function _generateToken() {
+  // 32-char random token, URL-safe
+  const bytes = new Uint8Array(24);
+  (window.crypto || window.msCrypto).getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function managePartnerLink(partnerId) {
+  if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
+  const p = getPartner(partnerId);
+  if (!p) return;
+
+  openModal(t('partnerLinkModalTitle'), `<div style="text-align:center;padding:24px 0;color:var(--ink-muted);font-size:13px">${t('loadingEllipsis')}</div>`, '');
+
+  try {
+    const { data: existing, error: fetchErr } = await supabaseClient
+      .from('partner_links')
+      .select('token, revoked, created_at')
+      .eq('partner_id', partnerId)
+      .eq('revoked', false)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fetchErr) throw fetchErr;
+
+    let token;
+    let isNew = false;
+    if (existing && existing.length > 0) {
+      token = existing[0].token;
+    } else {
+      token = _generateToken();
+      const { error: insertErr } = await supabaseClient
+        .from('partner_links')
+        .insert({ token, partner_id: partnerId, created_by: (_authUser && _authUser.email) || null });
+      if (insertErr) throw insertErr;
+      isNew = true;
+    }
+
+    renderPartnerLinkModal(partnerId, p.name, token, isNew);
+  } catch (e) {
+    openModal(t('partnerLinkModalTitle'), `<div style="color:var(--red);padding:20px 0;text-align:center">${t('partnerLinkError')}</div>`, '');
+  }
+}
+
+function renderPartnerLinkModal(partnerId, partnerName, token, isNew) {
+  const fullUrl = PARTNER_VIEW_BASE_URL + '?token=' + token;
+  const html = `
+    <div style="font-size:13px;color:var(--ink-muted);margin-bottom:14px">
+      ${isNew ? t('partnerLinkNewHint') : t('partnerLinkExistingHint')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input id="partner-link-url" type="text" readonly value="${escapeHtml(fullUrl)}"
+        style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12px;font-family:monospace;color:var(--ink)">
+      <button class="btn sm" onclick="copyPartnerLink()">${t('copyLink')}</button>
+    </div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:18px">
+      ${t('partnerLinkNote', escapeHtml(partnerName))}
+    </div>
+    <div style="border-top:1px solid var(--line);padding-top:14px">
+      <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="revokePartnerLink('${partnerId}')">🗑 ${t('revokeLink')}</button>
+    </div>
+  `;
+  openModal(t('partnerLinkModalTitle') + ' — ' + escapeHtml(partnerName), html, '');
+}
+
+function copyPartnerLink() {
+  const input = document.getElementById('partner-link-url');
+  if (!input) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    toast(t('toastLinkCopied'));
+  }).catch(() => {
+    document.execCommand('copy');
+    toast(t('toastLinkCopied'));
+  });
+}
+
+async function revokePartnerLink(partnerId) {
+  if (!confirm(t('confirmRevokeLink'))) return;
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient
+      .from('partner_links')
+      .update({ revoked: true, revoked_at: new Date().toISOString() })
+      .eq('partner_id', partnerId)
+      .eq('revoked', false);
+    if (error) throw error;
+    toast(t('toastLinkRevoked'));
+    closeModal();
+  } catch (e) {
+    alert(t('partnerLinkError'));
+  }
+}
+
 function printPartnerReport(partnerId, existingEntry) {
   const p = getPartner(partnerId);
   if (!p) return;
@@ -12558,7 +12846,7 @@ async function refreshFromCloud(force) {
     subscribeToRealtime();
     _cloudFailUntil = 0;
     setSyncOnline(true);
-    render(state.detailParam);
+    renderPreserveScroll();
   } catch (e) {
     setSyncOnline(false);
     _cloudFailUntil = Date.now() + 15000;
