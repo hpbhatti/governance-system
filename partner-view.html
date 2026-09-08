@@ -205,11 +205,12 @@ function setLang(lang) {
   document.getElementById('html-root').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
   document.getElementById('btn-lang-en').classList.toggle('active', lang === 'en');
   document.getElementById('btn-lang-ar').classList.toggle('active', lang === 'ar');
-  document.getElementById('loading-msg').textContent = lang === 'ar' ? 'جارٍ تحميل مهامك…' : 'Loading your tasks…';
+  // loading-msg only exists in the pre-data-load state — it's gone forever once
+  // render() has run once, so this must NOT throw on later toggles (that used
+  // to silently abort the rest of this function, including the re-render below).
+  var loadingMsgEl = document.getElementById('loading-msg');
+  if (loadingMsgEl) loadingMsgEl.textContent = lang === 'ar' ? 'جارٍ تحميل مهامك…' : 'Loading your tasks…';
   if (!lastData) return;
-  // Show current data immediately, then upgrade any missing titles for this
-  // language in the background (translation or slot-detection), re-rendering
-  // once they arrive. Works the same way switching to either language.
   render(lastData);
   ensureTitlesForLang(lastData, lang).then(function() { render(lastData); });
 }
