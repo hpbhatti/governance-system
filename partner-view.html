@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SOE — My Tasks</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwRjIyMzUiLz48bGluZSB4MT0iMzIiIHkxPSIxMCIgeDI9IjMyIiB5Mj0iNTQiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9IjAuMyIvPjxsaW5lIHgxPSIxMCIgeTE9IjMyIiB4Mj0iNTQiIHkyPSIzMiIgc3Ryb2tlPSIjQzlBODRDIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC4zIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTg0QyIgc3Ryb2tlLXdpZHRoPSIyLjUiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSI5IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOUE4NEMiIHN0cm9rZS13aWR0aD0iMS44IiBvcGFjaXR5PSIwLjY1Ii8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMy41IiBmaWxsPSIjQzlBODRDIi8+PC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f5f3ee; --bg-card: #ffffff;
@@ -27,15 +30,13 @@
   .lang-toggle button { border: none; background: var(--bg-card); color: var(--ink-muted); font-size: 12px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
   .lang-toggle button.active { background: var(--accent); color: #fff; }
 
-  .header { background: linear-gradient(135deg, #0a1628 0%, #132744 100%); border-radius: 14px; padding: 24px 26px; margin-bottom: 24px; color: #e8dcc8; box-shadow: var(--shadow); }
-  .header-brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-  .header-logo { height: 30px; opacity: 0.95; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.3)); }
-  .header-crosshair { flex-shrink: 0; }
-  .header-brand-text { font-size: 12px; color: rgba(232,220,200,0.55); letter-spacing: 0.6px; text-transform: uppercase; }
-  .header-divider { height: 1px; background: rgba(201,168,76,0.2); margin: 14px 0; }
-  .header-partner-label { font-size: 11px; color: rgba(201,168,76,0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .header-partner { font-size: 24px; font-weight: 700; color: #f5f0e6; font-family: 'Reem Kufi', serif; }
-  .header-meta { font-size: 11.5px; color: rgba(232,220,200,0.4); margin-top: 10px; }
+  .header { background: linear-gradient(180deg, #0a1628 0%, #132744 100%); border-radius: 16px; padding: 40px 32px 32px; margin-bottom: 24px; color: #e8dcc8; box-shadow: var(--shadow); text-align: center; }
+  .header-logo { height: 34px; margin-bottom: 12px; opacity: 0.95; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.3)); }
+  .header-brand-text { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(232,220,200,0.55); margin-bottom: 22px; }
+  .header-divider { width: 40px; height: 1px; background: rgba(201,168,76,0.3); margin: 0 auto 22px; }
+  .header-partner-label { font-size: 11px; color: rgba(201,168,76,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .header-partner { font-size: 30px; font-weight: 600; color: #f5f0e6; font-family: 'Reem Kufi', serif; margin-bottom: 6px; }
+  .header-meta { font-size: 12px; color: rgba(232,220,200,0.4); }
 
   .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
   .kpi { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
@@ -91,6 +92,8 @@
   .state-box { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
   .state-box .icon { font-size: 40px; margin-bottom: 12px; }
   .state-box .msg { font-size: 15px; }
+  .retry-btn { margin-top: 16px; padding: 10px 22px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .retry-btn:hover { background: var(--accent-warm); }
 
   .footer-note { text-align: center; font-size: 11px; color: var(--ink-faint); margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line); }
 
@@ -121,8 +124,8 @@ const SCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAACICAYAAABd
 
 const STR = {
   en: {
-    brandLine: 'Partners Management — Projects & Tasks',
-    partnerLabel: 'Partner', subtitle: 'My Tasks — View Only', lastUpdated: 'Last updated',
+    brandLine: 'Partners and projects management',
+    partnerLabel: 'Partner', preparedFor: 'Prepared for', subtitle: 'My Tasks — View Only', lastUpdated: 'Last updated',
     totalTasks: 'Total Tasks', completed: 'Completed', open: 'Open',
     due: 'Due', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
@@ -133,12 +136,13 @@ const STR = {
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
+    loadTimeout: 'This is taking longer than expected.', retryBtn: 'Try Again',
     stCompleted: '\u2713 Completed', stOpen: 'Open', stOverdue: 'Overdue', stMissed: 'Missed',
     pHigh: 'High', pMedium: 'Medium', pLow: 'Low'
   },
   ar: {
-    brandLine: 'إدارة الشركاء — المشاريع والمهام',
-    partnerLabel: 'الشريك', subtitle: 'مهامي — للاطلاع فقط', lastUpdated: 'آخر تحديث',
+    brandLine: 'إدارة الشركاء والمشاريع',
+    partnerLabel: 'الشريك', preparedFor: 'إعداد التقرير من أجل', subtitle: 'مهامي — للاطلاع فقط', lastUpdated: 'آخر تحديث',
     totalTasks: 'إجمالي المهام', completed: 'مكتملة', open: 'مفتوحة',
     due: 'الاستحقاق', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
@@ -149,6 +153,7 @@ const STR = {
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
+    loadTimeout: 'هذا يستغرق وقتاً أطول من المتوقع.', retryBtn: 'إعادة المحاولة',
     stCompleted: '\u2713 مكتملة', stOpen: 'مفتوحة', stOverdue: 'متأخرة', stMissed: 'فائتة',
     pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة'
   }
@@ -341,9 +346,18 @@ function loadPartnerView() {
     return;
   }
 
+  // Never let this hang indefinitely — if the Edge Function doesn't respond
+  // within 15 seconds (cold start, network issue, or a server-side error),
+  // show a clear message instead of leaving the page stuck on the spinner
+  // with no feedback at all.
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function() { controller.abort(); }, 15000);
+
   fetch(FUNCTION_URL + '?token=' + encodeURIComponent(token), {
-    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY },
+    signal: controller.signal
   }).then(function(res) {
+    clearTimeout(timeoutId);
     if (!res.ok) {
       app.innerHTML = '<div class="state-box"><div class="icon">🔒</div><div class="msg">' + t('invalidLink') + '<br>' + t('contactSoe') + '</div></div>';
       return null;
@@ -356,8 +370,12 @@ function loadPartnerView() {
     render(data);
     // Fill in whichever slot is missing for the current language, in the background.
     ensureTitlesForLang(data, currentLang).then(function() { render(data); });
-  }).catch(function() {
-    app.innerHTML = '<div class="state-box"><div class="icon">⚠️</div><div class="msg">' + t('loadError') + '<br>' + t('tryAgain') + '</div></div>';
+  }).catch(function(err) {
+    clearTimeout(timeoutId);
+    var timedOut = err && err.name === 'AbortError';
+    app.innerHTML = '<div class="state-box"><div class="icon">⚠️</div><div class="msg">' +
+      (timedOut ? t('loadTimeout') : t('loadError')) + '<br>' + t('tryAgain') +
+      '</div><button class="retry-btn" onclick="loadPartnerView()">' + t('retryBtn') + '</button></div>';
   });
 }
 
@@ -400,13 +418,10 @@ function render(data) {
 
   app.innerHTML =
     '<div class="header">' +
-      '<div class="header-brand-row">' +
-        '<img class="header-logo" src="' + SCE_LOGO + '" alt="SOE">' +
-        renderCrosshairIconInline(20) +
-        '<span class="header-brand-text">' + t('brandLine') + '</span>' +
-      '</div>' +
+      '<img class="header-logo" src="' + SCE_LOGO + '" alt="SOE">' +
+      '<div class="header-brand-text">' + t('brandLine') + '</div>' +
       '<div class="header-divider"></div>' +
-      '<div class="header-partner-label">' + t('partnerLabel') + '</div>' +
+      '<div class="header-partner-label">' + t('preparedFor') + '</div>' +
       '<div class="header-partner">' + escapeHtml(partnerDisplayName(data.partner)) + '</div>' +
       '<div class="header-meta">' + t('lastUpdated') + ': ' + fmtDate(data.generatedAt.slice(0,10)) + '</div>' +
     '</div>' +
