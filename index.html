@@ -1478,6 +1478,7 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   }
   .resp-team { color: var(--ink-faint); font-size: 10px; }
   .resp-tag-unassigned { color: var(--amber); font-weight: 500; background: var(--amber-bg); border: 1px solid rgba(196,126,42,0.3); border-radius: 8px; padding: 1px 8px; }
+  .field-fallback-note { font-size: 11.5px; color: var(--amber); margin-top: 5px; }
   .drift-chip {
     display: inline-block; padding: 1px 7px; border-radius: 8px;
     font-size: 10px; background: #fae0de; color: var(--red);
@@ -2456,6 +2457,7 @@ const T = {
     alertOfflineFeature: 'هذه الميزة تتطلب اتصالاً بالإنترنت.',
     fixNow: 'تصحيح الآن',
     ownerNeedsAssignment: 'يحتاج تعيين مسؤول',
+    fallbackTitleNote: 'لا توجد ترجمة لهذه اللغة بعد — يُعرض نص اللغة الأخرى. يرجى ترجمته قبل الحفظ، وإلا سيتم حفظه كما هو بهذه اللغة.',
     subtaskProgress: '{0} من {1} منجزة',
     originalDueDate: 'التاريخ الأصلي', currentDueDate: 'التاريخ الحالي',
     dueDateHistory: 'سجل التمديدات', extendDueDate: 'تمديد التاريخ',
@@ -3139,6 +3141,7 @@ const T = {
     alertOfflineFeature: 'This feature requires an internet connection.',
     fixNow: 'Fix Now',
     ownerNeedsAssignment: 'Owner needs assignment',
+    fallbackTitleNote: 'No translation yet for this language — showing the other language\'s text. Please translate it before saving, or it will be saved as-is in this language.',
     subtaskProgress: '{0} of {1} done',
     originalDueDate: 'Original Date', currentDueDate: 'Current Date',
     dueDateHistory: 'Extension History', extendDueDate: 'Extend Date',
@@ -5506,8 +5509,14 @@ async function translateText(text, from, to) {
 function collectUntranslatedStrings() {
   const items = [];
   function maybeAdd(obj, key) {
-    const ar = obj[key], en = obj[key + 'En'];
-    if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table });
+    // Prefer the real titleAr/nameAr/descriptionAr field as the source of
+    // truth. Only fall back to the canonical mirror for genuinely untouched
+    // legacy records that never went through the bilingual system at all —
+    // NOT as a source when the mirror is stuck at a corrupted "—" (that
+    // would silently skip exactly the records that most need re-translating).
+    const ar = obj[key + 'Ar'] || (containsArabic(obj[key]) ? obj[key] : '');
+    const en = obj[key + 'En'];
+    if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table, source: ar });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
@@ -5527,12 +5536,19 @@ async function translateAllUserContent(silent) {
   const changedActions = [], changedProjects = [];
   for (const item of items) {
     try {
-      const source = item.obj[item.key];
+      const source = item.source;
       const translated = await translateText(source, 'ar', 'en');
       // Write directly into the real field — auto-fill only, never sets the
       // Manual lock (that's reserved for an actual human edit), so this can
       // still be refined later exactly like the automatic system would.
       item.obj[item.key + 'En'] = translated;
+      // If English is the currently active UI language, also correct the
+      // canonical display/mirror field RIGHT NOW — before saveState() runs.
+      // Without this, saveState() persists the OLD stale mirror alongside
+      // the new correct translation, so the fix never actually shows up
+      // anywhere (cards, other computers, partner-view) even though the
+      // real field was updated correctly.
+      if (currentLang === 'en') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
@@ -5563,8 +5579,13 @@ async function translateAllUserContent(silent) {
 function collectUntranslatedStringsToArabic() {
   const items = [];
   function maybeAdd(obj, key) {
-    const en = obj[key], ar = obj[key + 'Ar'];
-    if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table });
+    // Same fix as the English-direction scanner: prefer the real titleEn/
+    // nameEn/descriptionEn field, only falling back to canonical for
+    // genuinely untouched legacy records — never as a source when the
+    // mirror is stuck corrupted, which would silently skip it forever.
+    const en = obj[key + 'En'] || (isEnglishOnly(obj[key]) ? obj[key] : '');
+    const ar = obj[key + 'Ar'];
+    if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table, source: en });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
@@ -5583,9 +5604,15 @@ async function translateAllUserContentToArabic(silent) {
   const changedActions = [], changedProjects = [];
   for (const item of items) {
     try {
-      const source = item.obj[item.key];
+      const source = item.source;
       const translated = await translateText(source, 'en', 'ar');
       item.obj[item.key + 'Ar'] = translated;
+      // Same fix as the English direction: correct the canonical display
+      // field NOW, before saveState() persists this record — otherwise the
+      // stale mirror gets saved right alongside the new correct translation,
+      // and the fix never actually appears anywhere (cards, other computers,
+      // partner-view), even though titleAr itself is correct in the database.
+      if (currentLang === 'ar') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
@@ -5701,15 +5728,18 @@ async function applyContentLanguage(lang) {
   const cap = lang === 'ar' ? 'Ar' : 'En';
   const otherCap = cap === 'Ar' ? 'En' : 'Ar';
   const missing = [];
-  // Apply the active language to a single field on an object (display the current slot,
-  // "—" placeholder when empty, queue translation from the other slot — never fall back).
+  // Apply the active language to a single field on an object. Shows the
+  // current slot when available; if it's missing, shows the OTHER
+  // language's real text immediately (honest, readable right away) instead
+  // of a meaningless "—" placeholder, and queues a background translation
+  // to upgrade it to the correct language shortly after.
   const applyField = (obj, key, opt) => {
     const cur = obj[key + cap];
     // A non-manual slot whose text is broken (wrong-script garbage) should be re-translated.
     const broken = cur && !obj[key + 'Manual' + cap] && looksBroken(cur, cap);
     if (cur && !broken) { obj[key] = cur; }
-    else if (obj[key + otherCap]) {            // empty OR broken → (re)translate from the other slot
-      obj[key] = opt ? '' : '—';
+    else if (obj[key + otherCap]) {            // empty OR broken → show the other language now, translate in background
+      obj[key] = obj[key + otherCap];
       missing.push({ obj, key, force: !!broken });
     }
     else if (cur) { obj[key] = cur; }          // broken but no source to fix it → show as-is
@@ -5725,27 +5755,34 @@ async function applyContentLanguage(lang) {
     applyField(p, 'name');
     applyField(p, 'description', true);
   });
+  // Nothing was blank/broken — the screen already shows real, correct-language
+  // content for everything, so paint it now and we're done immediately.
+  renderPreserveScroll(state.detailParam);
   if (missing.length === 0 || isApplyingContentLang) return;
   isApplyingContentLang = true;
-  let changed = false;
+  let changedSinceLastPaint = false;
+  let lastPaint = Date.now();
   for (const m of missing) {
     const ok = await ensureBilingual(m.obj, m.key, lang, m.force);
     if (ok) {
       m.obj[m.key] = m.obj[m.key + cap];
-      changed = true;
-    } else if (m.obj[m.key] === '—' || m.obj[m.key] === '') {
-      // Translation failed for this item — NEVER leave/save a meaningless
-      // dash as the canonical value (that would silently overwrite real
-      // content). Fall back to showing the other language's real text
-      // instead, which is honest and fully recoverable — better than losing
-      // the mirror field to a placeholder that then gets persisted.
-      const otherCap2 = cap === 'En' ? 'Ar' : 'En';
-      if (m.obj[m.key + otherCap2]) { m.obj[m.key] = m.obj[m.key + otherCap2]; changed = true; }
+      changedSinceLastPaint = true;
     }
+    // else: it already shows the honest other-language fallback from above —
+    // nothing more to do here, no dash was ever shown to begin with.
     await new Promise(r => setTimeout(r, 120)); // be gentle with the free API
+    // Repaint every ~1 second (not after every single item) so items visibly
+    // upgrade to the correct language as they finish, instead of the whole
+    // page staying frozen until the entire backlog is done.
+    if (changedSinceLastPaint && Date.now() - lastPaint > 1000) {
+      renderPreserveScroll(state.detailParam);
+      lastPaint = Date.now();
+      changedSinceLastPaint = false;
+    }
   }
   isApplyingContentLang = false;
-  if (changed) { saveState(); renderPreserveScroll(state.detailParam); }
+  saveState();
+  renderPreserveScroll(state.detailParam); // final paint to catch anything since the last interval
 }
 
 /* ========== TOAST ========== */
@@ -9223,7 +9260,9 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row">
       <label id="title-label">${t('fieldActionTitle')}</label>
-      <input id="f-title" value="${escapeHtml(editing ? (editing['title' + (currentLang==='ar'?'Ar':'En')] || '') : '')}" placeholder="">
+      <input id="f-title" value="${escapeHtml(editing ? (editing['title' + (currentLang==='ar'?'Ar':'En')] || editing['title' + (currentLang==='ar'?'En':'Ar')] || editing.title || '') : '')}" placeholder="">
+      ${editing && !editing['title' + (currentLang==='ar'?'Ar':'En')] && (editing['title' + (currentLang==='ar'?'En':'Ar')] || editing.title) ?
+        `<div class="field-fallback-note">⚠ ${t('fallbackTitleNote')}</div>` : ''}
     </div>
     <div class="form-row">
       <label>${t('fieldProjectName')}</label>
