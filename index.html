@@ -5674,8 +5674,16 @@ function setBilingualField(obj, baseKey, value) {
 // the garbage mixed-language results some translation services return (e.g. "...Startegy" in Arabic).
 function looksBroken(text, cap) {
   if (!text) return false;
-  if (cap === 'Ar') return /[A-Za-z]{2,}/.test(text);   // Arabic slot containing a Latin word
-  return /[\u0600-\u06FF]/.test(text);                   // English slot containing Arabic letters
+  // Genuinely broken = the text is dominated by the WRONG script, not just
+  // containing a short embedded acronym/proper noun (BRD, IBAN, VAT, UAT,
+  // MVP, B2B...) — those are normal and correct even in real Arabic
+  // business writing, and flagging them caused a real bug: a perfectly
+  // correct translation kept getting judged "broken", discarded, and
+  // re-translated forever in an infinite loop that never resolved.
+  const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const latinChars = (text.match(/[A-Za-z]/g) || []).length;
+  if (cap === 'Ar') return arabicChars === 0 || latinChars > arabicChars;
+  return latinChars === 0 || arabicChars > latinChars;
 }
 
 // Fill obj[baseKey + <targetLang>] by translating from the other slot. Writes when the target slot
