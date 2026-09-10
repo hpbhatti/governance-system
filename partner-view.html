@@ -49,6 +49,7 @@
   .project-section { margin-bottom: 24px; }
   .project-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 4px; border-bottom: 2px solid var(--accent-warm); margin-bottom: 10px; }
   .project-name { font-size: 16px; font-weight: 600; color: var(--accent); font-family: 'Reem Kufi', serif; }
+  .project-eyebrow { font-size: 10px; font-weight: 600; color: var(--accent-warm); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
 
   .delay-impact-box { display: flex; align-items: flex-start; gap: 8px; background: var(--red-bg); border: 1px solid rgba(176,69,64,0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--red); }
   .delay-impact-box .icon { flex-shrink: 0; font-size: 15px; line-height: 1.3; }
@@ -125,7 +126,7 @@ const SCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAACICAYAAABd
 const STR = {
   en: {
     brandLine: 'Partners and projects management',
-    partnerLabel: 'Partner', preparedFor: 'Prepared for', subtitle: 'My Tasks — View Only', lastUpdated: 'Last updated',
+    partnerLabel: 'Partner', preparedFor: 'Prepared for', projectLabel: 'Project', subtitle: 'My Tasks — View Only', lastUpdated: 'Last updated',
     totalTasks: 'Total Tasks', completed: 'Completed', open: 'Open',
     due: 'Due', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
@@ -142,7 +143,7 @@ const STR = {
   },
   ar: {
     brandLine: 'إدارة الشركاء والمشاريع',
-    partnerLabel: 'الشريك', preparedFor: 'إعداد التقرير من أجل', subtitle: 'مهامي — للاطلاع فقط', lastUpdated: 'آخر تحديث',
+    partnerLabel: 'الشريك', preparedFor: 'إعداد التقرير من أجل', projectLabel: 'مشروع', subtitle: 'مهامي — للاطلاع فقط', lastUpdated: 'آخر تحديث',
     totalTasks: 'إجمالي المهام', completed: 'مكتملة', open: 'مفتوحة',
     due: 'الاستحقاق', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
@@ -232,6 +233,14 @@ function fmtDate(iso) {
   return d.toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso); // full ISO timestamp, not date-only — includes the actual time
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 function fmtBytes(bytes) {
   if (!bytes) return '';
   if (bytes < 1024) return bytes + ' B';
@@ -261,6 +270,13 @@ function taskTitle(task) {
     return task.titleAr || task.titleRaw || task.titleEn || '';
   }
   return task.titleEn || task.titleRaw || task.titleAr || '';
+}
+
+function projectName(project) {
+  if (currentLang === 'ar') {
+    return project.nameAr || project.nameRaw || project.nameEn || '';
+  }
+  return project.nameEn || project.nameRaw || project.nameAr || '';
 }
 
 // True when the title actually being shown is NOT in the currently selected
@@ -409,7 +425,7 @@ function render(data) {
         ? '<div class="delay-impact-box"><span class="icon">⚠️</span><span>' + (overdueCount === 1 ? t('delayImpactOne') : t('delayImpactMany', overdueCount)) + '</span></div>'
         : '';
       return '<div class="project-section">' +
-        '<div class="project-head"><div class="project-name">📁 ' + escapeHtml(p.name) + '</div></div>' +
+        '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
         delayBox +
         cardsHtml +
         renderProjectFiles(p.attachments) +
@@ -423,7 +439,7 @@ function render(data) {
       '<div class="header-divider"></div>' +
       '<div class="header-partner-label">' + t('preparedFor') + '</div>' +
       '<div class="header-partner">' + escapeHtml(partnerDisplayName(data.partner)) + '</div>' +
-      '<div class="header-meta">' + t('lastUpdated') + ': ' + fmtDate(data.generatedAt.slice(0,10)) + '</div>' +
+      '<div class="header-meta">' + t('lastUpdated') + ': ' + fmtDateTime(data.generatedAt) + '</div>' +
     '</div>' +
     '<div class="kpi-strip">' +
       '<div class="kpi k-total"><div class="kpi-label">' + t('totalTasks') + '</div><div class="kpi-value">' + mainTasks.length + '</div></div>' +
