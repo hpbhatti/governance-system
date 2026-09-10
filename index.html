@@ -5519,6 +5519,7 @@ function collectUntranslatedStrings() {
     if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table, source: ar });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
+  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -5533,7 +5534,7 @@ async function translateAllUserContent(silent) {
   }
   isTranslating = true;
   let count = 0, failures = 0;
-  const changedActions = [], changedProjects = [];
+  const changedActions = [], changedProjects = [], changedPartners = [];
   for (const item of items) {
     try {
       const source = item.source;
@@ -5550,6 +5551,7 @@ async function translateAllUserContent(silent) {
       // real field was updated correctly.
       if (currentLang === 'en') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
+      else if (item.table === 'partners') changedPartners.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
       if (count % 3 === 0 || count === items.length) {
@@ -5565,7 +5567,7 @@ async function translateAllUserContent(silent) {
       }
     }
   }
-  saveState({ actions: changedActions, projects: changedProjects });
+  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners });
   isTranslating = false;
   toast(t('translationDone', count));
   await applyContentLanguage(currentLang); // refresh canonical display fields immediately
@@ -5588,6 +5590,7 @@ function collectUntranslatedStringsToArabic() {
     if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table, source: en });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
+  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -5601,7 +5604,7 @@ async function translateAllUserContentToArabic(silent) {
   }
   isTranslating = true;
   let count = 0, failures = 0;
-  const changedActions = [], changedProjects = [];
+  const changedActions = [], changedProjects = [], changedPartners = [];
   for (const item of items) {
     try {
       const source = item.source;
@@ -5614,6 +5617,7 @@ async function translateAllUserContentToArabic(silent) {
       // partner-view), even though titleAr itself is correct in the database.
       if (currentLang === 'ar') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
+      else if (item.table === 'partners') changedPartners.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
       if (count % 3 === 0 || count === items.length) {
@@ -5629,7 +5633,7 @@ async function translateAllUserContentToArabic(silent) {
       }
     }
   }
-  saveState({ actions: changedActions, projects: changedProjects });
+  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners });
   isTranslating = false;
   toast(t('translationDone', count));
   await applyContentLanguage(currentLang); // refresh canonical display fields immediately
@@ -5758,6 +5762,9 @@ async function applyContentLanguage(lang) {
     applyField(a, 'title');
     if (a.type === 'meeting') applyField(a, 'meetingNotes', true);
     else applyField(a, 'note', true);
+  });
+  (state.partners || []).forEach(p => {
+    applyField(p, 'name');
   });
   (state.projects || []).forEach(p => {
     applyField(p, 'name');
@@ -8639,9 +8646,12 @@ function savePartner(id) {
   if (id) {
     const p = getPartner(id);
     Object.assign(p, data);
+    if (p.name) setBilingualField(p, 'name', p.name);
     toast(t('toastSavedChanges'));
   } else {
-    state.partners.push({ id: uid(), ...data, createdAt: todayDate() });
+    const newP = { id: uid(), ...data, createdAt: todayDate() };
+    if (newP.name) setBilingualField(newP, 'name', newP.name);
+    state.partners.push(newP);
     toast(t('toastPartnerAdded'));
   }
   saveState();
