@@ -190,9 +190,10 @@ function ensureTitlesForLang(data, lang) {
 }
 
 function partnerDisplayName(partner) {
-  // Partners have no separate bilingual name field in the main system —
-  // shown exactly as stored, in whichever language it was entered.
-  return partner.name;
+  if (currentLang === 'ar') {
+    return partner.nameAr || partner.nameRaw || partner.nameEn || partner.name || '';
+  }
+  return partner.nameEn || partner.nameRaw || partner.nameAr || partner.name || '';
 }
 
 function t(key) {
