@@ -26,6 +26,15 @@
   .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
 
   .lang-toggle-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+  .submissions-btn { margin-inline-end: auto; padding: 6px 14px; border-radius: 6px; border: 0.5px solid var(--line-strong); background: var(--bg-card); font-size: 12px; cursor: pointer; font-family: inherit; color: var(--ink-muted); }
+  .submissions-btn:hover { background: var(--bg); }
+  .submission-row { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .submission-row:last-child { border-bottom: none; }
+  .submission-status-badge { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; }
+  .submission-status-badge.pending { background: var(--amber-bg); color: var(--amber); }
+  .submission-status-badge.approved { background: var(--green-bg); color: var(--green); }
+  .submission-status-badge.rejected { background: var(--red-bg); color: var(--red); }
+  .submission-reject-reason { font-size: 12px; color: var(--red); margin-top: 5px; padding: 6px 8px; background: var(--red-bg); border-radius: 6px; }
   .lang-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
   .lang-toggle button { border: none; background: var(--bg-card); color: var(--ink-muted); font-size: 12px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
   .lang-toggle button.active { background: var(--accent); color: #fff; }
@@ -52,7 +61,7 @@
   .project-eyebrow { font-size: 10px; font-weight: 600; color: var(--accent-warm); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
 
   .delay-impact-box { display: flex; align-items: flex-start; gap: 8px; background: var(--red-bg); border: 1px solid rgba(176,69,64,0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--red); }
-  .critical-note-banner { display: flex; align-items: flex-start; gap: 8px; background: #fdf3d9; border: 1px solid rgba(184,136,74,0.4); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; color: #8a6414; }
+  .critical-note-banner { display: flex; align-items: flex-start; gap: 8px; background: #fdf3d9; border: 1.5px solid #b8884a; border-radius: 8px; padding: 11px 13px; margin-bottom: 10px; font-size: 13px; color: #6b4a10; font-weight: 500; }
   .critical-note-banner .icon { flex-shrink: 0; }
   .big-picture { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
   .bp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -61,6 +70,7 @@
   .bp-bar-track { height: 8px; background: #eee8dc; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
   .bp-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
   .bp-footer { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); }
+  .contribution-line { font-size: 12.5px; color: var(--ink-muted); margin-bottom: 10px; font-style: italic; }
   .milestones-box { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
   .milestones-title { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
   .milestone-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; border-top: 1px dashed var(--line); }
@@ -135,6 +145,7 @@
 <body>
   <div class="wrap">
     <div class="lang-toggle-row">
+      <button class="submissions-btn" onclick="openMySubmissions()">📋 <span id="submissions-btn-label"></span></button>
       <div class="lang-toggle">
         <button id="btn-lang-en" onclick="setLang('en')">English</button>
         <button id="btn-lang-ar" onclick="setLang('ar')">العربية</button>
@@ -158,7 +169,12 @@ const STR = {
     due: 'Due', startDate: 'Start', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
     projectFiles: 'Project Files', footer: 'This is a read-only view shared by SOE. Refresh this page anytime to see the latest status.',
-    originalLanguageNote: '(shown in original language)',
+    originalLanguageNote: '(shown in original language)', criticalLabel: 'Critical',
+    mySubmissions: 'My Submissions', mySubmissionsTitle: 'My Submitted Tasks',
+    submissionsEmpty: 'You haven\'t submitted anything yet.', submissionsLoadError: 'Could not load your submissions.',
+    statusPending: 'Pending', statusApproved: 'Approved', statusRejected: 'Rejected',
+    rejectionReasonLabel: 'Reason', submissionChangeComplete: 'Marked Complete', submissionChangeNote: 'Added Note',
+    closeBtn: 'Close',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
     proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
@@ -170,6 +186,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     statusOnTrack: 'On Track', statusAtRisk: 'At Risk', statusDelayed: 'Delayed',
     yourShare: function(yours, total){ return 'Your team: ' + yours + ' of ' + total + ' tasks'; },
     yourContribution: function(yours, total){ return 'You\'re contributing ' + yours + ' of this project\'s ' + total + ' tasks'; },
+    yourTaskCountOnly: function(yours){ return 'You have ' + yours + ' task' + (yours===1?'':'s') + ' on this project'; },
     projectMilestones: 'Project Milestones',
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
@@ -185,7 +202,12 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     due: 'الاستحقاق', startDate: 'البدء', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
     projectFiles: 'ملفات المشروع', footer: 'هذا عرض للاطلاع فقط تمت مشاركته من قبل SOE. أعد تحميل الصفحة في أي وقت لرؤية آخر تحديث.',
-    originalLanguageNote: '(معروضة باللغة الأصلية)',
+    originalLanguageNote: '(معروضة باللغة الأصلية)', criticalLabel: 'حرج',
+    mySubmissions: 'مهامي المرسلة', mySubmissionsTitle: 'المهام التي أرسلتها',
+    submissionsEmpty: 'لم ترسل أي شيء بعد.', submissionsLoadError: 'تعذر تحميل ما أرسلته.',
+    statusPending: 'قيد الانتظار', statusApproved: 'تمت الموافقة', statusRejected: 'مرفوض',
+    rejectionReasonLabel: 'السبب', submissionChangeComplete: 'تم وضعها كمكتملة', submissionChangeNote: 'إضافة ملاحظة',
+    closeBtn: 'إغلاق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
     proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
@@ -197,6 +219,7 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     statusOnTrack: 'على المسار الصحيح', statusAtRisk: 'يحتاج متابعة', statusDelayed: 'متأخر',
     yourShare: function(yours, total){ return 'فريقكم: ' + yours + ' من أصل ' + total + ' مهمة'; },
     yourContribution: function(yours, total){ return 'تساهم في ' + yours + ' من أصل ' + total + ' مهمة في هذا المشروع'; },
+    yourTaskCountOnly: function(yours){ return 'لديك ' + yours + ' مهمة في هذا المشروع'; },
     projectMilestones: 'مراحل المشروع الرئيسية',
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
@@ -256,6 +279,7 @@ function setLang(lang) {
   document.getElementById('html-root').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
   document.getElementById('btn-lang-en').classList.toggle('active', lang === 'en');
   document.getElementById('btn-lang-ar').classList.toggle('active', lang === 'ar');
+  setSubmissionsButtonLabel();
   // loading-msg only exists in the pre-data-load state — it's gone forever once
   // render() has run once, so this must NOT throw on later toggles (that used
   // to silently abort the rest of this function, including the re-render below).
@@ -373,6 +397,7 @@ function renderTaskCard(task, subtasks) {
   var untranslated = isTitleUntranslated(task);
   var canPropose = task.status !== 'completed' && task.status !== 'missed';
   return '<div class="task-card st-' + cls + '">' +
+    (task.criticalNote ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(task.criticalNote) + '</span></div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     '<div class="task-meta">' +
       statusBadge(task) +
@@ -382,7 +407,6 @@ function renderTaskCard(task, subtasks) {
       (cls === 'overdue' && delay > 0 ? '<span style="color:var(--red);font-weight:600">' + t('overdueDays', delay) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
-    (task.criticalNote ? '<div class="critical-note-banner"><span class="icon">📌</span><span>' + escapeHtml(task.criticalNote) + '</span></div>' : '') +
     renderSubtasks(subtasks) +
     (canPropose ?
       '<div class="propose-row">' +
@@ -479,6 +503,20 @@ function render(data) {
         }
         return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
       });
+// Always shown, regardless of the overview privilege — personalization
+// isn't sensitive project-wide data, it's just about this person's own
+// contribution, so it shouldn't require the same admin toggle as
+// milestones/progress do.
+function renderContributionLine(p) {
+  var total = (p.bigPicture && p.bigPicture.totalTasks) || null;
+  if (total) {
+    return '<div class="contribution-line">' + t('yourContribution', p.yourTaskCount || 0, total) + '</div>';
+  }
+  // No overview privilege granted — still personalize using only this
+  // member's own task count for the project, no project-wide totals exposed.
+  return '<div class="contribution-line">' + t('yourTaskCountOnly', p.yourTaskCount || 0) + '</div>';
+}
+
 function renderBigPicture(p) {
   var bp = p.bigPicture;
   if (!bp || !bp.totalTasks) return '';
@@ -496,7 +534,6 @@ function renderBigPicture(p) {
     '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
     '<div class="bp-footer">' +
       '<span>' + bp.progressPercent + '% ' + t('complete') + ' (' + bp.completedTasks + '/' + bp.totalTasks + ')</span>' +
-      '<span>' + t('yourContribution', p.yourTaskCount || 0, bp.totalTasks) + '</span>' +
     '</div>' +
   '</div>';
 }
@@ -532,6 +569,7 @@ function renderMilestones(p) {
         : '';
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
+        renderContributionLine(p) +
         renderBigPicture(p) +
         renderMilestones(p) +
         delayBox +
@@ -631,6 +669,54 @@ function openProposeNote(taskId) {
       alert(t('proposalError'));
     });
   };
+}
+
+function setSubmissionsButtonLabel() {
+  var el = document.getElementById('submissions-btn-label');
+  if (el) el.textContent = t('mySubmissions');
+}
+
+function openMySubmissions() {
+  var token = getCurrentToken();
+  if (!token) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box" style="max-width:480px;max-height:80vh;overflow-y:auto">' +
+      '<div style="font-weight:600;margin-bottom:12px">' + t('mySubmissionsTitle') + '</div>' +
+      '<div id="submissions-list">' + t('loadingEllipsis') + '</div>' +
+      '<div class="modal-actions" style="margin-top:14px">' +
+        '<button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('closeBtn') + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  fetch(FUNCTION_URL + '?token=' + encodeURIComponent(token) + '&myProposals=1', {
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
+  }).then(function(res) { return res.ok ? res.json() : null; })
+    .then(function(data) {
+      var listEl = document.getElementById('submissions-list');
+      if (!listEl) return;
+      if (!data || !data.proposals) { listEl.textContent = t('submissionsLoadError'); return; }
+      if (data.proposals.length === 0) { listEl.textContent = t('submissionsEmpty'); return; }
+      listEl.innerHTML = data.proposals.map(function(p) {
+        var statusClass = p.status;
+        var statusLabel = p.status === 'pending' ? t('statusPending') : p.status === 'approved' ? t('statusApproved') : t('statusRejected');
+        var changeLabel = p.changeType === 'complete' ? t('submissionChangeComplete') : t('submissionChangeNote');
+        return '<div class="submission-row">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+            '<div style="font-size:13px;font-weight:500">' + escapeHtml(p.taskTitle || '(task unavailable)') + '</div>' +
+            '<span class="submission-status-badge ' + statusClass + '">' + statusLabel + '</span>' +
+          '</div>' +
+          '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:3px">' + escapeHtml(changeLabel) + ' · ' + fmtDate((p.createdAt || '').slice(0,10)) + '</div>' +
+          (p.noteText ? '<div style="font-size:12px;color:var(--ink-muted);margin-top:4px">' + escapeHtml(p.noteText) + '</div>' : '') +
+          (p.status === 'rejected' && p.rejectionReason ? '<div class="submission-reject-reason">' + t('rejectionReasonLabel') + ': ' + escapeHtml(p.rejectionReason) + '</div>' : '') +
+        '</div>';
+      }).join('');
+    }).catch(function() {
+      var listEl = document.getElementById('submissions-list');
+      if (listEl) listEl.textContent = t('submissionsLoadError');
+    });
 }
 
 loadPartnerView();
