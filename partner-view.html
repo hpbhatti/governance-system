@@ -41,7 +41,7 @@
 
   .header { background: linear-gradient(180deg, #0a1628 0%, #132744 100%); border-radius: 16px; padding: 28px 32px 30px; margin-bottom: 24px; color: #e8dcc8; box-shadow: var(--shadow); text-align: center; }
   .header-logo { height: 34px; margin-bottom: 12px; opacity: 0.95; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.3)); }
-  .header-brand-text { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(232,220,200,0.55); margin-bottom: 16px; }
+  .header-brand-text { font-size: 18px; letter-spacing: 0.3px; text-transform: none; color: rgba(232,220,200,0.85); margin-bottom: 18px; }
   .header-divider { width: 40px; height: 1px; background: rgba(201,168,76,0.3); margin: 0 auto 22px; }
   .header-partner-label { font-size: 11px; color: rgba(201,168,76,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
   .header-partner { font-size: 25px; font-weight: 600; color: #f5f0e6; font-family: 'Reem Kufi', serif; margin-bottom: 6px; }
@@ -329,6 +329,14 @@ function taskTitle(task) {
   return task.titleEn || task.titleRaw || task.titleAr || '';
 }
 
+function criticalNoteText(task) {
+  if (!task.criticalNoteEn && !task.criticalNoteAr && !task.criticalNoteRaw) return '';
+  if (currentLang === 'ar') {
+    return task.criticalNoteAr || task.criticalNoteRaw || task.criticalNoteEn || '';
+  }
+  return task.criticalNoteEn || task.criticalNoteRaw || task.criticalNoteAr || '';
+}
+
 function projectName(project) {
   if (currentLang === 'ar') {
     return project.nameAr || project.nameRaw || project.nameEn || '';
@@ -385,7 +393,7 @@ function renderTaskCard(task, subtasks) {
   var untranslated = isTitleUntranslated(task);
   var canPropose = task.status !== 'completed' && task.status !== 'missed';
   return '<div class="task-card st-' + cls + '">' +
-    (task.criticalNote ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(task.criticalNote) + '</span></div>' : '') +
+    (criticalNoteText(task) ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(criticalNoteText(task)) + '</span></div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     '<div class="task-meta">' +
       statusBadge(task) +
