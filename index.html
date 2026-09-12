@@ -1478,6 +1478,13 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   }
   .resp-team { color: var(--ink-faint); font-size: 10px; }
   .resp-tag-unassigned { color: var(--amber); font-weight: 500; background: var(--amber-bg); border: 1px solid rgba(196,126,42,0.3); border-radius: 8px; padding: 1px 8px; }
+  .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--line-strong); transition: 0.2s; border-radius: 22px; }
+  .switch .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; transition: 0.2s; border-radius: 50%; }
+  .switch input:checked + .slider { background-color: var(--accent); }
+  .switch input:checked + .slider:before { transform: translateX(18px); }
+  .pending-approval-card { background: var(--bg-card); border: 1px solid var(--line); border-left: 4px solid var(--accent-warm); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
   .field-fallback-note { font-size: 11.5px; color: var(--amber); margin-top: 5px; }
   .drift-chip {
     display: inline-block; padding: 1px 7px; border-radius: 8px;
@@ -1793,6 +1800,7 @@ const supabaseClient = SUPABASE_ENABLED
 // Map each cloud table to its in-memory state key.
 // Early auth state (needed by sidebar render before auth functions are defined)
 var _authUser = null;
+var _pendingApprovalCount = 0;
 const SUPABASE_TABLES = [
   { table: 'partners',      key: 'partners' },
   { table: 'internal_team', key: 'team' },
@@ -2446,6 +2454,16 @@ const T = {
     openInProject: 'فتح في المشروع',
     teamMemberReportBtn: '📄 تقرير الأداء', teamMemberReportTitle: 'تقرير عضو الفريق',
     partnerLinkBtn: 'رابط الشريك', partnerLinkModalTitle: 'رابط عرض الشريك (للاطلاع فقط)',
+    memberLinkBtn: 'رابط العضو', memberLinkModalTitle: 'رابط عضو الفريق',
+    canSeeOverviewLabel: 'يمكنه رؤية نظرة عامة على المشروع', canSeeOverviewHint: 'يعرض التقدم العام للمشروع (للاطلاع فقط) إلى جانب مهامه الخاصة',
+    toastOverviewEnabled: 'تم تفعيل نظرة عامة على المشروع لهذا العضو', toastOverviewDisabled: 'تم تعطيل نظرة عامة على المشروع لهذا العضو',
+    pendingApprovals: 'الموافقات المعلقة', pendingApprovalsEmpty: 'لا توجد موافقات معلقة حالياً.',
+    proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
+    approveBtn: 'موافقة', rejectBtn: 'رفض',
+    toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
+    markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
+    proposalSubmitted: 'تم الإرسال للموافقة', proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
+    proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
     partnerLinkNewHint: 'تم إنشاء رابط جديد لهذا الشريك. شاركه معه — يبقى صالحاً حتى تقوم بإلغائه.',
     partnerLinkExistingHint: 'يمتلك هذا الشريك رابطاً نشطاً بالفعل. شاركه مرة أخرى أو انسخه أدناه.',
     partnerLinkNote: 'أي شخص يملك هذا الرابط يمكنه رؤية مهام {0} فقط — للعرض فقط، بدون تسجيل دخول، وبدون الوصول لأي بيانات أخرى.',
@@ -3130,6 +3148,16 @@ const T = {
     openInProject: 'Open in Project',
     teamMemberReportBtn: '📄 Performance Report', teamMemberReportTitle: 'Team Member Report',
     partnerLinkBtn: 'Partner Link', partnerLinkModalTitle: 'Partner View-Only Link',
+    memberLinkBtn: 'Member Link', memberLinkModalTitle: 'Team Member Link',
+    canSeeOverviewLabel: 'Can see project overview', canSeeOverviewHint: 'Shows overall project progress (view-only) alongside their own tasks',
+    toastOverviewEnabled: 'Project overview enabled for this member', toastOverviewDisabled: 'Project overview disabled for this member',
+    pendingApprovals: 'Pending Approvals', pendingApprovalsEmpty: 'No pending approvals right now.',
+    proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
+    approveBtn: 'Approve', rejectBtn: 'Reject',
+    toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
+    markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
+    proposalSubmitted: 'Submitted for approval', proposalNotePlaceholder: 'Add a note or delay reason…',
+    proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
     partnerLinkNewHint: 'A new link has been created for this partner. Share it with them — it stays valid until you revoke it.',
     partnerLinkExistingHint: 'This partner already has an active link. Share it again or copy it below.',
     partnerLinkNote: 'Anyone with this link can view {0}\'s own tasks only — read-only, no login required, no access to any other data.',
@@ -3367,6 +3395,11 @@ function renderSidebar() {
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
         ${t('reportsArchive')}
         ${state.reports && state.reports.length > 0 ? `<span style="background:rgba(245,243,238,0.15);color:rgba(245,243,238,0.85);font-size:10px;padding:1px 6px;border-radius:10px;margin-inline-start:auto;font-family:'Reem Kufi',serif">${state.reports.length}</span>` : ''}
+      </button>
+      <button class="nav-item ${state.currentView==='pendingApprovals'?'active':''}" data-view="pendingApprovals">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        ${t('pendingApprovals')}
+        ${(_pendingApprovalCount || 0) > 0 ? `<span style="background:var(--amber);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-inline-start:auto;font-family:'Reem Kufi',serif">${_pendingApprovalCount}</span>` : ''}
       </button>
 
       <button class="nav-item ${state.currentView==='calendar'?'active':''}" data-view="calendar">
@@ -3994,6 +4027,17 @@ function getDelayDays(action) {
   if (action.status === 'postponed') return 0;
   if (!action.dueDate) return 0;
   return Math.max(0, businessDaysBetween(action.dueDate, todayDate()));
+}
+
+// Sorts most-overdue-first (the correct triage priority), with due date
+// ascending as a tiebreaker for everything that isn't yet overdue. Without
+// this, every not-yet-due task ties at delay=0 and falls back to arbitrary
+// storage order — a task due tomorrow and one due in 90 days would appear
+// in no meaningful order relative to each other.
+function compareByDelayThenDueDate(a, b) {
+  const delayDiff = getDelayDays(b) - getDelayDays(a);
+  if (delayDiff !== 0) return delayDiff;
+  return (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31');
 }
 
 // Status helpers (work for both tasks and meetings)
@@ -4767,6 +4811,7 @@ function renderTaskNodeBody(a, subtasks) {
   const tracking = trackingFullDisplay(a);
   const extensions = a.extensions || [];
   return '<div class="task-node-body">' +
+    (!meeting && a.startDate ? '<div style="font-size:12px;color:var(--ink-muted);margin-bottom:8px">🚀 ' + t('fieldStartDate') + ': <strong>' + fmtDate(a.startDate) + '</strong></div>' : '') +
     ((a.tracking || []).length > 0 ? '<div style="font-size:11px;color:var(--accent-warm);font-weight:500;margin-bottom:4px">📋 ' + t('sectionTracking') + '</div><div style="margin-bottom:10px">' + tracking + '</div>' : '') +
     (extensions.length > 0 ? '<div class="extension-log"><div style="font-weight:500;color:var(--accent-warm);margin-bottom:4px">📅 ' + t('dueDateHistory') + ' (' + extensions.length + ')</div>' +
       extensions.map(function(e) {
@@ -4915,7 +4960,10 @@ function sortTasks(items) {
     const aPending = isOpen(a) || isMissed(a);
     const bPending = isOpen(b) || isMissed(b);
     if (aPending !== bPending) return aPending ? -1 : 1;
-    if (aPending) return getDelayDays(b) - getDelayDays(a);
+    if (aPending) {
+      const _d = getDelayDays(b) - getDelayDays(a);
+      return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
+    }
     return (b.completedDate || b.dueDate || '').localeCompare(a.completedDate || a.dueDate || '');
   });
 }
@@ -5899,7 +5947,10 @@ views.teamMemberDetail = (memberId) => {
         <h1 class="page-title">${escapeHtml(m.name)}</h1>
         <div class="page-sub">${escapeHtml(m.role || '')}${m.role && m.email ? ' · ' : ''}${escapeHtml(m.email || '')} — ${t('teamMemberDetailSub')}</div>
       </div>
-      <button class="btn ghost" onclick="printTeamMemberReport('${memberId}')">📄 ${t('teamMemberReportBtn')}</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" onclick="manageTeamMemberLink('${memberId}')">🔗 ${t('memberLinkBtn')}</button>
+        <button class="btn ghost" onclick="printTeamMemberReport('${memberId}')">📄 ${t('teamMemberReportBtn')}</button>
+      </div>
     </div>
     <div class="stats">
       <div class="stat"><div class="stat-label">${t('totalAssignedLabel')}</div><div class="stat-value">${tasks.length}</div></div>
@@ -5911,7 +5962,7 @@ views.teamMemberDetail = (memberId) => {
     ${tasks.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noTeamPerf')}</div></div>` :
       Object.keys(byProject).map(pid => {
         const pr = getProject(pid);
-        const items = byProject[pid].slice().sort((a,b)=>getDelayDays(b)-getDelayDays(a));
+        const items = byProject[pid].slice().sort(compareByDelayThenDueDate);
         return `
           <div class="section">
             <div class="section-head">
@@ -6001,7 +6052,7 @@ views.dashboard = () => {
     .sort((a,b) => a.commitment.score - b.commitment.score).slice(0, 5);
 
   const recentDelayed = delayedActions
-    .sort((a, b) => getDelayDays(b) - getDelayDays(a))
+    .sort(compareByDelayThenDueDate)
     .slice(0, 5);
 
   const today = new Date().toLocaleDateString(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -6204,7 +6255,8 @@ views.report = () => {
       mainTasks.sort((a, b) => {
         const pr = (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1);
         if (pr !== 0) return pr;
-        return getDelayDays(b) - getDelayDays(a);
+        const _d = getDelayDays(b) - getDelayDays(a);
+        return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
       });
       return { p, mainTasks };
     }).filter(x => x.mainTasks.length > 0);
@@ -6422,7 +6474,7 @@ views.report = () => {
           <div class="section-head">
             <div class="section-title">${t('sectionTasksMissedInPeriod')} (${openTasksDelayed.length})<span class="accent-line"></span></div>
           </div>
-          ${openTasksDelayed.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(renderActionCard).join('')}
+          ${openTasksDelayed.sort(compareByDelayThenDueDate).map(renderActionCard).join('')}
         </div>
       ` : ''}
 
@@ -6492,7 +6544,7 @@ function renderReportGrouped(actions, groupBy) {
   // Within a group, order by urgency: delayed-open tasks, open tasks, meetings, completed
   const orderItems = (items) => {
     const delayedOpen = items.filter(x => isTask(x) && isOpen(x) && getDelayDays(x) > 0)
-      .sort((a,b)=>getDelayDays(b)-getDelayDays(a));
+      .sort(compareByDelayThenDueDate);
     const openOnTime = items.filter(x => isTask(x) && isOpen(x) && getDelayDays(x) === 0)
       .sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
     const mtgs = items.filter(isMeeting).sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
@@ -6543,7 +6595,7 @@ function renderReportComprehensive(open, completed) {
   const meetings = completed.filter(isMeeting).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
   const completedTasks = completed.filter(a => !isMeeting(a));
   const openTasks = open.filter(a => !isMeeting(a));
-  const sorted = [...openTasks].sort((a, b) => getDelayDays(b) - getDelayDays(a));
+  const sorted = [...openTasks].sort(compareByDelayThenDueDate);
   const byRisk = { critical: [], high: [], medium: [], low: [] };
   sorted.forEach(a => {
     const r = getRiskLevel(getDelayDays(a)).key;
@@ -6686,6 +6738,95 @@ views.agenda = () => {
     </div>
   `;
 };
+
+// ── Pending Approvals — proposals from Partner/Team Member links ──
+// pending_changes isn't part of the normal sync engine (it's not in
+// SUPABASE_TABLES) — fetched ad-hoc, same as partner_links/team_member_links.
+var _pendingApprovalsCache = null;
+
+async function refreshPendingApprovals() {
+  if (!supabaseClient) return;
+  try {
+    const { data, error } = await supabaseClient
+      .from('pending_changes')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    _pendingApprovalsCache = data || [];
+    _pendingApprovalCount = _pendingApprovalsCache.length;
+    try { renderSidebar(); } catch (e) {}
+    if (state.currentView === 'pendingApprovals') { try { renderPreserveScroll(); } catch (e) {} }
+  } catch (e) { /* silent — badge just won't update this cycle */ }
+}
+
+views.pendingApprovals = () => {
+  if (_pendingApprovalsCache === null) {
+    refreshPendingApprovals();
+    return `<div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div><div class="empty">${t('loadingEllipsis')}</div>`;
+  }
+  const items = _pendingApprovalsCache;
+  return `
+    <div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div>
+    ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : items.map(row => {
+      const task = state.actions.find(a => a.id === row.task_id);
+      const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(task not found — may have been deleted)</em>`;
+      const proj = task ? getProject(task.projectId) : null;
+      const changeLabel = row.change_type === 'complete' ? t('proposalMarkComplete') : t('proposalAddNote');
+      return `
+        <div class="pending-approval-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div>
+              <div style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">${escapeHtml(changeLabel)}</div>
+              <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
+              ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
+              ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
+              <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
+              <button class="btn ghost sm" onclick="rejectProposal('${row.id}')">✕ ${t('rejectBtn')}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+};
+
+async function approveProposal(id) {
+  if (!supabaseClient) return;
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (!row) return;
+  const task = state.actions.find(a => a.id === row.task_id);
+  if (task) {
+    if (row.change_type === 'complete') {
+      completeAction(task.id); // reuses the existing, already-correct completion logic (status, completedDate, saveState)
+    } else if (row.change_type === 'note') {
+      if (!task.tracking) task.tracking = [];
+      task.tracking.push({ date: new Date().toISOString(), text: row.note_text || '' });
+      saveState();
+    }
+  }
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
+  toast(t('toastProposalApproved'));
+  refreshPendingApprovals();
+}
+
+async function rejectProposal(id) {
+  if (!supabaseClient) return;
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
+  toast(t('toastProposalRejected'));
+  refreshPendingApprovals();
+}
 
 views.reports = () => {
   const reports = state.reports || [];
@@ -7149,7 +7290,7 @@ views.projectDetail = (projectId) => {
         <button class="btn sm" onclick="showActionForm(null,'${p.id}')">${t('addAction')}</button>
       </div>
       ${openMainTasks.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
-        openMainTasks.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderTaskNode(a, false)).join('')}
+        openMainTasks.sort(compareByDelayThenDueDate).map(a => renderTaskNode(a, false)).join('')}
     </div>
 
     ${completedMainTasks.length > 0 ? `
@@ -7247,7 +7388,8 @@ views.actions = () => {
       if (ka !== kb) return ka < kb ? -dirM : dirM;
       const aOpen = isOpen(a), bOpen = isOpen(b);
       if (aOpen !== bOpen) return aOpen ? -1 : 1;
-      return getDelayDays(b) - getDelayDays(a);
+      const _d = getDelayDays(b) - getDelayDays(a);
+      return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
     });
   } else if (actionSort === 'dueDateAsc' || actionSort === 'dueDateDesc') {
     const dd = actionSort === 'dueDateDesc' ? -1 : 1;
@@ -7256,7 +7398,8 @@ views.actions = () => {
     list = list.sort((a, b) => {
       const aOpen = isOpen(a), bOpen = isOpen(b);
       if (aOpen !== bOpen) return aOpen ? -1 : 1;
-      return getDelayDays(b) - getDelayDays(a);
+      const _d = getDelayDays(b) - getDelayDays(a);
+      return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
     });
   }
 
@@ -7752,7 +7895,7 @@ views.partnerDetail = (partnerId) => {
             <button class="btn sm" onclick="showActionForm(null,null,'${p.id}')">${t('addAction')}</button>
           </div>
           ${open.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
-            open.sort((a,b)=>getDelayDays(b)-getDelayDays(a)).map(a => renderActionCard(a, {hidePartner:true, showEdit:true})).join('')}
+            open.sort(compareByDelayThenDueDate).map(a => renderActionCard(a, {hidePartner:true, showEdit:true})).join('')}
         </div>
 
         ${completed.length > 0 ? `
@@ -8296,7 +8439,8 @@ views.calendar = () => {
           : selectedTasks.sort((a,b) => {
               const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
               if (ao !== bo) return ao - bo;
-              return getDelayDays(b) - getDelayDays(a);
+              const _d = getDelayDays(b) - getDelayDays(a);
+              return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
             }).map(a => renderTaskNode(a, false)).join('')}
       </div>
     ` : '<div class="empty" style="margin-top:20px"><div class="empty-icon">👆</div>' + t('selectDayHint') + '</div>'}
@@ -8340,7 +8484,8 @@ function printOpenTasksReport(existingEntry) {
     mainTasks.sort((a, b) => {
       const pr = (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1);
       if (pr !== 0) return pr;
-      return getDelayDays(b) - getDelayDays(a);
+      const _d = getDelayDays(b) - getDelayDays(a);
+      return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
     });
     return { project: p, mainTasks };
   }).filter(x => x.mainTasks.length > 0);
@@ -8472,16 +8617,15 @@ function subscribeBroadcast() {
 // shouldn't get silently snapped back to the top every time unrelated data
 // changes underneath them. User-initiated navigation still uses plain
 // render(), which correctly does reset scroll — this wrapper is only for
-// updates that happen WHILE they're already looking at the same view.
-function renderPreserveScroll(param) {
-  const scrollY = window.scrollY;
-  try { render(param !== undefined ? param : state.detailParam); } catch(e) {}
-  requestAnimationFrame(() => window.scrollTo(0, scrollY));
-}
+var _lastRenderedView = null;
+var _lastRenderedParam = undefined;
 
 function render(param) {
   const main = document.getElementById('main-content');
   const view = state.currentView;
+  const effectiveParam = (param !== undefined ? param : state.detailParam);
+  const scrollY = window.scrollY;
+  const isSameContentAsLastRender = (view === _lastRenderedView) && (effectiveParam === _lastRenderedParam);
   if (view === 'partnerDetail') {
     main.innerHTML = views.partnerDetail(param || state.detailParam);
   } else if (view === 'calendar') {
@@ -8496,7 +8640,27 @@ function render(param) {
   } else if (views[view]) {
     main.innerHTML = views[view]();
   }
-  window.scrollTo(0, 0);
+  // Root-cause scroll fix: only jump to the top when this render is showing
+  // GENUINELY different content than last time (a real navigation — different
+  // view, or the same view with a different item, e.g. a different project).
+  // Every other render — in-place edits, saves, toggles, background Realtime
+  // updates, translation refreshes — keeps the reader exactly where they were.
+  // This replaces the old approach of manually wrapping every individual
+  // background-triggered call site (renderPreserveScroll) with one fix at
+  // the source, so this can't silently regress again as new features are added.
+  if (isSameContentAsLastRender) {
+    window.scrollTo(0, scrollY);
+  } else {
+    window.scrollTo(0, 0);
+  }
+  _lastRenderedView = view;
+  _lastRenderedParam = effectiveParam;
+}
+
+// Kept as a thin alias for any external/legacy callers — render() itself now
+// handles scroll correctly in all cases, so this no longer needs special logic.
+function renderPreserveScroll(param) {
+  try { render(param); } catch(e) {}
 }
 
 function setupDragDrop(projectId) {
@@ -10578,7 +10742,10 @@ function printProjectTasksReport(projectId, existingEntry) {
       const aPending = isOpen(a) || isMissed(a);
       const bPending = isOpen(b) || isMissed(b);
       if (aPending !== bPending) return aPending ? -1 : 1;
-      if (aPending) return getDelayDays(b) - getDelayDays(a);
+      if (aPending) {
+        const _d = getDelayDays(b) - getDelayDays(a);
+        return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
+      }
       return (b.completedDate || b.dueDate || '').localeCompare(a.completedDate || a.dueDate || '');
     });
   }
@@ -10855,6 +11022,120 @@ async function revokePartnerLink(partnerId) {
   } catch (e) {
     alert(t('partnerLinkError'));
   }
+}
+
+// ── Team Member Link management — same pattern as Partner Link, just a
+// separate isolated table (team_member_links) and a separate view-only
+// page (team-member-view.html). ──
+const TEAM_MEMBER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/team-member-view.html';
+
+async function manageTeamMemberLink(memberId) {
+  if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
+  const m = getTeamMember(memberId);
+  if (!m) return;
+
+  openModal(t('memberLinkModalTitle'), `<div style="text-align:center;padding:24px 0;color:var(--ink-muted);font-size:13px">${t('loadingEllipsis')}</div>`, '');
+
+  try {
+    const { data: existing, error: fetchErr } = await supabaseClient
+      .from('team_member_links')
+      .select('token, revoked, created_at')
+      .eq('member_id', memberId)
+      .eq('revoked', false)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fetchErr) throw fetchErr;
+
+    let token;
+    let isNew = false;
+    if (existing && existing.length > 0) {
+      token = existing[0].token;
+    } else {
+      token = _generateToken();
+      const { error: insertErr } = await supabaseClient
+        .from('team_member_links')
+        .insert({ token, member_id: memberId, created_by: (_authUser && _authUser.email) || null });
+      if (insertErr) throw insertErr;
+      isNew = true;
+    }
+
+    renderTeamMemberLinkModal(memberId, m.name, token, isNew);
+  } catch (e) {
+    openModal(t('memberLinkModalTitle'), `<div style="color:var(--red);padding:20px 0;text-align:center">${t('partnerLinkError')}</div>`, '');
+  }
+}
+
+function renderTeamMemberLinkModal(memberId, memberName, token, isNew) {
+  const fullUrl = TEAM_MEMBER_VIEW_BASE_URL + '?token=' + token;
+  const m = getTeamMember(memberId);
+  const canSeeOverview = !!(m && m.canSeeProjectOverview);
+  const html = `
+    <div style="font-size:13px;color:var(--ink-muted);margin-bottom:14px">
+      ${isNew ? t('partnerLinkNewHint') : t('partnerLinkExistingHint')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input id="member-link-url" type="text" readonly value="${escapeHtml(fullUrl)}"
+        style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12px;font-family:monospace;color:var(--ink)">
+      <button class="btn sm" onclick="copyTeamMemberLink()">${t('copyLink')}</button>
+    </div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:14px">
+      ${t('partnerLinkNote', escapeHtml(memberName))}
+    </div>
+    <div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:13px;font-weight:500">${t('canSeeOverviewLabel')}</div>
+        <div style="font-size:11.5px;color:var(--ink-faint)">${t('canSeeOverviewHint')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" ${canSeeOverview ? 'checked' : ''} onchange="toggleMemberOverview('${memberId}', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div style="padding-top:4px">
+      <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="revokeTeamMemberLink('${memberId}')">🗑 ${t('revokeLink')}</button>
+    </div>
+  `;
+  openModal(t('memberLinkModalTitle') + ' — ' + escapeHtml(memberName), html, '');
+}
+
+function copyTeamMemberLink() {
+  const input = document.getElementById('member-link-url');
+  if (!input) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    toast(t('toastLinkCopied'));
+  }).catch(() => {
+    document.execCommand('copy');
+    toast(t('toastLinkCopied'));
+  });
+}
+
+async function revokeTeamMemberLink(memberId) {
+  if (!confirm(t('confirmRevokeLink'))) return;
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient
+      .from('team_member_links')
+      .update({ revoked: true, revoked_at: new Date().toISOString() })
+      .eq('member_id', memberId)
+      .eq('revoked', false);
+    if (error) throw error;
+    toast(t('toastLinkRevoked'));
+    closeModal();
+  } catch (e) {
+    alert(t('partnerLinkError'));
+  }
+}
+
+// Admin toggle: does this member's link also show overall project health?
+// View-only aggregate counts if enabled — never other people's individual tasks.
+function toggleMemberOverview(memberId, checked) {
+  const m = getTeamMember(memberId);
+  if (!m) return;
+  m.canSeeProjectOverview = checked;
+  saveState({ internal_team: [m] });
+  toast(checked ? t('toastOverviewEnabled') : t('toastOverviewDisabled'));
 }
 
 function printPartnerReport(partnerId, existingEntry) {
@@ -11251,7 +11532,7 @@ function openDailyReportPopup(existingEntry) {
       const taskItems = items.filter(isTask);
       const meetingItems = items.filter(isMeeting).sort(sortByDue);
       const orderedTasks = [
-        ...taskItems.filter(x => isOpen(x) && getDelayDays(x) > 0).sort((a, b) => getDelayDays(b) - getDelayDays(a)),
+        ...taskItems.filter(x => isOpen(x) && getDelayDays(x) > 0).sort(compareByDelayThenDueDate),
         ...taskItems.filter(x => isOpen(x) && getDelayDays(x) === 0).sort(sortByDue),
         ...taskItems.filter(isCompleted).sort(sortByDue),
         ...taskItems.filter(isMissed)
@@ -11275,7 +11556,7 @@ function openDailyReportPopup(existingEntry) {
     if (meetings.length > 0) {
       bodySections += section(t('sectionMeetingsConducted'), meetings, sortByDue);
     }
-    const sorted = [...open].filter(a => !isMeeting(a)).sort((a, b) => getDelayDays(b) - getDelayDays(a));
+    const sorted = [...open].filter(a => !isMeeting(a)).sort(compareByDelayThenDueDate);
     const byRisk = { critical: [], high: [], medium: [], low: [] };
     sorted.forEach(a => { byRisk[getRiskLevel(getDelayDays(a)).key].push(a); });
     const labels = { critical: t('riskCriticalGroup'), high: t('riskHighGroup'), medium: t('riskMediumGroup'), low: t('riskLowGroup') };
@@ -11288,7 +11569,7 @@ function openDailyReportPopup(existingEntry) {
     }
   } else {
     bodySections += section(t('sectionMeetingsConducted'), meetings, sortByDue);
-    bodySections += section(t('sectionTasksMissedInPeriod'), openTasksDelayed, (a,b) => getDelayDays(b) - getDelayDays(a));
+    bodySections += section(t('sectionTasksMissedInPeriod'), openTasksDelayed, compareByDelayThenDueDate);
     bodySections += section(t('sectionTasksOpenInPeriod'), openTasks, sortByDue);
     bodySections += section(t('sectionTasksCompletedInPeriod'), completedTasks, sortByDue);
   }
@@ -11476,7 +11757,7 @@ function exportCSV() {
   // Mirror the on-screen report's data selection
   let actions;
   if (period === 'all') {
-    actions = state.actions.filter(isOpen).sort((a,b) => getDelayDays(b) - getDelayDays(a));
+    actions = state.actions.filter(isOpen).sort(compareByDelayThenDueDate);
   } else {
     actions = filterActionsByPeriod(state.actions, period, reportDate)
       .sort((a,b) => (a.dueDate||'').localeCompare(b.dueDate||''));
@@ -12882,6 +13163,8 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
   try {
     sendDailyNotification(false);
     setInterval(() => sendDailyNotification(false), 60 * 60 * 1000);
+    setInterval(() => refreshPendingApprovals(), 5 * 60 * 1000); // keep the sidebar badge reasonably current
+    refreshPendingApprovals(); // initial check on boot
   } catch (e) {}
 })();
 
