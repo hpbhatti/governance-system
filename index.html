@@ -4785,11 +4785,12 @@ function renderTaskNode(a, expanded) {
     : ownDelayed ? 'risk-' + risk.cls
     : (isOpen(a) && hasOverdueSubtask) ? 'risk-amber'
     : (isCompleted(a) ? 'risk-green' : '');
-  const dateDisplay = isCompleted(a) && a.completedDate
-    ? '<span class="date-current" style="color:var(--green)">✓ ' + t('colCompletedDate') + ': ' + fmtDate(a.completedDate) + '</span>'
-    : wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
+  const dateDisplay = wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
     ? '<span class="date-original">' + fmtDate(a.originalDueDate) + '</span> <span class="date-current">→ ' + fmtDate(a.dueDate) + '</span>'
     : '<span class="date-current">' + fmtDate(a.dueDate) + '</span>';
+  const completedDisplay = isCompleted(a) && a.completedDate
+    ? '<span style="color:var(--green)">✓ ' + t('colCompletedDate') + ': ' + fmtDate(a.completedDate) + '</span>'
+    : '';
   return '<div class="task-node ' + riskCls + '">' +
     '<div class="task-node-head" onclick="toggleTaskNode(\'' + a.id + '\')">' +
     '<div style="flex:1">' +
@@ -4804,6 +4805,7 @@ function renderTaskNode(a, expanded) {
     '<span>📁 ' + escapeHtml(project ? project.name : '—') + '</span>' +
     (responsibleTag(a) ? '<span>' + responsibleTag(a) + '</span>' : '') +
     '<span>' + (meeting ? t('meetingDateLabel') : t('dueLabel')) + ': ' + dateDisplay + '</span>' +
+    (completedDisplay ? '<span>' + completedDisplay + '</span>' : '') +
     (ownDelayed ? '<span style="color:var(--red)">⏰ ' + delay + ' ' + t('days') + '</span>' : '') +
     '</div>' +
     (prog.total > 0 ? '<div class="subtask-progress-bar"><div class="subtask-progress-fill" style="width:' + Math.round(prog.done / prog.total * 100) + '%"></div></div>' : '') +
