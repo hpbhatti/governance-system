@@ -2461,6 +2461,8 @@ const T = {
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
     approveBtn: 'موافقة', rejectBtn: 'رفض',
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
+    rejectionReasonPrompt: 'لماذا ترفض هذا؟', rejectionReasonRequired: 'السبب مطلوب للرفض.',
+    viewAttachedLink: 'عرض الرابط المرفق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
     proposalSubmitted: 'تم الإرسال للموافقة', proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
@@ -2511,6 +2513,8 @@ const T = {
     alertSelectPartner: 'الرجاء اختيار شريك واحد على الأقل',
     noTeamMembers: 'لا يوجد أعضاء فريق بعد',
     fieldDescription: 'الوصف', fieldStartDate: 'تاريخ البدء', fieldTargetDate: 'الموعد المستهدف',
+    fieldCriticalNote: 'ملاحظة حرجة (اختياري)', criticalNotePlaceholder: 'مثال: هذا يعطل إطلاق 30 سبتمبر',
+    criticalNoteHint: 'تُعرض كعلامة بارزة للشريك/عضو الفريق — استخدمها فقط للسياق الحرج فعلاً.',
     devShort: 'تطوير', supShort: 'إشراف',
     addActionTitle: 'إضافة إجراء', editActionTitle: 'تعديل إجراء',
     fieldActionType: 'نوع الإجراء *', fieldActionTitle: 'عنوان المهمة *',
@@ -3155,6 +3159,8 @@ const T = {
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
     approveBtn: 'Approve', rejectBtn: 'Reject',
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
+    rejectionReasonPrompt: 'Why are you rejecting this?', rejectionReasonRequired: 'A reason is required to reject.',
+    viewAttachedLink: 'View attached link',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
     proposalSubmitted: 'Submitted for approval', proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
@@ -3205,6 +3211,8 @@ const T = {
     alertSelectPartner: 'Please select at least one partner',
     noTeamMembers: 'No internal team members yet',
     fieldDescription: 'Description', fieldStartDate: 'Start Date', fieldTargetDate: 'Target Date',
+    fieldCriticalNote: 'Critical Note (optional)', criticalNotePlaceholder: 'e.g., This is blocking the Sep 30 launch',
+    criticalNoteHint: 'Shown as a highlighted flag to the partner/team member — use only for genuinely critical context.',
     devShort: 'dev', supShort: 'supervised',
     addActionTitle: 'Add Action', editActionTitle: 'Edit Action',
     fieldActionType: 'Action Type *', fieldActionTitle: 'Task Title *',
@@ -6781,6 +6789,7 @@ views.pendingApprovals = () => {
               <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
               ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
               ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
+              ${row.attachment_link ? `<div style="margin-top:6px"><a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent)">🔗 ${t('viewAttachedLink')}</a></div>` : ''}
               <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
@@ -6800,12 +6809,16 @@ async function approveProposal(id) {
   if (!row) return;
   const task = state.actions.find(a => a.id === row.task_id);
   if (task) {
+    // Preserve any note/link the submitter included, regardless of change
+    // type, so it isn't lost once the proposal is approved and archived.
+    const trackingText = [row.note_text, row.attachment_link ? '🔗 ' + row.attachment_link : ''].filter(Boolean).join(' — ');
+    if (trackingText) {
+      if (!task.tracking) task.tracking = [];
+      task.tracking.push({ date: new Date().toISOString(), text: trackingText });
+      saveState(); // persist the note immediately — independent of whether completion below succeeds or is blocked by open dependencies
+    }
     if (row.change_type === 'complete') {
       completeAction(task.id); // reuses the existing, already-correct completion logic (status, completedDate, saveState)
-    } else if (row.change_type === 'note') {
-      if (!task.tracking) task.tracking = [];
-      task.tracking.push({ date: new Date().toISOString(), text: row.note_text || '' });
-      saveState();
     }
   }
   try {
@@ -6819,9 +6832,13 @@ async function approveProposal(id) {
 
 async function rejectProposal(id) {
   if (!supabaseClient) return;
+  const reason = prompt(t('rejectionReasonPrompt'));
+  if (reason === null) return; // cancelled
+  if (!reason.trim()) { alert(t('rejectionReasonRequired')); return; }
   try {
     await supabaseClient.from('pending_changes').update({
-      status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+      status: 'rejected', rejection_reason: reason.trim(),
+      reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
     }).eq('id', id);
   } catch (e) {}
   toast(t('toastProposalRejected'));
@@ -9447,6 +9464,11 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
         `<div class="field-fallback-note">⚠ ${t('fallbackTitleNote')}</div>` : ''}
     </div>
     <div class="form-row">
+      <label>${t('fieldCriticalNote')}</label>
+      <input id="f-critical-note" value="${escapeHtml(editing && editing.criticalNote ? editing.criticalNote : '')}" placeholder="${t('criticalNotePlaceholder')}">
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('criticalNoteHint')}</div>
+    </div>
+    <div class="form-row">
       <label>${t('fieldProjectName')}</label>
       <select id="f-project">
         ${projects.map(p => `<option value="${p.id}" data-partner="${p.partnerId}" ${(editing?.projectId||defaultProjectId)===p.id?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(getPartner(p.partnerId)?.name || '')}</option>`).join('')}
@@ -9790,6 +9812,7 @@ function saveAction(id) {
     partnerId,
     startDate: document.getElementById('f-start-date')?.value || todayDate(),
     dueDate,
+    criticalNote: (document.getElementById('f-critical-note')?.value || '').trim(),
     meetingTime: type === 'meeting' ? document.getElementById('f-time').value : null,
     priority: document.getElementById('f-priority').value,
     status,
