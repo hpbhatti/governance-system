@@ -52,6 +52,8 @@
   .project-eyebrow { font-size: 10px; font-weight: 600; color: var(--accent-warm); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
 
   .delay-impact-box { display: flex; align-items: flex-start; gap: 8px; background: var(--red-bg); border: 1px solid rgba(176,69,64,0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--red); }
+  .critical-note-banner { display: flex; align-items: flex-start; gap: 8px; background: #fdf3d9; border: 1px solid rgba(184,136,74,0.4); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; color: #8a6414; }
+  .critical-note-banner .icon { flex-shrink: 0; }
   .big-picture { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
   .bp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .bp-progress-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -59,6 +61,14 @@
   .bp-bar-track { height: 8px; background: #eee8dc; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
   .bp-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
   .bp-footer { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); }
+  .milestones-box { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
+  .milestones-title { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+  .milestone-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; border-top: 1px dashed var(--line); }
+  .milestone-row:first-of-type { border-top: none; }
+  .milestone-check { flex-shrink: 0; color: var(--green); font-weight: 700; width: 16px; }
+  .milestone-name { flex: 1; }
+  .milestone-name.done { color: var(--ink-faint); text-decoration: line-through; }
+  .milestone-date { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
   .delay-impact-box .icon { flex-shrink: 0; font-size: 15px; line-height: 1.3; }
 
   .task-card { background: var(--bg-card); border: 1px solid var(--line); border-inline-start: 4px solid var(--line-strong); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow); }
@@ -152,12 +162,15 @@ const STR = {
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
     proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
-    proposalSubmitted: 'Submitted for approval', proposalError: 'Could not submit — please try again.',
+    proposalSubmitted: 'Submitted for cross-checking', proposalError: 'Could not submit — please try again.',
+proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     delayImpactOne: 'One of your tasks is currently overdue, delaying this project\'s timeline.',
     delayImpactMany: function(n){ return n + ' of your tasks are currently overdue, delaying this project\'s timeline.'; },
     overallProgress: 'Overall Project Progress', complete: 'complete',
     statusOnTrack: 'On Track', statusAtRisk: 'At Risk', statusDelayed: 'Delayed',
     yourShare: function(yours, total){ return 'Your team: ' + yours + ' of ' + total + ' tasks'; },
+    yourContribution: function(yours, total){ return 'You\'re contributing ' + yours + ' of this project\'s ' + total + ' tasks'; },
+    projectMilestones: 'Project Milestones',
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
@@ -176,12 +189,15 @@ const STR = {
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
     proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
-    proposalSubmitted: 'تم الإرسال للموافقة', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
+    proposalSubmitted: 'تم الإرسال للتحقق', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
+proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     delayImpactOne: 'إحدى مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.',
     delayImpactMany: function(n){ return n + ' من مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.'; },
     overallProgress: 'التقدم الإجمالي للمشروع', complete: 'مكتمل',
     statusOnTrack: 'على المسار الصحيح', statusAtRisk: 'يحتاج متابعة', statusDelayed: 'متأخر',
     yourShare: function(yours, total){ return 'فريقكم: ' + yours + ' من أصل ' + total + ' مهمة'; },
+    yourContribution: function(yours, total){ return 'تساهم في ' + yours + ' من أصل ' + total + ' مهمة في هذا المشروع'; },
+    projectMilestones: 'مراحل المشروع الرئيسية',
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
@@ -366,6 +382,7 @@ function renderTaskCard(task, subtasks) {
       (cls === 'overdue' && delay > 0 ? '<span style="color:var(--red);font-weight:600">' + t('overdueDays', delay) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
+    (task.criticalNote ? '<div class="critical-note-banner"><span class="icon">📌</span><span>' + escapeHtml(task.criticalNote) + '</span></div>' : '') +
     renderSubtasks(subtasks) +
     (canPropose ?
       '<div class="propose-row">' +
@@ -479,8 +496,29 @@ function renderBigPicture(p) {
     '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
     '<div class="bp-footer">' +
       '<span>' + bp.progressPercent + '% ' + t('complete') + ' (' + bp.completedTasks + '/' + bp.totalTasks + ')</span>' +
-      '<span>' + t('yourShare', p.yourTaskCount || 0, bp.totalTasks) + '</span>' +
+      '<span>' + t('yourContribution', p.yourTaskCount || 0, bp.totalTasks) + '</span>' +
     '</div>' +
+  '</div>';
+}
+
+function milestoneTitle(m) {
+  if (currentLang === 'ar') return m.titleAr || m.titleRaw || m.titleEn || '';
+  return m.titleEn || m.titleRaw || m.titleAr || '';
+}
+
+function renderMilestones(p) {
+  var list = p.milestones;
+  if (!list || !list.length) return '';
+  return '<div class="milestones-box">' +
+    '<div class="milestones-title">🚩 ' + t('projectMilestones') + '</div>' +
+    list.map(function(m) {
+      var done = m.status === 'completed';
+      return '<div class="milestone-row">' +
+        '<span class="milestone-check">' + (done ? '✓' : '○') + '</span>' +
+        '<span class="milestone-name' + (done ? ' done' : '') + '">' + escapeHtml(milestoneTitle(m)) + '</span>' +
+        '<span class="milestone-date">' + (done ? t('completedOn') + ' ' + fmtDate(m.completedDate) : fmtDate(m.dueDate)) + '</span>' +
+      '</div>';
+    }).join('') +
   '</div>';
 }
 
@@ -495,6 +533,7 @@ function renderBigPicture(p) {
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
         renderBigPicture(p) +
+        renderMilestones(p) +
         delayBox +
         cardsHtml +
         renderProjectFiles(p.attachments) +
@@ -528,26 +567,46 @@ function getCurrentToken() {
   return new URLSearchParams(window.location.search).get('token');
 }
 
-function submitProposal(taskId, changeType, noteText) {
+function submitProposal(taskId, changeType, noteText, attachmentLink) {
   var token = getCurrentToken();
   if (!token) return Promise.reject(new Error('no token'));
   return fetch(FUNCTION_URL, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: token, taskId: taskId, changeType: changeType, noteText: noteText || '' }),
+    body: JSON.stringify({ token: token, taskId: taskId, changeType: changeType, noteText: noteText || '', attachmentLink: attachmentLink || '' }),
   }).then(function(res) {
     if (!res.ok) throw new Error('failed');
     return res.json();
   });
 }
 
+// Mark Complete now opens the same kind of modal as Add Note — optional
+// comment, optional link to a file (e.g. Google Drive) — instead of a bare
+// yes/no confirmation with zero context.
 function openProposeComplete(taskId) {
-  if (!confirm(t('markCompleteBtn') + '?')) return;
-  submitProposal(taskId, 'complete').then(function() {
-    alert(t('proposalSubmitted'));
-  }).catch(function() {
-    alert(t('proposalError'));
-  });
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box">' +
+      '<div style="font-weight:600;margin-bottom:10px">' + t('markCompleteBtn') + '</div>' +
+      '<textarea id="propose-complete-note" placeholder="' + t('proposalNotePlaceholder') + '"></textarea>' +
+      '<input id="propose-complete-link" type="url" placeholder="' + t('proposalLinkPlaceholder') + '" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:4px">' +
+      '<div class="modal-actions" style="margin-top:12px">' +
+        '<button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('proposalCancelBtn') + '</button>' +
+        '<button class="primary" id="propose-complete-submit">' + t('proposalSubmitBtn') + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('propose-complete-submit').onclick = function() {
+    var note = document.getElementById('propose-complete-note').value.trim();
+    var link = document.getElementById('propose-complete-link').value.trim();
+    submitProposal(taskId, 'complete', note, link).then(function() {
+      overlay.remove();
+      alert(t('proposalSubmitted'));
+    }).catch(function() {
+      alert(t('proposalError'));
+    });
+  };
 }
 
 function openProposeNote(taskId) {
