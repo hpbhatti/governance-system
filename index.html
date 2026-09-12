@@ -4785,7 +4785,9 @@ function renderTaskNode(a, expanded) {
     : ownDelayed ? 'risk-' + risk.cls
     : (isOpen(a) && hasOverdueSubtask) ? 'risk-amber'
     : (isCompleted(a) ? 'risk-green' : '');
-  const dateDisplay = wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
+  const dateDisplay = isCompleted(a) && a.completedDate
+    ? '<span class="date-current" style="color:var(--green)">✓ ' + t('colCompletedDate') + ': ' + fmtDate(a.completedDate) + '</span>'
+    : wasExtended && a.originalDueDate && a.originalDueDate !== a.dueDate
     ? '<span class="date-original">' + fmtDate(a.originalDueDate) + '</span> <span class="date-current">→ ' + fmtDate(a.dueDate) + '</span>'
     : '<span class="date-current">' + fmtDate(a.dueDate) + '</span>';
   return '<div class="task-node ' + riskCls + '">' +
