@@ -5576,8 +5576,9 @@ function collectUntranslatedStrings() {
     const en = obj[key + 'En'];
     if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table, source: ar });
   }
-  state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
+  state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
   state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
+  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -5592,7 +5593,7 @@ async function translateAllUserContent(silent) {
   }
   isTranslating = true;
   let count = 0, failures = 0;
-  const changedActions = [], changedProjects = [], changedPartners = [];
+  const changedActions = [], changedProjects = [], changedPartners = [], changedTeamMembers = [];
   for (const item of items) {
     try {
       const source = item.source;
@@ -5610,6 +5611,7 @@ async function translateAllUserContent(silent) {
       if (currentLang === 'en') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
       else if (item.table === 'partners') changedPartners.push(item.obj);
+      else if (item.table === 'internal_team') changedTeamMembers.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
       if (count % 3 === 0 || count === items.length) {
@@ -5625,7 +5627,7 @@ async function translateAllUserContent(silent) {
       }
     }
   }
-  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners });
+  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners, internal_team: changedTeamMembers });
   isTranslating = false;
   toast(t('translationDone', count));
   await applyContentLanguage(currentLang); // refresh canonical display fields immediately
@@ -5647,8 +5649,9 @@ function collectUntranslatedStringsToArabic() {
     const ar = obj[key + 'Ar'];
     if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table, source: en });
   }
-  state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); });
+  state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
   state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
+  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -5662,7 +5665,7 @@ async function translateAllUserContentToArabic(silent) {
   }
   isTranslating = true;
   let count = 0, failures = 0;
-  const changedActions = [], changedProjects = [], changedPartners = [];
+  const changedActions = [], changedProjects = [], changedPartners = [], changedTeamMembers = [];
   for (const item of items) {
     try {
       const source = item.source;
@@ -5676,6 +5679,7 @@ async function translateAllUserContentToArabic(silent) {
       if (currentLang === 'ar') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
       else if (item.table === 'partners') changedPartners.push(item.obj);
+      else if (item.table === 'internal_team') changedTeamMembers.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
       if (count % 3 === 0 || count === items.length) {
@@ -5691,7 +5695,7 @@ async function translateAllUserContentToArabic(silent) {
       }
     }
   }
-  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners });
+  saveState({ actions: changedActions, projects: changedProjects, partners: changedPartners, internal_team: changedTeamMembers });
   isTranslating = false;
   toast(t('translationDone', count));
   await applyContentLanguage(currentLang); // refresh canonical display fields immediately
@@ -5710,6 +5714,7 @@ function storeActionBilingual(a) {
   if (a.title) setBilingualField(a, 'title', a.title);
   const noteKey = a.type === 'meeting' ? 'meetingNotes' : 'note';
   if (a[noteKey]) setBilingualField(a, noteKey, a[noteKey]);
+  if (a.criticalNote) setBilingualField(a, 'criticalNote', a.criticalNote);
 }
 // Best-effort background translation of an action's text fields into the other language.
 function autoTranslateAction(a) {
@@ -5820,9 +5825,13 @@ async function applyContentLanguage(lang) {
     applyField(a, 'title');
     if (a.type === 'meeting') applyField(a, 'meetingNotes', true);
     else applyField(a, 'note', true);
+    applyField(a, 'criticalNote', true);
   });
   (state.partners || []).forEach(p => {
     applyField(p, 'name');
+  });
+  (state.team || []).forEach(m => {
+    applyField(m, 'name');
   });
   (state.projects || []).forEach(p => {
     applyField(p, 'name');
@@ -6019,9 +6028,12 @@ function saveTeamMember(id) {
   if (id) {
     const m = getTeamMember(id);
     Object.assign(m, data);
+    if (m.name) setBilingualField(m, 'name', m.name);
     toast(t('toastSavedChanges'));
   } else {
-    state.team.push({ id: 'tm_' + uid(), ...data, createdAt: todayDate() });
+    const newM = { id: 'tm_' + uid(), ...data, createdAt: todayDate() };
+    if (newM.name) setBilingualField(newM, 'name', newM.name);
+    state.team.push(newM);
     toast(t('toastSavedChanges'));
   }
   saveState();
@@ -9467,7 +9479,7 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row">
       <label>${t('fieldCriticalNote')}</label>
-      <input id="f-critical-note" value="${escapeHtml(editing && editing.criticalNote ? editing.criticalNote : '')}" placeholder="${t('criticalNotePlaceholder')}">
+      <input id="f-critical-note" value="${escapeHtml(editing ? (editing['criticalNote' + (currentLang==='ar'?'Ar':'En')] || editing['criticalNote' + (currentLang==='ar'?'En':'Ar')] || editing.criticalNote || '') : '')}" placeholder="${t('criticalNotePlaceholder')}">
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('criticalNoteHint')}</div>
     </div>
     <div class="form-row">
