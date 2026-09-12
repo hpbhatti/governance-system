@@ -30,12 +30,12 @@
   .lang-toggle button { border: none; background: var(--bg-card); color: var(--ink-muted); font-size: 12px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
   .lang-toggle button.active { background: var(--accent); color: #fff; }
 
-  .header { background: linear-gradient(180deg, #0a1628 0%, #132744 100%); border-radius: 16px; padding: 40px 32px 32px; margin-bottom: 24px; color: #e8dcc8; box-shadow: var(--shadow); text-align: center; }
+  .header { background: linear-gradient(180deg, #0a1628 0%, #132744 100%); border-radius: 16px; padding: 28px 32px 30px; margin-bottom: 24px; color: #e8dcc8; box-shadow: var(--shadow); text-align: center; }
   .header-logo { height: 34px; margin-bottom: 12px; opacity: 0.95; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.3)); }
-  .header-brand-text { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(232,220,200,0.55); margin-bottom: 22px; }
+  .header-brand-text { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(232,220,200,0.55); margin-bottom: 16px; }
   .header-divider { width: 40px; height: 1px; background: rgba(201,168,76,0.3); margin: 0 auto 22px; }
   .header-partner-label { font-size: 11px; color: rgba(201,168,76,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .header-partner { font-size: 30px; font-weight: 600; color: #f5f0e6; font-family: 'Reem Kufi', serif; margin-bottom: 6px; }
+  .header-partner { font-size: 25px; font-weight: 600; color: #f5f0e6; font-family: 'Reem Kufi', serif; margin-bottom: 6px; }
   .header-meta { font-size: 12px; color: rgba(232,220,200,0.4); }
 
   .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
@@ -48,10 +48,17 @@
 
   .project-section { margin-bottom: 24px; }
   .project-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 4px; border-bottom: 2px solid var(--accent-warm); margin-bottom: 10px; }
-  .project-name { font-size: 16px; font-weight: 600; color: var(--accent); font-family: 'Reem Kufi', serif; }
+  .project-name { font-size: 16px; font-weight: 800; color: var(--accent); font-family: 'Reem Kufi', serif; }
   .project-eyebrow { font-size: 10px; font-weight: 600; color: var(--accent-warm); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
 
   .delay-impact-box { display: flex; align-items: flex-start; gap: 8px; background: var(--red-bg); border: 1px solid rgba(176,69,64,0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--red); }
+  .big-picture { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .bp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .bp-progress-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+  .bp-status-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+  .bp-bar-track { height: 8px; background: #eee8dc; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+  .bp-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .bp-footer { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); }
   .delay-impact-box .icon { flex-shrink: 0; font-size: 15px; line-height: 1.3; }
 
   .task-card { background: var(--bg-card); border: 1px solid var(--line); border-inline-start: 4px solid var(--line-strong); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow); }
@@ -91,6 +98,16 @@
   .file-size { color: var(--ink-faint); font-size: 11px; white-space: nowrap; }
 
   .state-box { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
+  .propose-row { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .propose-btn { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .propose-btn.secondary { background: var(--bg-card); color: var(--accent); }
+  .propose-btn:hover { opacity: 0.9; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,22,40,0.55); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+  .modal-box { background: var(--bg-card); border-radius: 14px; padding: 22px; max-width: 400px; width: 100%; }
+  .modal-box textarea { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-family: inherit; font-size: 13px; margin: 12px 0; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal-actions button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line-strong); font-size: 13px; cursor: pointer; font-family: inherit; }
+  .modal-actions .primary { background: var(--accent); color: #fff; border: none; }
   .state-box .icon { font-size: 40px; margin-bottom: 12px; }
   .state-box .msg { font-size: 15px; }
   .retry-btn { margin-top: 16px; padding: 10px 22px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
@@ -128,12 +145,19 @@ const STR = {
     brandLine: 'Partners and projects management',
     partnerLabel: 'Partner', preparedFor: 'Prepared for', projectLabel: 'Project', subtitle: 'My Tasks — View Only', lastUpdated: 'Last updated',
     totalTasks: 'Total Tasks', completed: 'Completed', open: 'Open',
-    due: 'Due', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
+    due: 'Due', startDate: 'Start', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
     projectFiles: 'Project Files', footer: 'This is a read-only view shared by SOE. Refresh this page anytime to see the latest status.',
     originalLanguageNote: '(shown in original language)',
+    markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
+    proposalNotePlaceholder: 'Add a note or delay reason…',
+    proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
+    proposalSubmitted: 'Submitted for approval', proposalError: 'Could not submit — please try again.',
     delayImpactOne: 'One of your tasks is currently overdue, delaying this project\'s timeline.',
     delayImpactMany: function(n){ return n + ' of your tasks are currently overdue, delaying this project\'s timeline.'; },
+    overallProgress: 'Overall Project Progress', complete: 'complete',
+    statusOnTrack: 'On Track', statusAtRisk: 'At Risk', statusDelayed: 'Delayed',
+    yourShare: function(yours, total){ return 'Your team: ' + yours + ' of ' + total + ' tasks'; },
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
@@ -145,12 +169,19 @@ const STR = {
     brandLine: 'إدارة الشركاء والمشاريع',
     partnerLabel: 'الشريك', preparedFor: 'إعداد التقرير من أجل', projectLabel: 'مشروع', subtitle: 'مهامي — للاطلاع فقط', lastUpdated: 'آخر تحديث',
     totalTasks: 'إجمالي المهام', completed: 'مكتملة', open: 'مفتوحة',
-    due: 'الاستحقاق', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
+    due: 'الاستحقاق', startDate: 'البدء', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
     projectFiles: 'ملفات المشروع', footer: 'هذا عرض للاطلاع فقط تمت مشاركته من قبل SOE. أعد تحميل الصفحة في أي وقت لرؤية آخر تحديث.',
     originalLanguageNote: '(معروضة باللغة الأصلية)',
+    markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
+    proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
+    proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
+    proposalSubmitted: 'تم الإرسال للموافقة', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
     delayImpactOne: 'إحدى مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.',
     delayImpactMany: function(n){ return n + ' من مهامك متأخرة حالياً، مما يؤخر الجدول الزمني لهذا المشروع.'; },
+    overallProgress: 'التقدم الإجمالي للمشروع', complete: 'مكتمل',
+    statusOnTrack: 'على المسار الصحيح', statusAtRisk: 'يحتاج متابعة', statusDelayed: 'متأخر',
+    yourShare: function(yours, total){ return 'فريقكم: ' + yours + ' من أصل ' + total + ' مهمة'; },
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
@@ -327,16 +358,23 @@ function renderTaskCard(task, subtasks) {
   var cls = taskStatusClass(task);
   var delay = task.dueDate ? daysBetween(task.dueDate, todayStr()) : 0;
   var untranslated = isTitleUntranslated(task);
+  var canPropose = task.status !== 'completed' && task.status !== 'missed';
   return '<div class="task-card st-' + cls + '">' +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
+      (task.startDate ? '<span>🚀 ' + t('startDate') + ': ' + fmtDate(task.startDate) + '</span>' : '') +
       '<span>📅 ' + t('due') + ': ' + fmtDate(task.dueDate) + '</span>' +
       (cls === 'overdue' && delay > 0 ? '<span style="color:var(--red);font-weight:600">' + t('overdueDays', delay) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
     renderSubtasks(subtasks) +
+    (canPropose ?
+      '<div class="propose-row">' +
+        '<button class="propose-btn" onclick="openProposeComplete(\'' + task.id + '\')">✓ ' + t('markCompleteBtn') + '</button>' +
+        '<button class="propose-btn secondary" onclick="openProposeNote(\'' + task.id + '\')">📝 ' + t('addNoteBtn') + '</button>' +
+      '</div>' : '') +
   '</div>';
 }
 
@@ -415,8 +453,40 @@ function render(data) {
         var ac = taskStatusClass(a), bc = taskStatusClass(b);
         if (ac === 'overdue' && bc !== 'overdue') return -1;
         if (bc === 'overdue' && ac !== 'overdue') return 1;
-        return (rank[ac] != null ? rank[ac] : 1) - (rank[bc] != null ? rank[bc] : 1);
+        var rankDiff = (rank[ac] != null ? rank[ac] : 1) - (rank[bc] != null ? rank[bc] : 1);
+        if (rankDiff !== 0) return rankDiff;
+        // Within the same group: open/overdue tasks sort by due date, soonest
+        // first (most urgent surfaces immediately). Completed tasks sort by
+        // completion date, most recent first (what just got finished shows
+        // before older history). Previously there was no date ordering at
+        // all within a group — tasks just sat in arbitrary storage order.
+        if (ac === 'completed' || ac === 'missed') {
+          return (b.completedDate || '').localeCompare(a.completedDate || '');
+        }
+        return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
       });
+function renderBigPicture(p) {
+  var bp = p.bigPicture;
+  if (!bp || !bp.totalTasks) return '';
+  var lightConfig = {
+    onTrack: { color: 'var(--green)', bg: 'var(--green-bg)', label: t('statusOnTrack') },
+    atRisk: { color: 'var(--amber)', bg: 'var(--amber-bg)', label: t('statusAtRisk') },
+    delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
+  };
+  var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
+  return '<div class="big-picture">' +
+    '<div class="bp-row">' +
+      '<div class="bp-progress-label">' + t('overallProgress') + '</div>' +
+      '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
+    '</div>' +
+    '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
+    '<div class="bp-footer">' +
+      '<span>' + bp.progressPercent + '% ' + t('complete') + ' (' + bp.completedTasks + '/' + bp.totalTasks + ')</span>' +
+      '<span>' + t('yourShare', p.yourTaskCount || 0, bp.totalTasks) + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
       var cardsHtml = items.map(function(tk) {
         var subtasks = tasks.filter(function(st){ return st.parentId === tk.id; });
         return renderTaskCard(tk, subtasks);
@@ -427,6 +497,7 @@ function render(data) {
         : '';
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
+        renderBigPicture(p) +
         delayBox +
         cardsHtml +
         renderProjectFiles(p.attachments) +
@@ -452,6 +523,60 @@ function render(data) {
 }
 
 setLang(currentLang);
+// ── Propose changes — never writes directly to the real task. Submits to
+// pending_changes via the Edge Function, which verifies the task genuinely
+// belongs to this partner before accepting anything. You/Karim approve or
+// reject in the main app. ──
+function getCurrentToken() {
+  return new URLSearchParams(window.location.search).get('token');
+}
+
+function submitProposal(taskId, changeType, noteText) {
+  var token = getCurrentToken();
+  if (!token) return Promise.reject(new Error('no token'));
+  return fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, taskId: taskId, changeType: changeType, noteText: noteText || '' }),
+  }).then(function(res) {
+    if (!res.ok) throw new Error('failed');
+    return res.json();
+  });
+}
+
+function openProposeComplete(taskId) {
+  if (!confirm(t('markCompleteBtn') + '?')) return;
+  submitProposal(taskId, 'complete').then(function() {
+    alert(t('proposalSubmitted'));
+  }).catch(function() {
+    alert(t('proposalError'));
+  });
+}
+
+function openProposeNote(taskId) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box">' +
+      '<textarea id="propose-note-text" placeholder="' + t('proposalNotePlaceholder') + '"></textarea>' +
+      '<div class="modal-actions">' +
+        '<button onclick="this.closest(\'.modal-overlay\').remove()">' + t('proposalCancelBtn') + '</button>' +
+        '<button class="primary" id="propose-note-submit">' + t('proposalSubmitBtn') + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('propose-note-submit').onclick = function() {
+    var text = document.getElementById('propose-note-text').value.trim();
+    if (!text) return;
+    submitProposal(taskId, 'note', text).then(function() {
+      overlay.remove();
+      alert(t('proposalSubmitted'));
+    }).catch(function() {
+      alert(t('proposalError'));
+    });
+  };
+}
+
 loadPartnerView();
 </script>
 </body>
