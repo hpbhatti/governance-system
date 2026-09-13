@@ -2463,6 +2463,9 @@ const T = {
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
     rejectionReasonPrompt: 'لماذا ترفض هذا؟', rejectionReasonRequired: 'السبب مطلوب للرفض.',
     viewAttachedLink: 'عرض الرابط المرفق',
+    tabAll: 'الكل', deleteBtn: 'حذف',
+    confirmDeleteProposalHistory: 'حذف هذا السجل نهائياً؟ سيختفي أيضاً من صفحة "مهامي المرسلة" الخاصة بمن أرسله.',
+    toastProposalDeleted: 'تم الحذف',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
     proposalSubmitted: 'تم الإرسال للموافقة', proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
@@ -3161,6 +3164,9 @@ const T = {
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
     rejectionReasonPrompt: 'Why are you rejecting this?', rejectionReasonRequired: 'A reason is required to reject.',
     viewAttachedLink: 'View attached link',
+    tabAll: 'All', deleteBtn: 'Delete',
+    confirmDeleteProposalHistory: 'Delete this record permanently? It will also disappear from the submitter\'s own "My Submissions" status page.',
+    toastProposalDeleted: 'Deleted',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
     proposalSubmitted: 'Submitted for approval', proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
@@ -6774,14 +6780,33 @@ async function refreshPendingApprovals() {
     const { data, error } = await supabaseClient
       .from('pending_changes')
       .select('*')
-      .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
     _pendingApprovalsCache = data || [];
-    _pendingApprovalCount = _pendingApprovalsCache.length;
+    // Badge count is always pending-only, regardless of which tab is currently viewed.
+    _pendingApprovalCount = _pendingApprovalsCache.filter(r => r.status === 'pending').length;
     try { renderSidebar(); } catch (e) {}
     if (state.currentView === 'pendingApprovals') { try { renderPreserveScroll(); } catch (e) {} }
   } catch (e) { /* silent — badge just won't update this cycle */ }
+}
+
+function setPendingApprovalsTab(tab) {
+  state.filters.pendingApprovalsTab = tab;
+  render();
+}
+
+async function deletePendingChange(id) {
+  if (!confirm(t('confirmDeleteProposalHistory'))) return;
+  if (!supabaseClient) return;
+  try {
+    // Deleting here IS the single source of truth this record lives in —
+    // the partner/team member's own "My Submissions" status page reads
+    // from this exact same table, so removing it here removes it there
+    // too. No separate copy exists anywhere else to clean up.
+    await supabaseClient.from('pending_changes').delete().eq('id', id);
+  } catch (e) {}
+  toast(t('toastProposalDeleted'));
+  refreshPendingApprovals();
 }
 
 views.pendingApprovals = () => {
@@ -6789,28 +6814,54 @@ views.pendingApprovals = () => {
     refreshPendingApprovals();
     return `<div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div><div class="empty">${t('loadingEllipsis')}</div>`;
   }
-  const items = _pendingApprovalsCache;
+  const tab = state.filters.pendingApprovalsTab || 'pending';
+  const all = _pendingApprovalsCache;
+  const items = tab === 'all' ? all : all.filter(r => r.status === tab);
+  const tabCount = (s) => all.filter(r => r.status === s).length;
+
+  const tabs = [
+    { key: 'pending', label: t('statusPending'), count: tabCount('pending') },
+    { key: 'approved', label: t('statusApproved'), count: tabCount('approved') },
+    { key: 'rejected', label: t('statusRejected'), count: tabCount('rejected') },
+    { key: 'all', label: t('tabAll'), count: all.length },
+  ];
+
   return `
     <div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div>
+    <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:0">
+      ${tabs.map(tb => `
+        <button class="btn ${tab === tb.key ? '' : 'ghost'} sm" style="border-radius:8px 8px 0 0;border-bottom:none"
+          onclick="setPendingApprovalsTab('${tb.key}')">${escapeHtml(tb.label)} (${tb.count})</button>
+      `).join('')}
+    </div>
     ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : items.map(row => {
       const task = state.actions.find(a => a.id === row.task_id);
       const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(task not found — may have been deleted)</em>`;
       const proj = task ? getProject(task.projectId) : null;
       const changeLabel = row.change_type === 'complete' ? t('proposalMarkComplete') : t('proposalAddNote');
+      const statusBadgeColors = { pending: 'amber', approved: 'green', rejected: 'red' };
       return `
         <div class="pending-approval-card">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
             <div>
-              <div style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">${escapeHtml(changeLabel)}</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${escapeHtml(changeLabel)}</span>
+                ${tab === 'all' ? `<span class="badge ${statusBadgeColors[row.status] || ''}" style="font-size:10px">${row.status === 'pending' ? t('statusPending') : row.status === 'approved' ? t('statusApproved') : t('statusRejected')}</span>` : ''}
+              </div>
               <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
               ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
               ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
               ${row.attachment_link ? `<div style="margin-top:6px"><a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent)">🔗 ${t('viewAttachedLink')}</a></div>` : ''}
+              ${row.status === 'rejected' && row.rejection_reason ? `<div class="submission-reject-reason" style="margin-top:6px">${t('rejectionReasonLabel')}: ${escapeHtml(row.rejection_reason)}</div>` : ''}
               <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
-              <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
-              <button class="btn ghost sm" onclick="rejectProposal('${row.id}')">✕ ${t('rejectBtn')}</button>
+              ${row.status === 'pending' ? `
+                <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
+                <button class="btn ghost sm" onclick="rejectProposal('${row.id}')">✕ ${t('rejectBtn')}</button>
+              ` : `
+                <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
+              `}
             </div>
           </div>
         </div>
