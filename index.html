@@ -6,7 +6,7 @@
 <title>نظام حوكمة الشركاء والمشاريع</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=Cairo:wght@400..800&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f5f3ee;
@@ -49,6 +49,22 @@
   }
 
   h1, h2, h3, h4 { font-family: 'Reem Kufi', serif; font-weight: 600; letter-spacing: -0.01em; }
+  /* Reem Kufi is a display/decorative typeface — reads poorly in Arabic.
+     Cairo is a proper text-optimized Arabic font, so every place that
+     currently uses Reem Kufi switches to it automatically in RTL/Arabic
+     mode. English stays on Reem Kufi. One compact rule instead of editing
+     all 30+ individual declarations. */
+  [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, [dir="rtl"] h4,
+  [dir="rtl"] .brand-title, [dir="rtl"] .stat-value, [dir="rtl"] .metric-value,
+  [dir="rtl"] .cal-day-num, [dir="rtl"] .cal-badge, [dir="rtl"] .cal-range,
+  [dir="rtl"] .calendar-day-num, [dir="rtl"] .calendar-month-label, [dir="rtl"] .calendar-weekday,
+  [dir="rtl"] .drift-chip, [dir="rtl"] .kpi .kv, [dir="rtl"] .page-date,
+  [dir="rtl"] .rep-metric .rm-value, [dir="rtl"] .report-stat .value, [dir="rtl"] .rii-number,
+  [dir="rtl"] .section-divider .sd-label, [dir="rtl"] .stars-count-label, [dir="rtl"] .stat-cell .v,
+  [dir="rtl"] .tl-tracking .tlt-num, [dir="rtl"] .tracking-item-date,
+  [dir="rtl"] .proj-report-head .pr-health .hs, [dir="rtl"] .proj-report-head .pr-title {
+    font-family: 'Cairo', sans-serif !important;
+  }
 
   .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
 
@@ -10188,6 +10204,17 @@ function buildReportHTML(title, bodyHTML, metadata) {
            border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
       h2 { font-family: 'Reem Kufi', serif; font-size: 16px; color: var(--accent);
            margin: 24px 0 12px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+      /* Same Cairo-for-Arabic fix as the main app and partner/team views —
+         Reem Kufi reads poorly in Arabic; this is a separate print/report
+         window with its own stylesheet, so needs its own copy of the rule. */
+      [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] .rii-number, [dir="rtl"] .stat-cell .v,
+      [dir="rtl"] .rep-metric .rm-value, [dir="rtl"] .proj-report-head .pr-title,
+      [dir="rtl"] .proj-report-head .pr-health .hs, [dir="rtl"] .kpi .kv,
+      [dir="rtl"] .tl-tracking .tlt-num, [dir="rtl"] .metric-value,
+      [dir="rtl"] .section-divider .sd-label, [dir="rtl"] .drift-chip,
+      [dir="rtl"] .analytics-card h3, [dir="rtl"] .page-date {
+        font-family: 'Cairo', sans-serif !important;
+      }
       .meta { color: var(--ink-faint); font-size: 12px; margin-bottom: 18px; }
       .report-issue-info {
         display: flex; justify-content: space-between; align-items: center;
@@ -10506,7 +10533,7 @@ function buildReportHTML(title, bodyHTML, metadata) {
   <title>${title}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;600&family=Cairo:wght@400..800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   ${baseStyles}
 </head>
 <body>
