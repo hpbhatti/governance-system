@@ -5585,7 +5585,7 @@ function collectUntranslatedStrings() {
     if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table, source: ar });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
-  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
+  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); }); });
   state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
@@ -5658,7 +5658,7 @@ function collectUntranslatedStringsToArabic() {
     if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table, source: en });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
-  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); });
+  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); }); });
   state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
@@ -5837,6 +5837,7 @@ async function applyContentLanguage(lang) {
   });
   (state.partners || []).forEach(p => {
     applyField(p, 'name');
+    (p.team || []).forEach(m => applyField(m, 'name'));
   });
   (state.team || []).forEach(m => {
     applyField(m, 'name');
@@ -8880,7 +8881,16 @@ function savePartner(id) {
   }
   const team = (window._editingPartnerTeam || [])
     .filter(m => m.name && m.name.trim())
-    .map(m => ({ id: m.id || ('pm_' + uid()), name: m.name.trim(), email: (m.email||'').trim() }));
+    .map(m => {
+      // Spread the existing member first — preserves any already-set
+      // nameEn/nameAr/manual-lock flags from the editing session (which
+      // itself starts from a full copy of the existing member, not just
+      // name/email). Rebuilding a fresh {id, name, email}-only object here
+      // would have silently discarded any previously translated/locked name.
+      const member = { ...m, id: m.id || ('pm_' + uid()), name: m.name.trim(), email: (m.email||'').trim() };
+      setBilingualField(member, 'name', member.name);
+      return member;
+    });
   const data = {
     name,
     type,
