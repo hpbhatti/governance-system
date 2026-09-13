@@ -581,12 +581,12 @@ function renderMilestones(p) {
         : '';
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
+        renderProjectFiles(p.attachments) +
         renderContributionLine(p) +
         renderBigPicture(p) +
         renderMilestones(p) +
         delayBox +
         cardsHtml +
-        renderProjectFiles(p.attachments) +
       '</div>';
     }).join('');
 
