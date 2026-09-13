@@ -79,6 +79,7 @@
   .task-card.st-missed { border-inline-start-color: var(--red); }
 
   .task-title { font-size: 14.5px; font-weight: 600; margin-bottom: 8px; unicode-bidi: plaintext; }
+  .stakeholder-line { font-size: 12px; color: var(--accent); margin-bottom: 8px; }
   .untranslated-note { font-size: 10.5px; font-weight: 400; color: var(--ink-faint); font-style: italic; }
   .task-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--ink-muted); align-items: center; unicode-bidi: isolate; }
   .task-meta > * { unicode-bidi: isolate; }
@@ -160,7 +161,7 @@ const STR = {
     due: 'Due', startDate: 'Start', overdueDays: function(n){ return '\u23F0 ' + n + ' day' + (n>1?'s':'') + ' overdue'; },
     completedOn: 'Completed', noTasks: 'No tasks assigned right now.',
     projectFiles: 'Project Files', footer: 'This is a read-only view shared by SOE. Refresh this page anytime to see the latest status.',
-    originalLanguageNote: '(shown in original language)', criticalLabel: 'Critical',
+    originalLanguageNote: '(shown in original language)', criticalLabel: 'Critical', assignedTo: 'Assigned to',
     mySubmissions: 'My Submissions', mySubmissionsTitle: 'My Submitted Tasks',
     submissionsEmpty: 'You haven\'t submitted anything yet.', submissionsLoadError: 'Could not load your submissions.',
     statusPending: 'Pending', statusApproved: 'Approved', statusRejected: 'Rejected',
@@ -190,7 +191,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     due: 'الاستحقاق', startDate: 'البدء', overdueDays: function(n){ return '\u23F0 متأخرة ' + n + ' يوم'; },
     completedOn: 'اكتملت في', noTasks: 'لا توجد مهام مسندة حالياً.',
     projectFiles: 'ملفات المشروع', footer: 'هذا عرض للاطلاع فقط تمت مشاركته من قبل SOE. أعد تحميل الصفحة في أي وقت لرؤية آخر تحديث.',
-    originalLanguageNote: '(معروضة باللغة الأصلية)', criticalLabel: 'حرج',
+    originalLanguageNote: '(معروضة باللغة الأصلية)', criticalLabel: 'حرج', assignedTo: 'مسند إلى',
     mySubmissions: 'مهامي المرسلة', mySubmissionsTitle: 'المهام التي أرسلتها',
     submissionsEmpty: 'لم ترسل أي شيء بعد.', submissionsLoadError: 'تعذر تحميل ما أرسلته.',
     statusPending: 'قيد الانتظار', statusApproved: 'تمت الموافقة', statusRejected: 'مرفوض',
@@ -395,6 +396,7 @@ function renderTaskCard(task, subtasks) {
   return '<div class="task-card st-' + cls + '">' +
     (criticalNoteText(task) ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(criticalNoteText(task)) + '</span></div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
+    (task.stakeholderName ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(task.stakeholderName) + '</strong></div>' : '') +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
@@ -531,10 +533,10 @@ function renderBigPicture(p) {
         : '';
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
+        renderProjectFiles(p.attachments) +
         renderBigPicture(p) +
         delayBox +
         cardsHtml +
-        renderProjectFiles(p.attachments) +
       '</div>';
     }).join('');
 
