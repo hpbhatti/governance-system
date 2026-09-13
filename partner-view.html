@@ -338,6 +338,14 @@ function criticalNoteText(task) {
   return task.criticalNoteEn || task.criticalNoteRaw || task.criticalNoteAr || '';
 }
 
+function stakeholderDisplayName(stakeholder) {
+  if (!stakeholder) return '';
+  if (currentLang === 'ar') {
+    return stakeholder.nameAr || stakeholder.nameRaw || stakeholder.nameEn || '';
+  }
+  return stakeholder.nameEn || stakeholder.nameRaw || stakeholder.nameAr || '';
+}
+
 function projectName(project) {
   if (currentLang === 'ar') {
     return project.nameAr || project.nameRaw || project.nameEn || '';
@@ -396,7 +404,7 @@ function renderTaskCard(task, subtasks) {
   return '<div class="task-card st-' + cls + '">' +
     (criticalNoteText(task) ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(criticalNoteText(task)) + '</span></div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
-    (task.stakeholderName ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(task.stakeholderName) + '</strong></div>' : '') +
+    (task.stakeholder ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(stakeholderDisplayName(task.stakeholder)) + '</strong></div>' : '') +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
