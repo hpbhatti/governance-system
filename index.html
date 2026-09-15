@@ -2472,6 +2472,11 @@ const T = {
     teamMemberReportBtn: '📄 تقرير الأداء', teamMemberReportTitle: 'تقرير عضو الفريق',
     partnerLinkBtn: 'رابط الشريك', partnerLinkModalTitle: 'رابط عرض الشريك (للاطلاع فقط)',
     memberLinkBtn: 'رابط العضو', memberLinkModalTitle: 'رابط عضو الفريق',
+    sendUpdateEmailBtn: 'إرسال بريد تحديث', alertNoEmailOnFile: 'لا يوجد بريد إلكتروني مسجل — أضف واحداً أولاً.',
+    toastEmailSent: 'تم إرسال البريد إلى {0}', toastEmailSentCount: 'تم إرسال البريد إلى {0} مستلم',
+    alertEmailSendFailed: 'تعذر إرسال البريد. يرجى المحاولة مرة أخرى.',
+    mainContact: 'جهة الاتصال الرئيسية', emailPickerHint: 'اختر من سيستلم هذا التحديث. سيتم تذكر اختيارك للمرة القادمة.',
+    alertSelectAtLeastOne: 'يرجى اختيار مستلم واحد على الأقل.',
     canSeeOverviewLabel: 'يمكنه رؤية نظرة عامة على المشروع', canSeeOverviewHint: 'يعرض التقدم العام للمشروع (للاطلاع فقط) إلى جانب مهامه الخاصة',
     toastOverviewEnabled: 'تم تفعيل نظرة عامة على المشروع لهذا العضو', toastOverviewDisabled: 'تم تعطيل نظرة عامة على المشروع لهذا العضو',
     pendingApprovals: 'الموافقات المعلقة', pendingApprovalsEmpty: 'لا توجد موافقات معلقة حالياً.',
@@ -3173,6 +3178,11 @@ const T = {
     teamMemberReportBtn: '📄 Performance Report', teamMemberReportTitle: 'Team Member Report',
     partnerLinkBtn: 'Partner Link', partnerLinkModalTitle: 'Partner View-Only Link',
     memberLinkBtn: 'Member Link', memberLinkModalTitle: 'Team Member Link',
+    sendUpdateEmailBtn: 'Send Update Email', alertNoEmailOnFile: 'No email address on file — add one first.',
+    toastEmailSent: 'Email sent to {0}', toastEmailSentCount: 'Email sent to {0} recipient(s)',
+    alertEmailSendFailed: 'Could not send the email. Please try again.',
+    mainContact: 'main contact', emailPickerHint: 'Choose who receives this update. Your selection will be remembered for next time.',
+    alertSelectAtLeastOne: 'Please select at least one recipient.',
     canSeeOverviewLabel: 'Can see project overview', canSeeOverviewHint: 'Shows overall project progress (view-only) alongside their own tasks',
     toastOverviewEnabled: 'Project overview enabled for this member', toastOverviewDisabled: 'Project overview disabled for this member',
     pendingApprovals: 'Pending Approvals', pendingApprovalsEmpty: 'No pending approvals right now.',
@@ -5994,6 +6004,7 @@ views.teamMemberDetail = (memberId) => {
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" onclick="manageTeamMemberLink('${memberId}')">🔗 ${t('memberLinkBtn')}</button>
+        <button class="btn ghost" onclick="sendStatusEmail('${memberId}')">📧 ${t('sendUpdateEmailBtn')}</button>
         <button class="btn ghost" onclick="printTeamMemberReport('${memberId}')">📄 ${t('teamMemberReportBtn')}</button>
       </div>
     </div>
@@ -7911,6 +7922,7 @@ views.partnerDetail = (partnerId) => {
         <button class="btn ghost" onclick="printPartnerReport('${p.id}')">${t('internalReport')}</button>
         <button class="btn ghost" onclick="printPartnerFacingReport('${p.id}')">${t('partnerFacingReport')}</button>
         <button class="btn ghost" onclick="managePartnerLink('${p.id}')">🔗 ${t('partnerLinkBtn')}</button>
+        <button class="btn ghost" onclick="openPartnerEmailPicker('${p.id}')">📧 ${t('sendUpdateEmailBtn')}</button>
         <button class="btn ghost" onclick="showPartnerForm('${p.id}')">${t('edit')}</button>
       </div>
     </div>
@@ -11265,6 +11277,157 @@ function toggleMemberOverview(memberId, checked) {
   m.canSeeProjectOverview = checked;
   saveState({ internal_team: [m] });
   toast(checked ? t('toastOverviewEnabled') : t('toastOverviewDisabled'));
+}
+
+// ── Send a lightweight status-nudge email — never embeds the task list
+// itself, just a short summary + a link to their existing live report.
+// Keeps a single source of truth (the live page) instead of a second
+// copy of task data that could drift out of sync.
+//
+// Team members: always exactly one person, sent directly, no picker.
+// Partners: can have multiple people (main contact + team members), so
+// a checklist lets you choose who's included each time — the selection
+// is remembered on the partner record and pre-checked next time,
+// staying as-is until you deliberately change it. ──
+const SEND_EMAIL_FUNCTION_URL = SUPABASE_URL + '/functions/v1/send-status-email';
+
+function computeProjectBreakdownForTeamMember(memberId) {
+  const byProject = {};
+  state.actions.forEach(a => {
+    if (a.type === 'meeting' || isCompleted(a) || isMissed(a)) return;
+    if (a.ownerKind !== 'internal' || a.ownerId !== memberId) return;
+    const proj = getProject(a.projectId);
+    if (!proj) return;
+    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, openCount: 0, overdueCount: 0, criticalTasks: [] };
+    byProject[proj.id].openCount++;
+    if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
+    if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
+  });
+  return Object.values(byProject);
+}
+
+function computeProjectBreakdownForPartner(partnerId) {
+  const p = getPartner(partnerId);
+  const teamIds = new Set((p && p.team || []).map(m => m.id));
+  const byProject = {};
+  state.actions.forEach(a => {
+    if (a.type === 'meeting' || isCompleted(a) || isMissed(a)) return;
+    const belongsToThisPartner = a.ownerKind === 'partner'
+      ? teamIds.has(a.ownerId)
+      : (a.ownerKind !== 'internal' && (getProject(a.projectId) || {}).partnerId === partnerId);
+    if (!belongsToThisPartner) return;
+    const proj = getProject(a.projectId);
+    if (!proj) return;
+    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, openCount: 0, overdueCount: 0, criticalTasks: [] };
+    byProject[proj.id].openCount++;
+    if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
+    if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
+  });
+  return Object.values(byProject);
+}
+
+async function getOrCreateViewLink(linkTable, linkIdField, id, viewBaseUrl) {
+  const { data: existing } = await supabaseClient
+    .from(linkTable).select('token').eq(linkIdField, id).eq('revoked', false)
+    .order('created_at', { ascending: false }).limit(1);
+  let token;
+  if (existing && existing.length > 0) {
+    token = existing[0].token;
+  } else {
+    token = _generateToken();
+    await supabaseClient.from(linkTable).insert({
+      token, [linkIdField]: id, created_by: (_authUser && _authUser.email) || null,
+    });
+  }
+  return viewBaseUrl + '?token=' + token;
+}
+
+async function dispatchStatusEmail(recipients, recipientName, projectBreakdown, linkUrl) {
+  const res = await fetch(SEND_EMAIL_FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipients, recipientName, projectBreakdown, linkUrl, lang: currentLang }),
+  });
+  if (!res.ok) throw new Error('send failed');
+}
+
+// Team member: single fixed recipient, sent directly — no picker needed.
+async function sendStatusEmail(id) {
+  if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
+  const m = getTeamMember(id);
+  if (!m) return;
+  if (!m.email) { alert(t('alertNoEmailOnFile')); return; }
+  try {
+    const projectBreakdown = computeProjectBreakdownForTeamMember(id);
+    const linkUrl = await getOrCreateViewLink('team_member_links', 'member_id', id, TEAM_MEMBER_VIEW_BASE_URL);
+    await dispatchStatusEmail([m.email], m.name, projectBreakdown, linkUrl);
+    toast(t('toastEmailSent', m.email));
+  } catch (e) {
+    alert(t('alertEmailSendFailed'));
+  }
+}
+
+// Partner: opens a checklist of the main contact + every team member with
+// an email on file. Pre-checks whichever combination was selected last
+// time (stored on the partner record) — stays as-is until changed.
+function openPartnerEmailPicker(partnerId) {
+  const p = getPartner(partnerId);
+  if (!p) return;
+  const candidates = [];
+  if (p.email) candidates.push({ email: p.email, name: p.contact || p.name, isMain: true });
+  (p.team || []).forEach(m => { if (m.email) candidates.push({ email: m.email, name: m.name, isMain: false }); });
+
+  if (candidates.length === 0) { alert(t('alertNoEmailOnFile')); return; }
+
+  const lastSelected = Array.isArray(p.lastEmailRecipients) ? p.lastEmailRecipients : null;
+  // Default (first-ever send): just the main contact, if one exists — otherwise everyone.
+  const defaultChecked = lastSelected
+    ? new Set(lastSelected)
+    : new Set(candidates.filter(c => c.isMain).length ? candidates.filter(c => c.isMain).map(c => c.email) : candidates.map(c => c.email));
+
+  const rowsHtml = candidates.map((c, i) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+      <input type="checkbox" id="email-pick-${i}" ${defaultChecked.has(c.email) ? 'checked' : ''} value="${escapeHtml(c.email)}">
+      <span style="font-size:13px">${escapeHtml(c.name)} <span style="color:var(--ink-faint);font-size:11.5px">(${escapeHtml(c.email)}${c.isMain ? ' · ' + t('mainContact') : ''})</span></span>
+    </label>
+  `).join('');
+
+  const html = `
+    <div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:12px">${t('emailPickerHint')}</div>
+    <div id="email-picker-rows">${rowsHtml}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn ghost sm" onclick="closeModal()">${t('proposalCancelBtn')}</button>
+      <button class="btn sm" onclick="confirmSendPartnerEmail('${partnerId}', ${candidates.length})">📧 ${t('sendUpdateEmailBtn')}</button>
+    </div>
+  `;
+  openModal(t('sendUpdateEmailBtn'), html, '');
+}
+
+async function confirmSendPartnerEmail(partnerId, candidateCount) {
+  const selected = [];
+  for (let i = 0; i < candidateCount; i++) {
+    const el = document.getElementById('email-pick-' + i);
+    if (el && el.checked) selected.push(el.value);
+  }
+  if (selected.length === 0) { alert(t('alertSelectAtLeastOne')); return; }
+
+  const p = getPartner(partnerId);
+  if (!p || !supabaseClient) return;
+
+  try {
+    // Remember this exact selection for next time — stays as-is until
+    // deliberately changed, per the requested behavior.
+    p.lastEmailRecipients = selected;
+    saveState();
+
+    const projectBreakdown = computeProjectBreakdownForPartner(partnerId);
+    const linkUrl = await getOrCreateViewLink('partner_links', 'partner_id', partnerId, PARTNER_VIEW_BASE_URL);
+    await dispatchStatusEmail(selected, p.name, projectBreakdown, linkUrl);
+    closeModal();
+    toast(t('toastEmailSentCount', selected.length));
+  } catch (e) {
+    alert(t('alertEmailSendFailed'));
+  }
 }
 
 function printPartnerReport(partnerId, existingEntry) {
