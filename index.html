@@ -3609,6 +3609,7 @@ function describeSupabaseError(e) {
 // failure (every table errors) falls back fully to localStorage.
 async function _loadStateInner(force) {
   if (!supabaseClient) return loadStateFromLocalStorage();
+  _lastLoadHadRealChanges = false; // reset for this call — only flipped true where a genuine change is found below
 
   // 1) Fetch ONLY the tiny per-table stamps (one small row).
   let cloudTs = {};
@@ -3633,7 +3634,7 @@ async function _loadStateInner(force) {
   }
 
   // 3) Nothing changed → ZERO table egress; cached copy already in memory.
-  if (toFetch.length === 0) { setSyncOnline(true); persistSyncMeta(); return true; }
+  if (toFetch.length === 0) { setSyncOnline(true); persistSyncMeta(); _lastLoadHadRealChanges = false; return true; }
 
   // Baseline cache for any table that errors mid-fetch.
   let cache = {};
@@ -3663,12 +3664,19 @@ async function _loadStateInner(force) {
     if (!syncMeta.rowVersions[r.t.table]) syncMeta.rowVersions[r.t.table]={};
     if (r.incremental && r.rows.length===0) { /* nothing changed */ }
     else if (r.incremental) {
+      _lastLoadHadRealChanges = true;
       const inc={}; (r.rows||[]).forEach(row=>{if(row.data)inc[row.id]=row;});
       const exist=state[r.t.key]||[]; const existIds=new Set(exist.map(x=>x.id));
       const merged=exist.map(item=>{ const i=inc[item.id]; if(!i)return item; if((i.version||1)>(syncMeta.rowVersions[r.t.table][item.id]||0)){syncMeta.rowVersions[r.t.table][item.id]=i.version||1;return i.data;} return item; });
       Object.keys(inc).forEach(id=>{ if(!existIds.has(id)){syncMeta.rowVersions[r.t.table][id]=inc[id].version||1;merged.push(inc[id].data);} });
       state[r.t.key]=merged.filter(Boolean);
     } else {
+      // Full/non-incremental fetch — happens on first-ever sync or an
+      // explicit forced sync (e.g. clicking "Sync Now"). Both are cases
+      // where the user genuinely expects to see feedback, so treated as
+      // a real change even though we can't cheaply tell if the content
+      // itself differs from what was already cached.
+      _lastLoadHadRealChanges = true;
       state[r.t.key]=(r.rows||[]).map(row=>{ if(row.data&&row.version)syncMeta.rowVersions[r.t.table][row.id]=row.version; return row.data; }).filter(Boolean);
     }
     syncMeta.tableTs[r.t.table]=cloudTs[r.t.table]||0;
@@ -3692,12 +3700,19 @@ async function _loadStateInner(force) {
 
 // Public wrapper: shows the "Syncing…" / "Updated ✓" header badge around EVERY load,
 // so init, refreshFromCloud, syncNow all light up the indicator uniformly.
+// The "Syncing…" flash still shows immediately on every call (we can't know
+// in advance whether there's real work), but the more noticeable, lingering
+// "Updated ✓" flash now only appears when something genuinely changed —
+// a routine tab-focus check that finds nothing new goes straight back to
+// idle instead of flashing "Updated" for a no-op, which is what made the
+// badge feel like it was constantly firing even when nothing had happened.
+let _lastLoadHadRealChanges = true; // safe default: unexpected/untracked paths still show feedback
 async function loadState(force) {
   if (!supabaseClient) return _loadStateInner(force); // local-only path: no badge needed
   setSyncBadge('syncing');
   try {
     const r = await _loadStateInner(force);
-    setSyncBadge('updated');
+    setSyncBadge(_lastLoadHadRealChanges ? 'updated' : 'idle');
     return r;
   } catch (e) { setSyncBadge('idle'); throw e; }
 }
