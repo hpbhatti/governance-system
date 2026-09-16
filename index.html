@@ -1322,6 +1322,9 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .tl-legend-group { display: flex; flex-wrap: wrap; gap: 14px 18px; }
   .tl-legend-section { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
   .tl-legend-title { font-weight: 600; color: var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tl-color-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .tl-color-row span { flex: 1; font-size: 13px; }
+  .tl-color-row input[type="color"] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
   .tl-legend-item { display: inline-flex; align-items: center; gap: 6px; }
   .tl-legend-swatch {
     display: inline-block;
@@ -1932,6 +1935,28 @@ async function loadConfig() {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) mergeConfig(JSON.parse(raw));
   } catch (e) { /* ignore corrupt config */ }
+}
+
+// Dedicated, isolated persistence for the Gantt's "Internal Team" custom
+// color — deliberately kept SEPARATE from IMPORTANCE_CONFIG/mergeConfig
+// (that pair is narrowly built for nested numeric scoring fields only,
+// so a flat string setting would save fine but silently fail to reload
+// on next boot if piggybacked onto it). Own config row, own load/save.
+async function _tlLoadInternalColor() {
+  if (!supabaseClient) return;
+  try {
+    const { data, error } = await withRequestTimeout(supabaseClient.from('config').select('settings').eq('id', 'timeline_settings').maybeSingle());
+    if (error) throw error;
+    if (data && data.settings && typeof data.settings.internalColor === 'string') {
+      state.timelineInternalColor = data.settings.internalColor;
+    }
+  } catch (e) { /* silent — falls back to the default palette color */ }
+}
+async function _tlSaveInternalColor(color) {
+  if (!supabaseClient) return;
+  try {
+    await supabaseClient.from('config').upsert({ id: 'timeline_settings', settings: { internalColor: color } });
+  } catch (e) { console.error('Timeline color save failed:', describeSupabaseError(e)); }
 }
 
 // PRIMARY config saver: cache locally immediately, then upsert the shared settings to Supabase.
@@ -5829,6 +5854,19 @@ function migrateBilingualContent() {
     mig(p, 'name');
     mig(p, 'description');
   });
+  // These three were missing entirely — the actual root cause of a real
+  // corruption bug: a legacy name (created before bilingual support
+  // existed) had no real English slot populated, so editing it while
+  // viewing it in Arabic silently saved the edit into the Arabic slot
+  // instead, and the next language switch then machine-translated that
+  // edited text into a garbled "English" name, overwriting the original.
+  (state.partners || []).forEach(p => {
+    mig(p, 'name');
+    (p.team || []).forEach(m => mig(m, 'name'));
+  });
+  (state.team || []).forEach(m => {
+    mig(m, 'name');
+  });
 }
 
 // On language switch: show every task title & project name in the active language,
@@ -8844,6 +8882,17 @@ function showPartnerForm(partnerId) {
       <label>${t('fieldEmailLabel')}</label>
       <input id="f-email" type="email" value="${escapeHtml(editing?.email || '')}">
     </div>
+    <div class="form-row">
+      <label>${t('fieldTimelineColor')}</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input id="f-timeline-color" type="color" value="${editing?.timelineColor || '#3d5a80'}" ${editing?.timelineColor ? '' : 'disabled'} style="width:48px;height:34px;padding:2px;border:1px solid var(--line);border-radius:6px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-muted);cursor:pointer">
+          <input type="checkbox" id="f-timeline-color-enabled" ${editing?.timelineColor ? 'checked' : ''} onchange="document.getElementById('f-timeline-color').disabled = !this.checked">
+          ${t('useCustomColor')}
+        </label>
+      </div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('timelineColorHint')}</div>
+    </div>
 
     <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px">
       <div style="font-size:13px;color:var(--accent);font-weight:500;margin-bottom:6px">👥 ${t('sectionPartnerTeam')}</div>
@@ -11342,11 +11391,11 @@ async function getOrCreateViewLink(linkTable, linkIdField, id, viewBaseUrl) {
   return viewBaseUrl + '?token=' + token;
 }
 
-async function dispatchStatusEmail(recipients, recipientName, projectBreakdown, linkUrl) {
+async function dispatchStatusEmail(recipients, recipientName, recipientType, projectBreakdown, linkUrl) {
   const res = await fetch(SEND_EMAIL_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipients, recipientName, projectBreakdown, linkUrl, lang: currentLang }),
+    body: JSON.stringify({ recipients, recipientName, recipientType, projectBreakdown, linkUrl, lang: currentLang }),
   });
   if (!res.ok) throw new Error('send failed');
 }
@@ -11360,7 +11409,7 @@ async function sendStatusEmail(id) {
   try {
     const projectBreakdown = computeProjectBreakdownForTeamMember(id);
     const linkUrl = await getOrCreateViewLink('team_member_links', 'member_id', id, TEAM_MEMBER_VIEW_BASE_URL);
-    await dispatchStatusEmail([m.email], m.name, projectBreakdown, linkUrl);
+    await dispatchStatusEmail([m.email], m.name, 'team_member', projectBreakdown, linkUrl);
     toast(t('toastEmailSent', m.email));
   } catch (e) {
     alert(t('alertEmailSendFailed'));
@@ -11422,7 +11471,7 @@ async function confirmSendPartnerEmail(partnerId, candidateCount) {
 
     const projectBreakdown = computeProjectBreakdownForPartner(partnerId);
     const linkUrl = await getOrCreateViewLink('partner_links', 'partner_id', partnerId, PARTNER_VIEW_BASE_URL);
-    await dispatchStatusEmail(selected, p.name, projectBreakdown, linkUrl);
+    await dispatchStatusEmail(selected, p.name, 'partner', projectBreakdown, linkUrl);
     closeModal();
     toast(t('toastEmailSentCount', selected.length));
   } catch (e) {
@@ -12251,9 +12300,14 @@ async function resetData() {
       legendPartners: 'الشركاء / الفرق',
       statusCompleted: 'مكتمل',
       statusDelayed: 'متأخر',
+      statusCritical: 'حرج',
       statusOnTrack: 'في الموعد',
       statusMilestone: 'معلم',
       legendCritical: 'المسار الحرج',
+      customizeColors: 'تخصيص الألوان', colorPickerTitle: 'تخصيص ألوان أصحاب المصلحة',
+      colorPickerHint: 'حدد لوناً مخصصاً للفريق الداخلي أو أي شريك يظهر في هذا الرسم البياني. اترك الافتراضي لاستخدام اللوحة التلقائية.',
+      resetToDefault: 'إعادة تعيين', saveColors: 'حفظ', internalTeamLabel: 'الفريق الداخلي',
+      legendClickToHighlight: 'انقر لتمييز مهام هذا الشريك',
       tooltipDates: 'من {0} إلى {1}',
       tooltipDelay: 'تأخير: {0} يوم',
       tooltipMilestone: 'معلم',
@@ -12279,9 +12333,14 @@ async function resetData() {
       legendPartners: 'Partners / Teams',
       statusCompleted: 'Completed',
       statusDelayed: 'Delayed',
+      statusCritical: 'Critical',
       statusOnTrack: 'On track',
       statusMilestone: 'Milestone',
       legendCritical: 'Critical path',
+      customizeColors: 'Customize Colors', colorPickerTitle: 'Customize Stakeholder Colors',
+      colorPickerHint: 'Set a custom color for internal team or any partner shown in this chart. Leave default to use the automatic palette.',
+      resetToDefault: 'Reset', saveColors: 'Save', internalTeamLabel: 'Internal Team',
+      legendClickToHighlight: 'Click to highlight this partner\'s tasks',
       tooltipDates: 'From {0} to {1}',
       tooltipDelay: 'Delay: {0} days',
       tooltipMilestone: 'Milestone',
@@ -12302,24 +12361,28 @@ async function resetData() {
   const _tlCache = {};
   // Per-project today-line X position (for auto-scroll-to-today on mount)
   const _tlTodayX = {};
+  // Per-project export-only data (legend markup + full dimensions) — the
+  // on-screen SVG deliberately excludes the legend (see _tlBuildLegendHtml),
+  // so exports pull it back in from here to stay complete/self-contained.
+  const _tlExportCache = {};
 
   // ----- Palette for PARTNERS / TEAMS -----
   // Deliberately chosen to be visually distinct from the STATUS colors
-  // (status = navy #1a3a52, red #b04540, crit #7a2d2a, green #4a7c59, purple #8b5cf6).
+  // (status = navy #1a3a52, red #b04540, crit #7a2d2a, green #4a7c59, milestone bronze-gold #8a6218).
   // No greenish hues here, so a partner stripe is never confused with the
   // "Completed" green status fill.
   const _tlPartnerPalette = [
-    '#2563eb', // blue
-    '#ea7317', // orange
-    '#c026d3', // magenta
-    '#4338ca', // indigo
-    '#0e7490', // dark cyan (blue-leaning, not green)
-    '#a16207', // amber-brown
-    '#be123c', // rose
-    '#7c3aed'  // violet
+    '#3d5a80', // slate blue
+    '#bc5a2e', // burnt terracotta
+    '#6b3f5c', // plum
+    '#3f4e73', // deep indigo
+    '#2c6e63', // deep teal
+    '#8a6420', // ochre-brown
+    '#7c3341', // wine/burgundy
+    '#4f4285'  // deep violet
   ];
-  const _TL_INTERNAL_COLOR = '#eab308'; // gold — clearly distinct from navy On-track and all other hues
-  const _TL_NO_PARTNER_COLOR = '#94a3b8'; // cool grey
+  const _TL_INTERNAL_COLOR = '#7a4a2e'; // copper-brown — a different hue family entirely from Milestone's gold, not just a different shade
+  const _TL_NO_PARTNER_COLOR = '#9ca3af'; // cool grey
 
   function _tlHashIndex(str, modulo) {
     if (!str) return 0;
@@ -12366,6 +12429,20 @@ async function resetData() {
     });
   }
 
+  // Unlike _tlStakeholderKey (which mirrors getTaskStakeholderPartnerId and
+  // falls back to the PROJECT's primary partner when a task has no direct
+  // owner), this checks specifically for a genuine task-level assignment.
+  // Used to decide whether the milestone diamond gets an owner-color
+  // outline — a task with no owner of its own shouldn't show one just
+  // because its project happens to have a primary partner.
+  function _tlHasDirectOwner(task) {
+    if (task.ownerKind === 'internal') return true;
+    if (task.ownerKind === 'partner' && task.ownerId) {
+      return state.partners.some(pp => (pp.team || []).some(m => m.id === task.ownerId));
+    }
+    return false;
+  }
+
   // Resolve the true stakeholder of a task. Mirrors the app's own
   // getTaskStakeholderPartnerId(): internal-owned → '__internal__',
   // partner-owned → that partner's id (by team membership),
@@ -12391,12 +12468,18 @@ async function resetData() {
   }
 
   // Determine the "stripe" color for a task based on its stakeholder.
-  // Uses the per-render color map so Internal / Waad / Vlora each get a
-  // distinct color that never overlaps the status palette.
+  // Checks for a user-set custom color first (per-partner, or a shared
+  // one for internal team), falling back to the auto-stepped palette.
   function _tlStripeColor(task) {
     const key = _tlStakeholderKey(task);
-    if (key === '__internal__') return _TL_INTERNAL_COLOR;
+    if (key === '__internal__') {
+      return (typeof state !== 'undefined' && state.timelineInternalColor) || _TL_INTERNAL_COLOR;
+    }
     if (key === '__none__') return _TL_NO_PARTNER_COLOR;
+    if (typeof getPartner === 'function') {
+      const p = getPartner(key);
+      if (p && p.timelineColor) return p.timelineColor;
+    }
     if (_tlPartnerColorMap[key]) return _tlPartnerColorMap[key];
     // Fallback (shouldn't happen if _tlAssignPartnerColors ran)
     return _tlPartnerPalette[_tlHashIndex(key, _tlPartnerPalette.length)];
@@ -12405,14 +12488,25 @@ async function resetData() {
   // Fill color for the bar based on status.
   function _tlFillColor(task) {
     if (typeof isCompleted === 'function' && isCompleted(task)) return '#4a7c59'; // green
-    if (typeof isMissed === 'function' && isMissed(task))      return '#7a2d2a'; // crit
+    if (typeof isMissed === 'function' && isMissed(task))      return '#b04540'; // red — critical
     // Open
     if (typeof getDelayDays === 'function' && getDelayDays(task) > 0) {
       // Use the dynamic risk threshold (mirrors isCriticalRisk).
-      if (typeof isCriticalRisk === 'function' && isCriticalRisk(task)) return '#7a2d2a'; // critical
-      return '#b04540'; // red — delayed but not critical
+      if (typeof isCriticalRisk === 'function' && isCriticalRisk(task)) return '#b04540'; // red — critical
+      return '#a8a29e'; // light grey — delayed but not (yet) critical; warning icon shown separately
     }
     return '#1a3a52'; // accent (on-track)
+  }
+
+  // A delayed-but-not-critical bar gets a small warning icon overlaid on
+  // it, since the grey fill alone (chosen so it doesn't compete visually
+  // with the red "critical" state) isn't attention-grabbing by itself.
+  function _tlIsWarningState(task) {
+    if (typeof isCompleted === 'function' && isCompleted(task)) return false;
+    if (typeof isMissed === 'function' && isMissed(task)) return false; // already critical, not warning
+    if (typeof getDelayDays !== 'function' || getDelayDays(task) <= 0) return false;
+    if (typeof isCriticalRisk === 'function' && isCriticalRisk(task)) return false; // already critical
+    return true;
   }
 
   // Status key (for legend mapping + tooltip label)
@@ -12544,6 +12638,171 @@ async function resetData() {
     return parts.join('~') + '#' + tasks.length;
   }
 
+  // Keeps the label column (task names), the date-axis header, and the
+  // legend visually pinned to the edges of the visible viewport while the
+  // chart scrolls underneath — the same effect as frozen spreadsheet rows
+  // and columns. Implemented as live transforms rather than restructuring
+  // into separate documents, so all existing rendering (milestones,
+  // colors, exports) is untouched. (The legend used to be handled here
+  // too, but relocating it to "float" over the rows caused it to
+  // permanently cover the first several task rows — see _tlBuildLegendHtml
+  // for the fix: it's now a structurally separate HTML block instead.)
+  function _tlAttachStickyLabels(host) {
+    const container = host.querySelector('.tl-container');
+    const labelLayer = host.querySelector('.tl-sticky-label-layer');
+    const headerLayer = host.querySelector('.tl-sticky-header-layer');
+    if (!container) return;
+
+    const totalW = labelLayer ? (parseFloat(labelLayer.getAttribute('data-total-w')) || 0) : 0;
+    const labelW = labelLayer ? (parseFloat(labelLayer.getAttribute('data-label-w')) || 0) : 0;
+    const rtl = labelLayer ? (labelLayer.getAttribute('data-rtl') === '1') : false;
+
+    function update() {
+      const scrollLeft = container.scrollLeft;
+      const scrollTop = container.scrollTop;
+      const visW = container.clientWidth || 0;
+
+      if (labelLayer) {
+        // Horizontal: LTR pins to the viewport's left edge, RTL pins to
+        // the viewport's right edge (see earlier horizontal-only version
+        // of this function for the full reasoning).
+        const tx = rtl ? (scrollLeft + visW - totalW) : scrollLeft;
+        labelLayer.setAttribute('transform', 'translate(' + tx + ',0)');
+      }
+      if (headerLayer) {
+        // Vertical only — the header's natural position is already at the
+        // top (titleH), so this only needs to counteract scroll to stay
+        // visible, never relocate.
+        headerLayer.setAttribute('transform', 'translate(0,' + scrollTop + ')');
+      }
+    }
+
+    // Avoid attaching more than once if this container is re-rendered
+    // in place (cache-hit path re-sets innerHTML but reuses the same host).
+    if (container._tlStickyHandler) {
+      container.removeEventListener('scroll', container._tlStickyHandler);
+    }
+    container._tlStickyHandler = update;
+    container.addEventListener('scroll', update, { passive: true });
+    update(); // set correct initial position immediately
+  }
+
+  // ----- Click-to-highlight a partner/team's tasks -----
+  // Per-project current highlight key (null = nothing highlighted, show
+  // everyone at full opacity). Applied via direct DOM opacity toggling on
+  // the <g data-tl-row-key="..."> groups each row is wrapped in — no
+  // re-render or cache-bust needed, so this stays fast even on large charts.
+  const _tlHighlightState = {};
+
+  // ----- Custom stakeholder colors (Internal Team + per-partner) -----
+  window._tlOpenColorPicker = function(projectId) {
+    const cached = _tlExportCache[projectId];
+    const partners = (cached && cached.legendData && cached.legendData.partners) || [];
+    const currentInternal = (typeof state !== 'undefined' && state.timelineInternalColor) || _TL_INTERNAL_COLOR;
+
+    // Each row pairs a native color swatch with a plain hex text input —
+    // both stay in sync with each other, so someone can either click the
+    // swatch or just type/paste an exact hex code directly.
+    const colorRow = (id, label, current, defaultColor) => `
+      <div class="tl-color-row" data-color-id="${id}">
+        <span>${_tlEscSvg(label)}</span>
+        <input type="color" id="tl-color-${id}" value="${current}" oninput="document.getElementById('tl-hex-${id}').value=this.value">
+        <input type="text" id="tl-hex-${id}" value="${current}" maxlength="7" placeholder="#000000" style="width:76px;font-family:monospace;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:4px"
+          oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value)) document.getElementById('tl-color-${id}').value=this.value">
+        <button class="btn ghost sm" onclick="document.getElementById('tl-color-${id}').value='${defaultColor}';document.getElementById('tl-hex-${id}').value='${defaultColor}'">${_tlEscSvg(tlT('resetToDefault'))}</button>
+      </div>`;
+
+    const rowsHtml = [colorRow('internal', tlT('internalTeamLabel'), currentInternal, _TL_INTERNAL_COLOR)]
+      .concat(partners.filter(p => p.key && p.key !== '__internal__' && p.key !== '__none__').map(p => {
+        const partner = (typeof getPartner === 'function') ? getPartner(p.key) : null;
+        const current = (partner && partner.timelineColor) || p.color;
+        return colorRow(p.key, p.label, current, p.color);
+      }));
+
+    const html = `
+      <div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:14px">${_tlEscSvg(tlT('colorPickerHint'))}</div>
+      <div style="max-height:320px;overflow-y:auto">${rowsHtml.join('')}</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn ghost sm" onclick="closeModal()">${_tlEscSvg(tlT('proposalCancelBtn'))}</button>
+        <button class="btn sm" onclick="_tlSaveColors('${projectId}')">${_tlEscSvg(tlT('saveColors'))}</button>
+      </div>
+    `;
+    openModal(tlT('colorPickerTitle'), html, '');
+  };
+
+  window._tlSaveColors = function(projectId) {
+    const cached = _tlExportCache[projectId];
+    const partners = (cached && cached.legendData && cached.legendData.partners) || [];
+
+    const internalInput = document.getElementById('tl-color-internal');
+    if (internalInput) {
+      const val = internalInput.value;
+      state.timelineInternalColor = (val && val.toLowerCase() !== _TL_INTERNAL_COLOR.toLowerCase()) ? val : null;
+      // Dedicated save — this field lives outside the normal synced table
+      // arrays, so the generic saveState() below won't pick it up on its own.
+      _tlSaveInternalColor(state.timelineInternalColor);
+    }
+
+    partners.filter(p => p.key && p.key !== '__internal__' && p.key !== '__none__').forEach(p => {
+      const input = document.getElementById('tl-color-' + p.key);
+      if (!input || typeof getPartner !== 'function') return;
+      const partner = getPartner(p.key);
+      if (!partner) return;
+      const val = input.value;
+      partner.timelineColor = (val && val.toLowerCase() !== p.color.toLowerCase()) ? val : null;
+    });
+
+    saveState();
+    closeModal();
+    // Force a fresh render so the new colors take effect immediately —
+    // a plain data change wouldn't otherwise bust the render cache.
+    delete _tlCache[projectId];
+    _tlEnsureRendered(projectId);
+    toast(t('toastSavedChanges'));
+  };
+
+
+  window._tlToggleHighlight = function(projectId, key) {
+    const host = document.getElementById('tl-host-' + projectId);
+    if (!host) return;
+    // Clicking the same stakeholder again clears the highlight (toggle).
+    const current = _tlHighlightState[projectId];
+    const next = (current === key) ? null : key;
+    _tlHighlightState[projectId] = next;
+    _tlApplyHighlight(host, next);
+
+    // Keep the Tasks tab's existing partner filter in sync, so navigating
+    // there after highlighting shows the same scoped view. '__none__'
+    // (unassigned) has no equivalent filter option, so it's left as-is.
+    if (typeof state !== 'undefined' && state.filters) {
+      if (!next) {
+        state.filters.actionPartner = 'all';
+      } else if (next === '__internal__') {
+        state.filters.actionPartner = '__internal__';
+      } else if (next !== '__none__') {
+        state.filters.actionPartner = next;
+      }
+    }
+  };
+
+  function _tlApplyHighlight(host, key) {
+    host.querySelectorAll('[data-tl-row-key]').forEach(el => {
+      if (!key) {
+        el.style.opacity = '';
+      } else {
+        el.style.opacity = (el.getAttribute('data-tl-row-key') === key) ? '' : '0.18';
+      }
+    });
+  }
+
+  // Re-applies whatever highlight was active before a re-render (e.g. a
+  // background sync update) — without this, a background refresh would
+  // silently reset everyone back to full opacity, dropping the highlight.
+  function _tlReapplyHighlight(projectId, host) {
+    const key = _tlHighlightState[projectId];
+    if (key) _tlApplyHighlight(host, key);
+  }
+
   function _tlEnsureRendered(projectId, forceScale) {
     const host = document.getElementById('tl-host-' + projectId);
     if (!host) return;
@@ -12554,12 +12813,16 @@ async function resetData() {
     // Reuse cache only if scale, language AND the underlying data are unchanged
     if (cached && cached.scale === scale && cached.lang === lang && cached.fp === fp) {
       host.innerHTML = cached.html;
+      _tlAttachStickyLabels(host);
+      _tlReapplyHighlight(projectId, host);
       _tlScrollToToday(projectId, host);
       return;
     }
     const html = _tlBuildHTML(projectId, scale);
     _tlCache[projectId] = { scale, lang, html, fp };
     host.innerHTML = html;
+    _tlAttachStickyLabels(host);
+    _tlReapplyHighlight(projectId, host);
     _tlScrollToToday(projectId, host);
   }
 
@@ -12671,6 +12934,12 @@ async function resetData() {
     // Total SVG height = title + axis header + chart + legend
     const chartTop = titleH + headerH;
     const totalH = titleH + headerH + chartH + legendH;
+    // On-screen the legend is a separate HTML block (see _tlBuildLegendHtml),
+    // not embedded in the SVG at all — so the visible SVG only needs to be
+    // tall enough for title+header+rows, not the extra legend space. The
+    // full totalH (legend included) is still used for exports, so those
+    // stay complete/self-contained files.
+    const onScreenH = titleH + headerH + chartH;
     const legendTop = titleH + headerH + chartH;
 
     // ----- RTL support -----
@@ -12708,11 +12977,11 @@ async function resetData() {
     // ----- SVG defs (arrowhead markers: normal + critical) -----
     let defs = `
       <defs>
-        <marker id="tl-arrow-${projectId}" viewBox="0 0 10 10" refX="8" refY="5"
+        <marker id="tl-arrow-${projectId}" viewBox="0 0 10 10" refX="9" refY="5"
                 markerWidth="6.5" markerHeight="6.5" orient="auto">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
         </marker>
-        <marker id="tl-arrow-crit-${projectId}" viewBox="0 0 10 10" refX="8" refY="5"
+        <marker id="tl-arrow-crit-${projectId}" viewBox="0 0 10 10" refX="9" refY="5"
                 markerWidth="7.5" markerHeight="7.5" orient="auto">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#b04540"/>
         </marker>
@@ -12780,7 +13049,10 @@ async function resetData() {
       `<text x="${titleDateX}" y="${titleH/2 + 4}" font-size="10" fill="#c9d3df" text-anchor="${rtl ? 'start' : 'end'}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(genDate)}</text>`;
 
     // Header: time axis labels + vertical grid lines
-    let header = '';
+    // Background for the header row — none existed before; needed now so
+    // rows scrolling underneath are fully covered once this is pinned.
+    let header = `<rect x="0" y="${titleH}" width="${totalW}" height="${headerH}" fill="#ffffff"/>` +
+      `<line x1="0" y1="${chartTop}" x2="${totalW}" y2="${chartTop}" stroke="#c8c2b0" stroke-width="1"/>`;
     let grid = '';
     const xForDate = (d) => labelW + _tlDayDiff(minD, d) * pxPerDay;
 
@@ -12828,7 +13100,20 @@ async function resetData() {
     // Rows: bars + labels + tooltips
     const STRIPE_W = 8; // thicker, clearly visible partner stripe
     let rows = '';
+    // Label text + stakeholder chips are accumulated separately from bars/bands
+    // so they can be wrapped in their own group and kept visually pinned to
+    // the viewport edge while the chart area scrolls underneath — see
+    // labelLayer assembly below.
+    let labelRows = '';
     sortedTasks.forEach((task, i) => {
+      // Marks where this row's content begins in each accumulator, so it
+      // can be wrapped in a <g data-tl-row-key="..."> group afterward —
+      // used by the click-to-highlight-partner feature to dim/un-dim a
+      // whole row (bar + band + label + chip) as one unit.
+      const rowsStartLen = rows.length;
+      const labelRowsStartLen = labelRows.length;
+      const rowStakeholderKey = _tlStakeholderKey(task);
+
       const rowY = chartTop + i * rowH;
       if (i % 2 === 1) {
         // Banding covers the chart area (the side opposite the label panel)
@@ -12874,10 +13159,11 @@ async function resetData() {
       const labelAnchorX = rtl ? (totalW - 10) : 10;
       const labelTextAnchor = rtl ? 'end' : 'start';
       const milePrefix = isMile ? '🎯 ' : '';
-      rows += `<text x="${labelAnchorX}" y="${rowY + rowH/2 + 4}" font-size="11" fill="#1a1f2e" text-anchor="${labelTextAnchor}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(milePrefix + labelTrunc)}<title>${_tlEscSvg(labelText)}</title></text>`;
-      // Stakeholder color chip near the outer edge of the label panel
+      labelRows += `<text x="${labelAnchorX}" y="${rowY + rowH/2 + 4}" font-size="11" fill="#1a1f2e" text-anchor="${labelTextAnchor}" font-family="system-ui,Arial,sans-serif">${_tlEscSvg(milePrefix + labelTrunc)}<title>${_tlEscSvg(labelText)}</title></text>`;
+      // Stakeholder color chip near the outer edge of the label panel —
+      // clickable to highlight/dim by this stakeholder (see _tlToggleHighlight).
       const chipX = rtl ? (totalW - 16) : (labelW - 16);
-      rows += `<rect x="${chipX}" y="${rowY + rowH/2 - 6}" width="8" height="12" fill="${stripeColor}" rx="1"><title>${_tlEscSvg(stakeholderLabel)}</title></rect>`;
+      labelRows += `<rect x="${chipX}" y="${rowY + rowH/2 - 6}" width="8" height="12" fill="${stripeColor}" rx="1" style="cursor:pointer" onclick="_tlToggleHighlight('${projectId}', '${rowStakeholderKey}')"><title>${_tlEscSvg(stakeholderLabel)}</title></rect>`;
 
       const onCrit = _critNodes.has(task.id);
 
@@ -12890,7 +13176,11 @@ async function resetData() {
         rows += `<g><title>${_tlEscSvg(tipLines)}</title>`;
         // Critical-path halo behind the diamond
         if (onCrit) rows += `<polygon points="${cx},${cy-r-3} ${cx+r+3},${cy} ${cx},${cy+r+3} ${cx-r-3},${cy}" fill="none" stroke="#b04540" stroke-width="2"/>`;
-        rows += `<polygon points="${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}" fill="#8b5cf6" stroke="${stripeColor}" stroke-width="2.5"/>`;
+        // Only show the owner-color outline when there's a genuinely
+        // assigned stakeholder — an unassigned task's milestone diamond
+        // stays plain, since there's no real owner to represent.
+        const milestoneStroke = _tlHasDirectOwner(task) ? `stroke="${stripeColor}" stroke-width="2.5"` : '';
+        rows += `<polygon points="${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}" fill="#8a6218" ${milestoneStroke}/>`;
         rows += `</g>`;
       } else {
         rows += `<g><title>${_tlEscSvg(tipLines)}</title>`;
@@ -12905,8 +13195,28 @@ async function resetData() {
         rows += `<rect x="${capX}" y="${barY}" width="3" height="${barH}" fill="${stripeColor}" rx="2" ry="2"/>`;
         // Critical-path outline around the whole bar
         if (onCrit) rows += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" fill="none" stroke="#b04540" stroke-width="2" rx="3" ry="3"/>`;
+        // Warning icon for delayed-but-not-critical tasks — the grey fill
+        // alone isn't attention-grabbing, so this makes it unmistakable
+        // without reaching for red (reserved for the more severe Critical
+        // state, so red keeps one consistent meaning throughout the chart).
+        // Drawn as plain SVG shapes (triangle + exclamation mark) rather
+        // than relying on an emoji/text glyph — font-based icons can fail
+        // to render inside SVG <text> depending on the browser/OS, a pure
+        // vector shape always renders identically everywhere.
+        if (_tlIsWarningState(task) && barW > 24) {
+          const wcx = rtl ? (barX + barW - 16) : (barX + 16);
+          const wcy = barY + barH / 2;
+          rows += `<polygon points="${wcx},${wcy-6} ${wcx+6},${wcy+5} ${wcx-6},${wcy+5}" fill="#f4b400" stroke="#7a5a00" stroke-width="1"/>` +
+                  `<rect x="${wcx-0.7}" y="${wcy-3}" width="1.4" height="4" fill="#7a5a00"/>` +
+                  `<rect x="${wcx-0.7}" y="${wcy+2}" width="1.4" height="1.4" fill="#7a5a00"/>`;
+        }
         rows += `</g>`;
       }
+      // Wrap everything this row added (in both accumulators) in a group
+      // tagged with its stakeholder key, so the highlight feature can
+      // dim/restore the whole row (chart side + label side) as one unit.
+      rows = rows.slice(0, rowsStartLen) + '<g data-tl-row-key="' + rowStakeholderKey + '">' + rows.slice(rowsStartLen) + '</g>';
+      labelRows = labelRows.slice(0, labelRowsStartLen) + '<g data-tl-row-key="' + rowStakeholderKey + '">' + labelRows.slice(labelRowsStartLen) + '</g>';
     });
 
     // Dependency arrows (FS): predecessor start-side → successor end-side.
@@ -13018,32 +13328,79 @@ async function resetData() {
       padTop: legendPadTop, titleH: legendTitleH, itemH: legendItemH
     });
 
-    // Compose SVG. White rect behind everything is omitted to keep background
-    // transparent for SVG export; the on-screen container provides white via CSS.
+    // Sticky label layer: background panel + all label text/chips, grouped
+    // together and painted LAST (on top of bars/arrows/today-line) so that
+    // content scrolling underneath is fully covered. A scroll listener
+    // (attached after insertion — see _tlAttachStickyLabels) applies a
+    // translateX transform to this group in real time, keeping task names
+    // visually pinned to the viewport edge while only the chart area
+    // scrolls — the same effect as a frozen spreadsheet column, achieved
+    // without restructuring the single-SVG rendering approach.
+    const labelLayer = `<g class="tl-sticky-label-layer" data-total-w="${totalW}" data-label-w="${labelW}" data-rtl="${rtl ? '1' : '0'}">${panelBg}${labelRows}</g>`;
+
+    // Sticky header layer: the date-axis row, pinned to the top of the
+    // visible area during vertical scroll — same technique as the label
+    // layer, just tracking scrollTop instead of scrollLeft. Natural
+    // position is already at the top (titleH), so this only needs to
+    // counteract scroll, not also relocate like the legend does below.
+    const headerLayer = `<g class="tl-sticky-header-layer" data-title-h="${titleH}" data-header-h="${headerH}">${header}</g>`;
+
+    // Compose the ON-SCREEN SVG — sized to onScreenH, legend NOT included,
+    // since it's now the separate HTML block built below. Previously this
+    // included legendSvg directly, which duplicated the new HTML legend
+    // and left a redundant second copy visible at the bottom of the chart.
     const svg =
-      `<svg class="tl-svg" xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">` +
+      `<svg class="tl-svg" xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${onScreenH}" viewBox="0 0 ${totalW} ${onScreenH}">` +
       defs +
       titleBand +
-      panelBg +
       grid +
-      header +
       rows +
       arrows +
       todayLine +
-      legendSvg +
+      labelLayer +
+      headerLayer +
       `</svg>`;
 
-    // The legend now lives inside the SVG, so the HTML wrapper just holds the toolbar + scrollable SVG.
-    return `<div class="tl-wrap">${toolbar}<div class="tl-container">${svg}</div></div>`;
+    // Stashed so the three export functions can build a complete,
+    // self-contained file (title+header+rows+legend) even though the
+    // on-screen SVG above deliberately excludes the legend.
+    _tlExportCache[projectId] = { legendSvg, totalW, totalH, onScreenH, legendData };
+
+    const legendHtml = _tlBuildLegendHtml(legendData, projectId);
+    return `<div class="tl-wrap">${toolbar}${legendHtml}<div class="tl-container" data-project-id="${projectId}">${svg}</div></div>`;
   }
 
   // Compute legend data: status entries (always 4) + distinct stakeholders present.
+  // Plain HTML legend — sits structurally above the scrollable chart (see
+  // the tl-wrap assembly), so it can never overlap a task row. This is
+  // what's actually shown on screen; the SVG-embedded legend still exists
+  // separately, purely so exported files stay self-contained. Reuses the
+  // existing .tl-legend-* CSS classes already defined for this purpose.
+  function _tlBuildLegendHtml(legendData, projectId) {
+    const swatchHtml = (it) => {
+      if (it.diamond) return `<span class="tl-legend-swatch tl-diamond" style="background:${it.color}"></span>`;
+      if (it.critLine) return `<span class="tl-legend-swatch" style="background:transparent;border:none;display:inline-flex;align-items:center"><span style="width:16px;height:2px;background:${it.color};display:inline-block"></span></span>`;
+      return `<span class="tl-legend-swatch" style="background:${it.color}"></span>`;
+    };
+    const statusItemsHtml = legendData.status.map(it => `<div class="tl-legend-item">${swatchHtml(it)}<span>${_tlEscSvg(it.label)}</span></div>`).join('');
+    // Partner/team items are clickable — same highlight-and-dim toggle as
+    // the stakeholder chips next to each task row (see _tlToggleHighlight).
+    const partnerItemsHtml = legendData.partners.map(it =>
+      `<div class="tl-legend-item" style="cursor:pointer" onclick="_tlToggleHighlight('${projectId}', '${it.key}')" title="${_tlEscSvg(tlT('legendClickToHighlight'))}">${swatchHtml(it)}<span>${_tlEscSvg(it.label)}</span></div>`
+    ).join('');
+    return `<div class="tl-legend"><div class="tl-legend-group">` +
+      `<div class="tl-legend-section"><div class="tl-legend-title">${_tlEscSvg(tlT('legendStatus').toUpperCase())}</div>${statusItemsHtml}</div>` +
+      `<div class="tl-legend-section"><div class="tl-legend-title">${_tlEscSvg(tlT('legendPartners').toUpperCase())}</div>${partnerItemsHtml}</div>` +
+    `</div></div>`;
+  }
+
   function _tlComputeLegend(tasks, hasCriticalPath) {
     const status = [
       { color: '#1a3a52', label: tlT('statusOnTrack') },
-      { color: '#b04540', label: tlT('statusDelayed') },
+      { color: '#a8a29e', label: tlT('statusDelayed') },
+      { color: '#b04540', label: tlT('statusCritical') },
       { color: '#4a7c59', label: tlT('statusCompleted') },
-      { color: '#8b5cf6', label: tlT('statusMilestone'), diamond: true }
+      { color: '#8a6218', label: tlT('statusMilestone'), diamond: true }
     ];
     if (hasCriticalPath) {
       status.push({ color: '#b04540', label: tlT('legendCritical'), critLine: true });
@@ -13054,7 +13411,7 @@ async function resetData() {
       const key = _tlStakeholderKey(task);
       if (seen.has(key)) return;
       seen.add(key);
-      partners.push({ color: _tlStripeColor(task), label: _tlStakeholderLabel(task) });
+      partners.push({ color: _tlStripeColor(task), label: _tlStakeholderLabel(task), key: key });
     });
     return { status, partners };
   }
@@ -13126,6 +13483,7 @@ async function resetData() {
           ${sBtn('monthly', tlT('scaleMonthly'))}
         </div>
         <span class="tl-spacer"></span>
+        <button class="tl-export-btn" onclick="_tlOpenColorPicker('${projectId}')">🎨 ${_tlEscSvg(tlT('customizeColors'))}</button>
         <button class="tl-export-btn" onclick="toggleTimelineFullscreen('${projectId}')">${_tlEscSvg(tlT('fullscreen'))}</button>
         <button class="tl-export-btn" onclick="exportTimelineAsSVG('${projectId}')">${_tlEscSvg(tlT('exportSVG'))}</button>
         <button class="tl-export-btn" onclick="exportTimelineAsPDF('${projectId}')">${_tlEscSvg(tlT('exportPDF'))}</button>
@@ -13224,6 +13582,25 @@ async function resetData() {
     if (!svgEl) return;
     // Clone and inline a tiny stylesheet so the SVG renders standalone with all fonts/colors baked in
     const clone = svgEl.cloneNode(true);
+    // Exports must always show the natural (unscrolled) layout — reset any
+    // live scroll-driven transform on all three sticky layers so a
+    // scrolled view doesn't get baked into the static export.
+    ['.tl-sticky-label-layer', '.tl-sticky-header-layer'].forEach(sel => {
+      const el = clone.querySelector(sel);
+      if (el) el.removeAttribute('transform');
+    });
+    // The on-screen SVG deliberately excludes the legend (it's a separate
+    // HTML block instead — see _tlBuildLegendHtml). Re-add it here and
+    // extend the clone's height so the exported file is still complete.
+    const exportData = _tlExportCache[projectId];
+    if (exportData) {
+      clone.setAttribute('height', exportData.totalH);
+      clone.setAttribute('viewBox', '0 0 ' + exportData.totalW + ' ' + exportData.totalH);
+      clone.insertAdjacentHTML('beforeend', exportData.legendSvg);
+    }
+    // Exports show everyone at full visibility, regardless of any active
+    // partner highlight on screen — same principle as resetting scroll.
+    clone.querySelectorAll('[data-tl-row-key]').forEach(el => { el.style.opacity = ''; });
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     const serialized = new XMLSerializer().serializeToString(clone);
@@ -13252,6 +13629,21 @@ async function resetData() {
     const svgEl = host.querySelector('svg.tl-svg');
     if (!svgEl) return;
     const clone = svgEl.cloneNode(true);
+    // Same fix as SVG export — reset any live scroll transform so the PDF
+    // always shows the natural layout, not whatever was scrolled at export time.
+    ['.tl-sticky-label-layer', '.tl-sticky-header-layer'].forEach(sel => {
+      const el = clone.querySelector(sel);
+      if (el) el.removeAttribute('transform');
+    });
+    // Same reasoning as SVG export — re-add the legend and extend height
+    // so the PDF export is also a complete, self-contained document.
+    const exportDataPdf = _tlExportCache[projectId];
+    if (exportDataPdf) {
+      clone.setAttribute('height', exportDataPdf.totalH);
+      clone.setAttribute('viewBox', '0 0 ' + exportDataPdf.totalW + ' ' + exportDataPdf.totalH);
+      clone.insertAdjacentHTML('beforeend', exportDataPdf.legendSvg);
+    }
+    clone.querySelectorAll('[data-tl-row-key]').forEach(el => { el.style.opacity = ''; });
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     const svgMarkup = new XMLSerializer().serializeToString(clone);
@@ -13262,7 +13654,7 @@ async function resetData() {
     const w = window.open('', '_blank');
     if (!w) {
       // Pop-up blocked → fall back to same-window print of just the SVG.
-      _tlPrintInline(host);
+      _tlPrintInline(host, projectId);
       return;
     }
     w.document.open();
@@ -13289,13 +13681,44 @@ async function resetData() {
 
   // Fallback: print just the timeline within the current document (used only
   // if the print window was blocked). Uses the tl-printing body class.
-  function _tlPrintInline(host) {
+  function _tlPrintInline(host, projectId) {
     const wasHidden = host.style.display === 'none' || host.style.display === '';
     if (wasHidden) host.style.display = 'block';
+    // Same as the other two export paths — reset any live scroll transform
+    // so the print always shows the natural layout, then restore it after
+    // so the user's on-screen scroll position isn't disrupted.
+    const stickyLayers = ['.tl-sticky-label-layer', '.tl-sticky-header-layer']
+      .map(sel => host.querySelector(sel))
+      .filter(Boolean);
+    const savedTransforms = stickyLayers.map(el => el.getAttribute('transform'));
+    stickyLayers.forEach(el => el.removeAttribute('transform'));
+    // Same reasoning as the other two export paths — the on-screen SVG
+    // excludes the legend, so temporarily add it back (and resize) for
+    // this print, then fully undo both once printing is done since this
+    // operates on the live DOM, not a disposable clone.
+    const svgEl = host.querySelector('svg.tl-svg');
+    const exportDataPrint = projectId ? _tlExportCache[projectId] : null;
+    const savedHeight = svgEl ? svgEl.getAttribute('height') : null;
+    const savedViewBox = svgEl ? svgEl.getAttribute('viewBox') : null;
+    if (svgEl && exportDataPrint) {
+      svgEl.setAttribute('height', exportDataPrint.totalH);
+      svgEl.setAttribute('viewBox', '0 0 ' + exportDataPrint.totalW + ' ' + exportDataPrint.totalH);
+      // Wrapped in a single group (legendSvg itself is several sibling
+      // elements, not one) so it can be cleanly removed as one unit
+      // afterward, rather than needing to track/remove each child.
+      svgEl.insertAdjacentHTML('beforeend', '<g data-print-legend="1">' + exportDataPrint.legendSvg + '</g>');
+    }
     document.body.classList.add('tl-printing');
     const cleanup = () => {
       document.body.classList.remove('tl-printing');
       if (wasHidden) host.style.display = 'none';
+      stickyLayers.forEach((el, i) => { if (savedTransforms[i]) el.setAttribute('transform', savedTransforms[i]); });
+      if (svgEl && exportDataPrint) {
+        if (savedHeight) svgEl.setAttribute('height', savedHeight);
+        if (savedViewBox) svgEl.setAttribute('viewBox', savedViewBox);
+        const injectedLegend = svgEl.querySelector('[data-print-legend="1"]');
+        if (injectedLegend) injectedLegend.remove();
+      }
       window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);
@@ -13432,6 +13855,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
       // The seedIfEmpty() function still exists in the file but is no longer called anywhere.
       try { migrateBilingualContent(); } catch (e) {}
       await withTimeout(loadConfig(), 12000, 'loadConfig');
+      try { await withTimeout(_tlLoadInternalColor(), 8000, '_tlLoadInternalColor'); } catch (e) {}
       // If we arrived via a deep link, route to the partner detail now that the partner
       // row has (hopefully) been pulled in by the cloud sync.
       try {
