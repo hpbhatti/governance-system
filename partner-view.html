@@ -194,12 +194,23 @@
   .pv-action-banner { display: flex; align-items: flex-start; gap: 10px; background: #e6f1fb; border: 1px solid rgba(24,95,165,0.18); border-radius: 10px; padding: 11px 14px; margin-bottom: 12px; }
   .pv-action-banner-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
   .pv-action-banner-text { font-size: 13px; font-weight: 600; color: #1a3a52; line-height: 1.5; }
-  .pv-task-rule { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
-  .pv-task-rule::before, .pv-task-rule::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
-  .pv-task-rule-label { font-size: 9px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
-  .pv-files-rule { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
-  .pv-files-rule::before, .pv-files-rule::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
-  .pv-files-rule-label { font-size: 9px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+  .pv-task-rule { display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; }
+  .pv-task-rule::after { content: ''; flex: 1; height: 1.5px; background: var(--line-strong); }
+  .pv-task-rule-label { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .pv-files-rule { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
+  .pv-files-rule::after { content: ''; flex: 1; height: 1.5px; background: var(--line-strong); }
+  .pv-files-rule-label { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .pv-impact-card { background: #e6f1fb; border: 1px solid rgba(24,95,165,0.15); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .pv-impact-row { display: flex; align-items: center; gap: 12px; }
+  .pv-impact-block { flex: 1; min-width: 0; }
+  .pv-impact-block-label { font-size: 9px; font-weight: 700; color: #185fa5; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .pv-impact-bar { height: 6px; background: rgba(24,95,165,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+  .pv-impact-fill-now { height: 100%; background: #4a7c59; border-radius: 3px; }
+  .pv-impact-fill-after { height: 100%; background: #185fa5; border-radius: 3px; }
+  .pv-impact-count { display: flex; align-items: baseline; gap: 3px; }
+  .pv-impact-n { font-size: 18px; font-weight: 700; color: #185fa5; line-height: 1; }
+  .pv-impact-of { font-size: 10px; color: rgba(24,95,165,0.6); }
+  .pv-impact-arrow { font-size: 18px; color: rgba(24,95,165,0.4); flex-shrink: 0; }
   .pv-sc-fraction { font-size: 22px; font-weight: 700; color: rgba(232,220,200,0.9); line-height: 1.2; margin-bottom: 6px; font-family: 'IBM Plex Sans Arabic', sans-serif; }
   .pv-sc-frac-n { font-size: 30px; color: #c9a84c; font-family: 'Reem Kufi', serif; }
   [dir="rtl"] .pv-sc-frac-n { font-family: 'Cairo', sans-serif; }
@@ -286,7 +297,10 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     scLegOpenOther: "Others' open tasks",
     msYourTasksNeeded: 'your tasks needed',
     delaySpecific: function(n, ms){ return n + ' of your task' + (n===1?'':'s') + ' ' + (n===1?'is':'are') + ' overdue, directly delaying: ' + ms; },
-    forwardLookingFraction: function(count, newDone, total, pct){ return 'Finishing your ' + count + ' remaining task' + (count===1?'':'s') + ' moves this to ' + newDone + ' of ' + total + ' (' + pct + '%)'; }
+    forwardLookingFraction: function(count, newDone, total, pct){ return 'Finishing your ' + count + ' remaining task' + (count===1?'':'s') + ' moves this to ' + newDone + ' of ' + total + ' (' + pct + '%)'; },
+    impactNow: 'Now',
+    impactOf: function(total){ return 'of ' + total; },
+    impactFinishLabel: function(n){ return 'Finish your ' + n + ' task' + (n===1?'':'s'); }
   },
   ar: {
     brandLine: 'إدارة الشركاء والمشاريع',
@@ -338,7 +352,10 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     scLegOpenOther: 'مهام الآخرين المفتوحة',
     msYourTasksNeeded: 'مهامك مطلوبة',
     delaySpecific: function(n, ms){ return n + ' من مهامك متأخرة، تؤخر مباشرة: ' + ms; },
-    forwardLookingFraction: function(count, newDone, total, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + newDone + ' من أصل ' + total + ' (' + pct + '%)'; }
+    forwardLookingFraction: function(count, newDone, total, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + newDone + ' من أصل ' + total + ' (' + pct + '%)'; },
+    impactNow: 'الآن',
+    impactOf: function(total){ return 'من أصل ' + total; },
+    impactFinishLabel: function(n){ return 'أنهِ ' + n + ' ' + (n===1?'مهمة':'مهام'); }
   }
 };
 
@@ -687,19 +704,45 @@ function toggleMilestones(pid) {
 
 
 function renderForwardLookingLine(p, stats) {
-  var pct = p.projectedPercentIfYouFinish;
-  if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
+  if (!p.yourOpenTaskCount) return '';
   stats = stats || {};
-  var lineText;
-  if (stats.completedTotal !== undefined && p.bigPicture && p.bigPicture.totalTasks) {
-    var newDone = stats.completedTotal + p.yourOpenTaskCount;
-    lineText = t('forwardLookingFraction', p.yourOpenTaskCount, newDone, p.bigPicture.totalTasks, pct);
-  } else {
-    lineText = t('forwardLookingLine', p.yourOpenTaskCount, pct);
+  var bp = p.bigPicture;
+  // Use the before/after bar when we have the data needed to render it.
+  // Falls back to the simple text banner for any view without per-person stats.
+  if (stats.completedTotal !== undefined && bp && bp.totalTasks) {
+    var total     = bp.totalTasks;
+    var nowDone   = stats.completedTotal;
+    var afterDone = stats.completedTotal + p.yourOpenTaskCount;
+    var nowPct    = Math.round((nowDone   / total) * 100);
+    var afterPct  = Math.round((afterDone / total) * 100);
+    return '<div class="pv-impact-card">' +
+      '<div class="pv-impact-row">' +
+        '<div class="pv-impact-block">' +
+          '<div class="pv-impact-block-label">' + t('impactNow') + '</div>' +
+          '<div class="pv-impact-bar"><div class="pv-impact-fill-now" style="width:' + nowPct + '%"></div></div>' +
+          '<div class="pv-impact-count">' +
+            '<span class="pv-impact-n">' + nowDone + '</span>' +
+            '<span class="pv-impact-of">' + t('impactOf', total) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pv-impact-arrow">→</div>' +
+        '<div class="pv-impact-block">' +
+          '<div class="pv-impact-block-label">' + t('impactFinishLabel', p.yourOpenTaskCount) + '</div>' +
+          '<div class="pv-impact-bar"><div class="pv-impact-fill-after" style="width:' + afterPct + '%"></div></div>' +
+          '<div class="pv-impact-count">' +
+            '<span class="pv-impact-n">' + afterDone + '</span>' +
+            '<span class="pv-impact-of">' + t('impactOf', total) + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
+  // Fallback: simple text banner (no stats available)
+  var pct = p.projectedPercentIfYouFinish;
+  if (pct === null || pct === undefined) return '';
   return '<div class="pv-action-banner">' +
     '<div class="pv-action-banner-icon">📈</div>' +
-    '<div class="pv-action-banner-text">' + lineText + '</div>' +
+    '<div class="pv-action-banner-text">' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>' +
   '</div>';
 }
 
@@ -732,8 +775,9 @@ function renderTaskCard(task, subtasks) {
 
 function renderProjectFiles(attachments) {
   if (!attachments || !attachments.length) return '';
-  return '<div class="project-files-divider"><span class="project-files-divider-label">📎 ' + t('projectFiles') + '</span></div>' +
-    '<div class="files-section">' +
+  // Header is now rendered by the pv-files-rule separator in render() —
+  // removed from here to prevent the duplicate label seen in the partner view.
+  return '<div class="files-section">' +
     attachments.map(function(att) {
       return '<div class="file-row">' +
         '<a href="' + att.data + '" download="' + escapeHtml(att.name) + '">📄 ' + escapeHtml(att.name) + '</a>' +
