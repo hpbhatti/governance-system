@@ -159,16 +159,61 @@
   }
 
   /* ── New layout zones — no existing classes modified ── */
-  .pv-zone-label { font-size: 10px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
-  .pv-zone-label:first-child { margin-top: 0; }
-  .pv-action-banner { display: flex; align-items: flex-start; gap: 10px; background: linear-gradient(135deg, #e6f4ee 0%, #deeef8 100%); border: 1.5px solid rgba(26,58,82,0.15); border-radius: 10px; padding: 13px 16px; margin-bottom: 12px; }
-  .pv-action-banner-icon { font-size: 20px; flex-shrink: 0; line-height: 1.3; }
-  .pv-action-banner-text { font-size: 13.5px; font-weight: 600; color: var(--accent); line-height: 1.5; }
-  .ms-box.ms-overdue-milestone { background: var(--red-bg) !important; border: 1px solid rgba(176,69,64,0.3) !important; }
-  .ms-box.ms-overdue-milestone .ms-title { color: var(--red) !important; }
-  .ms-box.ms-overdue-milestone .ms-date { color: var(--red) !important; font-weight: 600; }
-  .pv-progress-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-  .pv-milestones-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .pv-status-card { background: #0f2235; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; display: flex; align-items: center; gap: 18px; }
+  .pv-sc-pct-block { text-align: center; min-width: 54px; flex-shrink: 0; }
+  .pv-sc-pct { font-size: 30px; font-weight: 700; color: #c9a84c; line-height: 1; font-family: 'Reem Kufi', serif; }
+  [dir="rtl"] .pv-sc-pct { font-family: 'Cairo', sans-serif; }
+  .pv-sc-pct-label { font-size: 9px; color: rgba(201,168,76,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+  .pv-sc-right { flex: 1; min-width: 0; }
+  .pv-sc-top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .pv-sc-status-pill { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+  .pv-sc-status-pill.delayed { background: rgba(176,69,64,0.35); color: #f5a09c; }
+  .pv-sc-status-pill.atRisk { background: rgba(196,126,42,0.35); color: #f5c47c; }
+  .pv-sc-status-pill.onTrack { background: rgba(74,124,89,0.35); color: #90cfa7; }
+  .pv-sc-target { font-size: 10px; color: rgba(232,220,200,0.38); }
+  .pv-sc-bar-track { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; margin-bottom: 7px; }
+  .pv-sc-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .pv-sc-contrib { font-size: 11px; color: rgba(232,220,200,0.45); }
+  .pv-sc-scope-note { font-size: 11px; color: rgba(232,220,200,0.6); background: rgba(201,168,76,0.1); border-radius: 6px; padding: 7px 10px; margin-top: 9px; border-left: 2px solid rgba(201,168,76,0.4); line-height: 1.5; }
+  .pv-ms-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .pv-ms-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .pv-ms-card-title { font-size: 11px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .pv-ms-overdue-count { font-size: 10px; font-weight: 700; color: var(--red); background: var(--red-bg); padding: 2px 8px; border-radius: 8px; }
+  .pv-ms-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .pv-ms-row:last-child { border-bottom: none; }
+  .pv-ms-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 5px; white-space: nowrap; min-width: 56px; text-align: center; flex-shrink: 0; }
+  .pv-ms-badge.bdg-done { background: var(--green-bg); color: var(--green); }
+  .pv-ms-badge.bdg-overdue { background: var(--red-bg); color: var(--red); }
+  .pv-ms-badge.bdg-next { background: #e6f1fb; color: #185fa5; }
+  .pv-ms-badge.bdg-upcoming { background: #eef0f4; color: var(--ink-muted); }
+  .pv-ms-name { flex: 1; font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .pv-ms-row.pv-ms-overdue .pv-ms-name { color: var(--red); }
+  .pv-ms-date { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+  .pv-ms-row.pv-ms-overdue .pv-ms-date { color: var(--red); font-weight: 500; }
+  .pv-ms-toggle-link { font-size: 11.5px; color: var(--accent); cursor: pointer; margin-top: 8px; }
+  .pv-action-banner { display: flex; align-items: flex-start; gap: 10px; background: #e6f1fb; border: 1px solid rgba(24,95,165,0.18); border-radius: 10px; padding: 11px 14px; margin-bottom: 12px; }
+  .pv-action-banner-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+  .pv-action-banner-text { font-size: 13px; font-weight: 600; color: #1a3a52; line-height: 1.5; }
+  .pv-task-rule { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
+  .pv-task-rule::before, .pv-task-rule::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
+  .pv-task-rule-label { font-size: 9px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+  .pv-files-rule { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
+  .pv-files-rule::before, .pv-files-rule::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
+  .pv-files-rule-label { font-size: 9px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+  .pv-sc-fraction { font-size: 22px; font-weight: 700; color: rgba(232,220,200,0.9); line-height: 1.2; margin-bottom: 6px; font-family: 'IBM Plex Sans Arabic', sans-serif; }
+  .pv-sc-frac-n { font-size: 30px; color: #c9a84c; font-family: 'Reem Kufi', serif; }
+  [dir="rtl"] .pv-sc-frac-n { font-family: 'Cairo', sans-serif; }
+  .pv-sc-fraction-label { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 10px; color: rgba(232,220,200,0.45); flex-wrap: wrap; }
+  .pv-sc-bar-wrap { margin-bottom: 10px; }
+  .pv-sc-bar-track { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex; }
+  .pv-sc-seg { height: 100%; transition: width 0.4s ease; }
+  .pv-sc-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .pv-sc-leg-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: rgba(232,220,200,0.5); }
+  .pv-sc-leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .pv-sc-bottom-row { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 10px; }
+  .pv-sc-your-share { font-size: 12px; color: rgba(232,220,200,0.65); }
+  .pv-sc-your-share strong { color: #c9a84c; font-weight: 600; }
+  .pv-ms-your-tag { font-size: 9px; font-weight: 600; color: #185fa5; background: #e6f1fb; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -228,7 +273,20 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     loadTimeout: 'This is taking longer than expected.', retryBtn: 'Try Again',
     stCompleted: '\u2713 Completed', stOpen: 'Open', stOverdue: 'Overdue', stMissed: 'Missed',
     pHigh: 'High', pMedium: 'Medium', pLow: 'Low',
-    yourTasks: 'Your Tasks', projectFilesZone: 'Project Files'
+    yourTasks: 'Your Tasks', projectFilesZone: 'Project Files',
+    milestonesTitle: 'Milestones',
+    msBadgeDone: 'Done', msBadgeOverdue: 'Overdue', msBadgeNext: 'Next', msBadgeUpcoming: 'Upcoming',
+    msOverdueCount: function(n){ return n + ' overdue'; },
+    scopeNotePrefix: 'Progress revised',
+    scFraction: function(done, total){ return done + ' of ' + total + ' tasks complete'; },
+    scYourShare: function(yours, total, done, open){ return 'Your share: <strong>' + yours + ' of ' + total + ' tasks</strong> — ' + done + ' done, ' + open + ' remaining'; },
+    scLegDoneOther: 'Completed by others',
+    scLegDoneYou: 'Completed by you',
+    scLegOpenYou: 'Your open tasks',
+    scLegOpenOther: "Others' open tasks",
+    msYourTasksNeeded: 'your tasks needed',
+    delaySpecific: function(n, ms){ return n + ' of your task' + (n===1?'':'s') + ' ' + (n===1?'is':'are') + ' overdue, directly delaying: ' + ms; },
+    forwardLookingFraction: function(count, newDone, total, pct){ return 'Finishing your ' + count + ' remaining task' + (count===1?'':'s') + ' moves this to ' + newDone + ' of ' + total + ' (' + pct + '%)'; }
   },
   ar: {
     brandLine: 'إدارة الشركاء والمشاريع',
@@ -267,7 +325,20 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     loadTimeout: 'هذا يستغرق وقتاً أطول من المتوقع.', retryBtn: 'إعادة المحاولة',
     stCompleted: '\u2713 مكتملة', stOpen: 'مفتوحة', stOverdue: 'متأخرة', stMissed: 'فائتة',
     pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة',
-    yourTasks: 'مهامك', projectFilesZone: 'ملفات المشروع'
+    yourTasks: 'مهامك', projectFilesZone: 'ملفات المشروع',
+    milestonesTitle: 'المعالم',
+    msBadgeDone: 'مكتمل', msBadgeOverdue: 'متأخر', msBadgeNext: 'التالي', msBadgeUpcoming: 'قادم',
+    msOverdueCount: function(n){ return n + ' متأخرة'; },
+    scopeNotePrefix: 'تم مراجعة التقدم',
+    scFraction: function(done, total){ return done + ' من أصل ' + total + ' مهمة مكتملة'; },
+    scYourShare: function(yours, total, done, open){ return 'نصيبك: <strong>' + yours + ' من أصل ' + total + ' مهمة</strong> — ' + done + ' منجزة، ' + open + ' متبقية'; },
+    scLegDoneOther: 'أنجزها الآخرون',
+    scLegDoneYou: 'أنجزتها أنت',
+    scLegOpenYou: 'مهامك المفتوحة',
+    scLegOpenOther: 'مهام الآخرين المفتوحة',
+    msYourTasksNeeded: 'مهامك مطلوبة',
+    delaySpecific: function(n, ms){ return n + ' من مهامك متأخرة، تؤخر مباشرة: ' + ms; },
+    forwardLookingFraction: function(count, newDone, total, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + newDone + ' من أصل ' + total + ' (' + pct + '%)'; }
   }
 };
 
@@ -456,114 +527,179 @@ function milestoneTitle(m) {
   return m.titleEn || m.titleRaw || m.titleAr || '';
 }
 
-// ── renderProgressZone — shows the overall progress bar and project status.
-// Split out from renderBigPicture so the two zones (progress / milestones)
-// can be positioned independently in the page layout.
-function renderProgressZone(p) {
+// ── renderProgressZone — dark navy status card with segmented bar.
+// stats = { yourTaskCount, yourCompletedCount, yourOpenCount,
+//           completedTotal, completedByOthers, openByOthers }
+// Pass {} when calling without per-person context (e.g. from renderBigPicture).
+function renderProgressZone(p, stats) {
   var bp = p.bigPicture;
   if (!bp || !bp.totalTasks) return '';
-  var lightConfig = {
-    onTrack: { color: 'var(--green)', bg: 'var(--green-bg)', label: t('statusOnTrack') },
-    atRisk: { color: 'var(--amber)', bg: 'var(--amber-bg)', label: t('statusAtRisk') },
-    delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
+  stats = stats || {};
+  var statusLabels = {
+    onTrack: '● ' + t('statusOnTrack'),
+    atRisk:  '● ' + t('statusAtRisk'),
+    delayed: '● ' + t('statusDelayed'),
   };
-  var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
-  var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
-    ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
+  var cls = bp.statusLight || 'onTrack';
+  var completedTotal = (stats.completedTotal !== undefined)
+    ? stats.completedTotal
+    : Math.round((bp.progressPercent / 100) * bp.totalTasks);
+
+  // Segmented bar — shown when we have per-person data
+  var barHtml = '';
+  if (stats.yourTaskCount > 0) {
+    var total = bp.totalTasks;
+    var pDoneOther = Math.round((Math.max(0, stats.completedByOthers) / total) * 100);
+    var pDoneYou   = Math.round((Math.max(0, stats.yourCompletedCount) / total) * 100);
+    var pOpenYou   = Math.round((Math.max(0, stats.yourOpenCount) / total) * 100);
+    var pOpenOther = Math.max(0, 100 - pDoneOther - pDoneYou - pOpenYou);
+    barHtml =
+      '<div class="pv-sc-bar-track">' +
+        '<div class="pv-sc-seg" style="width:' + pDoneOther + '%;background:#4a7c59"></div>' +
+        '<div class="pv-sc-seg" style="width:' + pDoneYou   + '%;background:#c9a84c"></div>' +
+        '<div class="pv-sc-seg" style="width:' + pOpenYou   + '%;background:#c47e2a"></div>' +
+        '<div class="pv-sc-seg" style="width:' + pOpenOther + '%;background:rgba(255,255,255,0.12)"></div>' +
+      '</div>' +
+      '<div class="pv-sc-legend">' +
+        (stats.completedByOthers > 0 ? '<span class="pv-sc-leg-item"><span class="pv-sc-leg-dot" style="background:#4a7c59"></span>' + t('scLegDoneOther') + ' (' + stats.completedByOthers + ')</span>' : '') +
+        (stats.yourCompletedCount > 0 ? '<span class="pv-sc-leg-item"><span class="pv-sc-leg-dot" style="background:#c9a84c"></span>' + t('scLegDoneYou')   + ' (' + stats.yourCompletedCount + ')</span>' : '') +
+        (stats.yourOpenCount > 0      ? '<span class="pv-sc-leg-item"><span class="pv-sc-leg-dot" style="background:#c47e2a"></span>' + t('scLegOpenYou')   + ' (' + stats.yourOpenCount + ')</span>' : '') +
+        (stats.openByOthers > 0       ? '<span class="pv-sc-leg-item"><span class="pv-sc-leg-dot" style="background:rgba(255,255,255,.22)"></span>' + t('scLegOpenOther') + ' (' + stats.openByOthers + ')</span>' : '') +
+      '</div>';
+  } else {
+    // Fallback: simple unsegmented bar
+    var barColors = { onTrack: '#4a7c59', atRisk: '#c47e2a', delayed: '#b04540' };
+    var barColor = barColors[bp.statusLight] || barColors.onTrack;
+    barHtml =
+      '<div class="pv-sc-bar-track">' +
+        '<div class="pv-sc-seg" style="width:' + bp.progressPercent + '%;background:' + barColor + '"></div>' +
+      '</div>';
+  }
+
+  // Bottom row — only when per-person data is available
+  var bottomRow = (stats.yourTaskCount > 0)
+    ? '<div class="pv-sc-bottom-row"><div class="pv-sc-your-share">' +
+        t('scYourShare', stats.yourTaskCount, bp.totalTasks, stats.yourCompletedCount, stats.yourOpenCount) +
+      '</div></div>'
     : '';
-  return '<div class="pv-progress-card">' +
-    '<div class="bp-row">' +
-      '<div class="bp-progress-label">' + t('overallProgress') + '</div>' +
-      '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
+
+  return '<div class="pv-status-card">' +
+    '<div class="pv-sc-fraction">' +
+      '<span class="pv-sc-frac-n">' + completedTotal + '</span>' + (currentLang === 'ar' ? ' من أصل ' + bp.totalTasks + ' مهمة مكتملة' : ' of ' + bp.totalTasks + ' tasks complete') +
     '</div>' +
-    '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
-    '<div class="bp-footer">' +
-      '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
+    '<div class="pv-sc-fraction-label">' +
+      '<span class="pv-sc-status-pill ' + cls + '">' + (statusLabels[bp.statusLight] || statusLabels.onTrack) + '</span>' +
       (bp.targetDate ? '<span>' + t('targeting') + ' ' + fmtDate(bp.targetDate) + '</span>' : '') +
     '</div>' +
-    scopeCaption +
+    '<div class="pv-sc-bar-wrap">' + barHtml + '</div>' +
+    bottomRow +
   '</div>';
 }
 
-// ── renderMilestonesZone — shows the milestone timeline boxes.
-// Overdue upcoming milestones are colour-coded red so the status is
-// immediately visible without reading the date text.
-function renderMilestonesZone(p) {
+
+
+// ── renderMilestonesZone — milestone list with text badges.
+// milestoneYourTasksMap = { milestoneId: true, ... } — milestones where
+// this person has open/overdue tasks feeding in. Shows "your tasks needed" tag.
+function renderMilestonesZone(p, milestoneYourTasksMap) {
   var bp = p.bigPicture;
   if (!bp || !bp.totalTasks) return '';
   var milestones = bp.milestones || [];
   if (!milestones.length) return '';
+  milestoneYourTasksMap = milestoneYourTasksMap || {};
 
-  var completed = milestones.filter(function(m){ return m.completed; });
-  var upcoming = milestones.filter(function(m){ return !m.completed; });
+  var today = todayStr();
+  var completed  = milestones.filter(function(m){ return m.completed; });
+  var upcoming   = milestones.filter(function(m){ return !m.completed; });
+  var overdueMilestones = upcoming.filter(function(m){ return m.dueDate && m.dueDate < today; });
+  var nextMilestoneId   = upcoming.length ? upcoming[0].id : null;
+
   var shown = [];
   if (completed.length) shown.push(completed[completed.length - 1]);
   if (upcoming.length) shown.push(upcoming[0]);
   if (!completed.length && upcoming.length > 1) shown.push(upcoming[1]);
-  var nextMilestoneId = upcoming.length ? upcoming[0].id : null;
-  var today = todayStr();
 
-  function boxHtml(m) {
+  function msRowHtml(m) {
+    var isOverdue = !m.completed && m.dueDate && m.dueDate < today;
+    var isNext    = !m.completed && m.id === nextMilestoneId;
+    var badge, rowCls = '';
     if (m.completed) {
-      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
+      badge = '<span class="pv-ms-badge bdg-done">'    + t('msBadgeDone')    + '</span>';
+    } else if (isOverdue) {
+      badge = '<span class="pv-ms-badge bdg-overdue">' + t('msBadgeOverdue') + '</span>';
+      rowCls = ' pv-ms-overdue';
+    } else if (isNext) {
+      badge = '<span class="pv-ms-badge bdg-next">'    + t('msBadgeNext')    + '</span>';
+    } else {
+      badge = '<span class="pv-ms-badge bdg-upcoming">'+ t('msBadgeUpcoming')+ '</span>';
     }
-    // Detect overdue: dueDate exists and is in the past
-    var isOverdue = m.dueDate && m.dueDate < today;
-    var overdueCls = isOverdue ? ' ms-overdue-milestone' : '';
-    var overdueTag = isOverdue ? ' <span style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.04em">Overdue</span>' : '';
-    if (m.id === nextMilestoneId) {
-      return '<div class="ms-box ms-next' + overdueCls + '">' +
-        '<div class="ms-title">' + (isOverdue ? '⚠️' : '🚩') + ' ' + escapeHtml(milestoneTitle(m)) + overdueTag + '</div>' +
-        '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div>' +
-      '</div>';
-    }
-    return '<div class="ms-box ms-future' + overdueCls + '">' +
-      '<div class="ms-title">○ ' + escapeHtml(milestoneTitle(m)) + overdueTag + '</div>' +
-      '<div class="ms-date">' + fmtDate(m.dueDate) + '</div>' +
+    var yourTag = (!m.completed && milestoneYourTasksMap[m.id])
+      ? '<span class="pv-ms-your-tag">' + t('msYourTasksNeeded') + '</span>'
+      : '';
+    var dateStr = m.completed ? fmtDate(m.completedDate) : fmtDate(m.dueDate);
+    return '<div class="pv-ms-row' + rowCls + '">' +
+      badge +
+      '<span class="pv-ms-name">' + escapeHtml(milestoneTitle(m)) + '</span>' +
+      yourTag +
+      '<span class="pv-ms-date">' + dateStr + '</span>' +
     '</div>';
   }
 
   var pid = p.id;
-  var collapsedHtml = shown.map(boxHtml).join('');
-  var expandedHtml = milestones.map(boxHtml).join('');
+  var collapsedHtml = shown.map(msRowHtml).join('');
+  var expandedHtml  = milestones.map(msRowHtml).join('');
   var toggleLink = milestones.length > shown.length
-    ? '<div class="ms-toggle-link" id="ms-toggle-link-' + pid + '" onclick="toggleMilestones(\'' + pid + '\')">' +
+    ? '<div class="pv-ms-toggle-link" id="ms-toggle-link-' + pid + '" onclick="toggleMilestones(\'' + pid + '\')">' +
         t('viewAllMilestones', milestones.length) + '</div>'
     : '';
+  var overdueCountBadge = overdueMilestones.length > 0
+    ? '<span class="pv-ms-overdue-count">' + t('msOverdueCount', overdueMilestones.length) + '</span>'
+    : '';
 
-  return '<div class="pv-milestones-card">' +
-    '<div class="bp-caption">' + t('milestonesCaption') + '</div>' +
-    (collapsedHtml ? '<div class="ms-row" id="ms-collapsed-' + pid + '">' + collapsedHtml + '</div>' : '') +
-    (expandedHtml ? '<div class="ms-grid" id="ms-expanded-' + pid + '" style="display:none">' + expandedHtml + '</div>' : '') +
+  return '<div class="pv-ms-card">' +
+    '<div class="pv-ms-card-header">' +
+      '<span class="pv-ms-card-title">' + t('milestonesTitle') + '</span>' +
+      overdueCountBadge +
+    '</div>' +
+    (collapsedHtml ? '<div id="ms-collapsed-' + pid + '">' + collapsedHtml + '</div>' : '') +
+    (expandedHtml  ? '<div id="ms-expanded-'  + pid + '" style="display:none">' + expandedHtml + '</div>' : '') +
     toggleLink +
   '</div>';
 }
 
-// ── renderBigPicture — kept for compatibility; delegates to the two zone
-// renderers so existing callers outside this page are unaffected.
+// ── renderBigPicture — kept for compatibility; delegates to the two zones.
 function renderBigPicture(p) {
-  return renderProgressZone(p) + renderMilestonesZone(p);
+  return renderProgressZone(p, {}) + renderMilestonesZone(p, {});
 }
 
 function toggleMilestones(pid) {
   var collapsed = document.getElementById('ms-collapsed-' + pid);
-  var expanded = document.getElementById('ms-expanded-' + pid);
-  var link = document.getElementById('ms-toggle-link-' + pid);
+  var expanded  = document.getElementById('ms-expanded-'  + pid);
+  var link      = document.getElementById('ms-toggle-link-' + pid);
   if (!expanded || !link) return;
   var isExpanded = expanded.style.display !== 'none';
   if (collapsed) collapsed.style.display = isExpanded ? '' : 'none';
   expanded.style.display = isExpanded ? 'none' : '';
-  var totalCount = expanded.querySelectorAll('.ms-box').length;
+  var totalCount = expanded.querySelectorAll('.pv-ms-row').length;
   link.textContent = isExpanded ? t('viewAllMilestones', totalCount) : t('showLessMilestones');
 }
 
-function renderForwardLookingLine(p) {
+
+
+function renderForwardLookingLine(p, stats) {
   var pct = p.projectedPercentIfYouFinish;
   if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
+  stats = stats || {};
+  var lineText;
+  if (stats.completedTotal !== undefined && p.bigPicture && p.bigPicture.totalTasks) {
+    var newDone = stats.completedTotal + p.yourOpenTaskCount;
+    lineText = t('forwardLookingFraction', p.yourOpenTaskCount, newDone, p.bigPicture.totalTasks, pct);
+  } else {
+    lineText = t('forwardLookingLine', p.yourOpenTaskCount, pct);
+  }
   return '<div class="pv-action-banner">' +
     '<div class="pv-action-banner-icon">📈</div>' +
-    '<div class="pv-action-banner-text">' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>' +
+    '<div class="pv-action-banner-text">' + lineText + '</div>' +
   '</div>';
 }
 
@@ -686,35 +822,60 @@ function render(data) {
         return renderTaskCard(tk, subtasks);
       }).join('');
       var overdueCount = items.filter(function(tk){ return taskStatusClass(tk) === 'overdue'; }).length;
-      var delayBox = overdueCount > 0
-        ? '<div class="delay-impact-box"><span class="icon">⚠️</span><span>' + (overdueCount === 1 ? t('delayImpactOne') : t('delayImpactMany', overdueCount)) + '</span></div>'
-        : '';
-      // ── Overdue milestone count for the milestones zone label ──
-      var overdueMilestoneCount = (p.bigPicture && p.bigPicture.milestones
-        ? p.bigPicture.milestones.filter(function(m){ return !m.completed && m.dueDate && m.dueDate < todayStr(); }).length
-        : 0);
-      var milestoneLabelExtra = overdueMilestoneCount > 0
-        ? ' <span style="color:var(--red);font-weight:700">· ' + overdueMilestoneCount + ' overdue</span>'
-        : '';
-      var hasMilestones = p.bigPicture && p.bigPicture.milestones && p.bigPicture.milestones.length > 0;
+
+      // ── Per-person stats for segmented bar ──────────────────────────────
+      var yourCompletedCount = items.filter(function(tk){ return tk.status === 'completed'; }).length;
+      var yourOpenCountActual = items.filter(function(tk){ var c = taskStatusClass(tk); return c === 'open' || c === 'overdue'; }).length;
+      var bpData = p.bigPicture;
+      var completedTotal = 0, completedByOthers = 0, openByOthers = 0;
+      if (bpData && bpData.totalTasks) {
+        completedTotal    = Math.round((bpData.progressPercent / 100) * bpData.totalTasks);
+        completedByOthers = Math.max(0, completedTotal - yourCompletedCount);
+        openByOthers      = Math.max(0, bpData.totalTasks - completedTotal - yourOpenCountActual);
+      }
+      var personStats = {
+        yourTaskCount:     items.length,
+        yourCompletedCount: yourCompletedCount,
+        yourOpenCount:     yourOpenCountActual,
+        completedTotal:    completedTotal,
+        completedByOthers: completedByOthers,
+        openByOthers:      openByOthers
+      };
+
+      // ── Milestone linkage: which milestones have this person's open tasks ──
+      var milestoneYourTasksMap = {};
+      var delayedMilestonesList = [];
+      items.forEach(function(tk) {
+        var cls = taskStatusClass(tk);
+        if ((cls === 'open' || cls === 'overdue') && tk.feedsIntoMilestone) {
+          milestoneYourTasksMap[tk.feedsIntoMilestone.id] = true;
+        }
+        if (cls === 'overdue' && tk.feedsIntoMilestone) {
+          var alreadyIn = delayedMilestonesList.some(function(m){ return m.id === tk.feedsIntoMilestone.id; });
+          if (!alreadyIn) delayedMilestonesList.push(tk.feedsIntoMilestone);
+        }
+      });
+
+      // ── Delay banner — names the specific milestone being blocked ────────
+      var delayBox = '';
+      if (overdueCount > 0) {
+        var delayMsg = delayedMilestonesList.length > 0
+          ? t('delaySpecific', overdueCount, delayedMilestonesList.map(function(m){ return milestoneTitle(m); }).join(', '))
+          : (overdueCount === 1 ? t('delayImpactOne') : t('delayImpactMany', overdueCount));
+        delayBox = '<div class="delay-impact-box"><span class="icon">⚠️</span><span>' + delayMsg + '</span></div>';
+      }
 
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
-        // Zone 1 — Overall progress
-        '<div class="pv-zone-label">' + t('overallProgress') + '</div>' +
-        renderProgressZone(p) +
-        // Zone 2 — Milestones (only shown when they exist)
-        (hasMilestones ? '<div class="pv-zone-label">' + t('upcomingMilestones') + milestoneLabelExtra + '</div>' : '') +
-        renderMilestonesZone(p) +
-        // Zone 3 — Actionable impact line
-        renderForwardLookingLine(p) +
-        // Zone 4 — Delay alert
+        renderProgressZone(p, personStats) +
+        renderMilestonesZone(p, milestoneYourTasksMap) +
+        renderForwardLookingLine(p, personStats) +
         delayBox +
-        // Zone 5 — Task cards
-        (cardsHtml ? '<div class="pv-zone-label">' + t('yourTasks') + '</div>' : '') +
+        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span></div>' : '') +
         cardsHtml +
-        // Zone 6 — Project files (reference material, at the bottom)
-        (p.attachments && p.attachments.length ? '<div class="pv-zone-label">' + t('projectFilesZone') + '</div>' : '') +
+        (p.attachments && p.attachments.length
+          ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
+          : '') +
         renderProjectFiles(p.attachments) +
       '</div>';
     }).join('');
