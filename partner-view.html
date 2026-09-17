@@ -157,6 +157,18 @@
     .kpi-value { font-size: 20px; }
     .header-partner { font-size: 20px; }
   }
+
+  /* ── New layout zones — no existing classes modified ── */
+  .pv-zone-label { font-size: 10px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .pv-zone-label:first-child { margin-top: 0; }
+  .pv-action-banner { display: flex; align-items: flex-start; gap: 10px; background: linear-gradient(135deg, #e6f4ee 0%, #deeef8 100%); border: 1.5px solid rgba(26,58,82,0.15); border-radius: 10px; padding: 13px 16px; margin-bottom: 12px; }
+  .pv-action-banner-icon { font-size: 20px; flex-shrink: 0; line-height: 1.3; }
+  .pv-action-banner-text { font-size: 13.5px; font-weight: 600; color: var(--accent); line-height: 1.5; }
+  .ms-box.ms-overdue-milestone { background: var(--red-bg) !important; border: 1px solid rgba(176,69,64,0.3) !important; }
+  .ms-box.ms-overdue-milestone .ms-title { color: var(--red) !important; }
+  .ms-box.ms-overdue-milestone .ms-date { color: var(--red) !important; font-weight: 600; }
+  .pv-progress-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .pv-milestones-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -215,7 +227,8 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
     loadTimeout: 'This is taking longer than expected.', retryBtn: 'Try Again',
     stCompleted: '\u2713 Completed', stOpen: 'Open', stOverdue: 'Overdue', stMissed: 'Missed',
-    pHigh: 'High', pMedium: 'Medium', pLow: 'Low'
+    pHigh: 'High', pMedium: 'Medium', pLow: 'Low',
+    yourTasks: 'Your Tasks', projectFilesZone: 'Project Files'
   },
   ar: {
     brandLine: 'إدارة الشركاء والمشاريع',
@@ -253,7 +266,8 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
     loadTimeout: 'هذا يستغرق وقتاً أطول من المتوقع.', retryBtn: 'إعادة المحاولة',
     stCompleted: '\u2713 مكتملة', stOpen: 'مفتوحة', stOverdue: 'متأخرة', stMissed: 'فائتة',
-    pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة'
+    pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة',
+    yourTasks: 'مهامك', projectFilesZone: 'ملفات المشروع'
   }
 };
 
@@ -442,7 +456,10 @@ function milestoneTitle(m) {
   return m.titleEn || m.titleRaw || m.titleAr || '';
 }
 
-function renderBigPicture(p) {
+// ── renderProgressZone — shows the overall progress bar and project status.
+// Split out from renderBigPicture so the two zones (progress / milestones)
+// can be positioned independently in the page layout.
+function renderProgressZone(p) {
   var bp = p.bigPicture;
   if (!bp || !bp.totalTasks) return '';
   var lightConfig = {
@@ -451,55 +468,14 @@ function renderBigPicture(p) {
     delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
   };
   var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
-
-  // Collapsed default: most recently completed + next upcoming (or, if
-  // nothing's completed yet, the next two upcoming) — a bounded,
-  // scannable pair rather than every milestone the project has.
-  var milestones = bp.milestones || [];
-  var completed = milestones.filter(function(m){ return m.completed; });
-  var upcoming = milestones.filter(function(m){ return !m.completed; });
-  var shown = [];
-  if (completed.length) shown.push(completed[completed.length - 1]);
-  if (upcoming.length) shown.push(upcoming[0]);
-  if (!completed.length && upcoming.length > 1) shown.push(upcoming[1]);
-  var nextMilestoneId = upcoming.length ? upcoming[0].id : null;
-
-  function boxHtml(m) {
-    if (m.completed) {
-      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
-    }
-    if (m.id === nextMilestoneId) {
-      return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-        '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
-    }
-    return '<div class="ms-box ms-future"><div class="ms-title">○ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-      '<div class="ms-date">' + fmtDate(m.dueDate) + '</div></div>';
-  }
-
-  var collapsedHtml = shown.map(boxHtml).join('');
-  var expandedHtml = milestones.map(boxHtml).join('');
-  var pid = p.id;
-  // Only worth offering when there's genuinely more to see than the
-  // collapsed view already shows — otherwise the link would be a dead end.
-  var toggleLink = milestones.length > shown.length
-    ? '<div class="ms-toggle-link" id="ms-toggle-link-' + pid + '" onclick="toggleMilestones(\'' + pid + '\')">' +
-        t('viewAllMilestones', milestones.length) + '</div>'
-    : '';
-
   var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
     ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
     : '';
-
-  return '<div class="big-picture">' +
+  return '<div class="pv-progress-card">' +
     '<div class="bp-row">' +
-      '<div class="bp-progress-label">' + (milestones.length ? t('upcomingMilestones') : t('overallProgress')) + '</div>' +
+      '<div class="bp-progress-label">' + t('overallProgress') + '</div>' +
       '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
     '</div>' +
-    (milestones.length ? '<div class="bp-caption">' + t('milestonesCaption') + '</div>' : '') +
-    (collapsedHtml ? '<div class="ms-row" id="ms-collapsed-' + pid + '">' + collapsedHtml + '</div>' : '') +
-    (expandedHtml ? '<div class="ms-grid" id="ms-expanded-' + pid + '" style="display:none">' + expandedHtml + '</div>' : '') +
-    toggleLink +
     '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
     '<div class="bp-footer">' +
       '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
@@ -507,6 +483,67 @@ function renderBigPicture(p) {
     '</div>' +
     scopeCaption +
   '</div>';
+}
+
+// ── renderMilestonesZone — shows the milestone timeline boxes.
+// Overdue upcoming milestones are colour-coded red so the status is
+// immediately visible without reading the date text.
+function renderMilestonesZone(p) {
+  var bp = p.bigPicture;
+  if (!bp || !bp.totalTasks) return '';
+  var milestones = bp.milestones || [];
+  if (!milestones.length) return '';
+
+  var completed = milestones.filter(function(m){ return m.completed; });
+  var upcoming = milestones.filter(function(m){ return !m.completed; });
+  var shown = [];
+  if (completed.length) shown.push(completed[completed.length - 1]);
+  if (upcoming.length) shown.push(upcoming[0]);
+  if (!completed.length && upcoming.length > 1) shown.push(upcoming[1]);
+  var nextMilestoneId = upcoming.length ? upcoming[0].id : null;
+  var today = todayStr();
+
+  function boxHtml(m) {
+    if (m.completed) {
+      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
+    }
+    // Detect overdue: dueDate exists and is in the past
+    var isOverdue = m.dueDate && m.dueDate < today;
+    var overdueCls = isOverdue ? ' ms-overdue-milestone' : '';
+    var overdueTag = isOverdue ? ' <span style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.04em">Overdue</span>' : '';
+    if (m.id === nextMilestoneId) {
+      return '<div class="ms-box ms-next' + overdueCls + '">' +
+        '<div class="ms-title">' + (isOverdue ? '⚠️' : '🚩') + ' ' + escapeHtml(milestoneTitle(m)) + overdueTag + '</div>' +
+        '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div>' +
+      '</div>';
+    }
+    return '<div class="ms-box ms-future' + overdueCls + '">' +
+      '<div class="ms-title">○ ' + escapeHtml(milestoneTitle(m)) + overdueTag + '</div>' +
+      '<div class="ms-date">' + fmtDate(m.dueDate) + '</div>' +
+    '</div>';
+  }
+
+  var pid = p.id;
+  var collapsedHtml = shown.map(boxHtml).join('');
+  var expandedHtml = milestones.map(boxHtml).join('');
+  var toggleLink = milestones.length > shown.length
+    ? '<div class="ms-toggle-link" id="ms-toggle-link-' + pid + '" onclick="toggleMilestones(\'' + pid + '\')">' +
+        t('viewAllMilestones', milestones.length) + '</div>'
+    : '';
+
+  return '<div class="pv-milestones-card">' +
+    '<div class="bp-caption">' + t('milestonesCaption') + '</div>' +
+    (collapsedHtml ? '<div class="ms-row" id="ms-collapsed-' + pid + '">' + collapsedHtml + '</div>' : '') +
+    (expandedHtml ? '<div class="ms-grid" id="ms-expanded-' + pid + '" style="display:none">' + expandedHtml + '</div>' : '') +
+    toggleLink +
+  '</div>';
+}
+
+// ── renderBigPicture — kept for compatibility; delegates to the two zone
+// renderers so existing callers outside this page are unaffected.
+function renderBigPicture(p) {
+  return renderProgressZone(p) + renderMilestonesZone(p);
 }
 
 function toggleMilestones(pid) {
@@ -524,7 +561,10 @@ function toggleMilestones(pid) {
 function renderForwardLookingLine(p) {
   var pct = p.projectedPercentIfYouFinish;
   if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
-  return '<div class="fwd-line">📈 ' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>';
+  return '<div class="pv-action-banner">' +
+    '<div class="pv-action-banner-icon">📈</div>' +
+    '<div class="pv-action-banner-text">' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>' +
+  '</div>';
 }
 
 function renderTaskCard(task, subtasks) {
@@ -649,13 +689,33 @@ function render(data) {
       var delayBox = overdueCount > 0
         ? '<div class="delay-impact-box"><span class="icon">⚠️</span><span>' + (overdueCount === 1 ? t('delayImpactOne') : t('delayImpactMany', overdueCount)) + '</span></div>'
         : '';
+      // ── Overdue milestone count for the milestones zone label ──
+      var overdueMilestoneCount = (p.bigPicture && p.bigPicture.milestones
+        ? p.bigPicture.milestones.filter(function(m){ return !m.completed && m.dueDate && m.dueDate < todayStr(); }).length
+        : 0);
+      var milestoneLabelExtra = overdueMilestoneCount > 0
+        ? ' <span style="color:var(--red);font-weight:700">· ' + overdueMilestoneCount + ' overdue</span>'
+        : '';
+      var hasMilestones = p.bigPicture && p.bigPicture.milestones && p.bigPicture.milestones.length > 0;
+
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
-        renderProjectFiles(p.attachments) +
-        renderBigPicture(p) +
+        // Zone 1 — Overall progress
+        '<div class="pv-zone-label">' + t('overallProgress') + '</div>' +
+        renderProgressZone(p) +
+        // Zone 2 — Milestones (only shown when they exist)
+        (hasMilestones ? '<div class="pv-zone-label">' + t('upcomingMilestones') + milestoneLabelExtra + '</div>' : '') +
+        renderMilestonesZone(p) +
+        // Zone 3 — Actionable impact line
         renderForwardLookingLine(p) +
+        // Zone 4 — Delay alert
         delayBox +
+        // Zone 5 — Task cards
+        (cardsHtml ? '<div class="pv-zone-label">' + t('yourTasks') + '</div>' : '') +
         cardsHtml +
+        // Zone 6 — Project files (reference material, at the bottom)
+        (p.attachments && p.attachments.length ? '<div class="pv-zone-label">' + t('projectFilesZone') + '</div>' : '') +
+        renderProjectFiles(p.attachments) +
       '</div>';
     }).join('');
 
