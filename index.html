@@ -2565,6 +2565,9 @@ const T = {
     fieldDescription: 'الوصف', fieldStartDate: 'تاريخ البدء', fieldTargetDate: 'الموعد المستهدف',
     fieldCriticalNote: 'ملاحظة حرجة (اختياري)', criticalNotePlaceholder: 'مثال: هذا يعطل إطلاق 30 سبتمبر',
     criticalNoteHint: 'تُعرض كعلامة بارزة للشريك/عضو الفريق — استخدمها فقط للسياق الحرج فعلاً.',
+    fieldFeedsIntoMilestone: 'يغذي المعلم (اختياري)', noneOption: 'لا شيء',
+    noMilestonesInProject: 'لا توجد معالم محددة لهذا المشروع بعد.',
+    feedsIntoMilestoneHint: 'يُعرض للشريك/عضو الفريق كـ "مطلوب لـ: [المعلم]" في هذه المهمة.',
     devShort: 'تطوير', supShort: 'إشراف',
     addActionTitle: 'إضافة إجراء', editActionTitle: 'تعديل إجراء',
     fieldActionType: 'نوع الإجراء *', fieldActionTitle: 'عنوان المهمة *',
@@ -3271,6 +3274,9 @@ const T = {
     fieldDescription: 'Description', fieldStartDate: 'Start Date', fieldTargetDate: 'Target Date',
     fieldCriticalNote: 'Critical Note (optional)', criticalNotePlaceholder: 'e.g., This is blocking the Sep 30 launch',
     criticalNoteHint: 'Shown as a highlighted flag to the partner/team member — use only for genuinely critical context.',
+    fieldFeedsIntoMilestone: 'Feeds Into Milestone (optional)', noneOption: 'None',
+    noMilestonesInProject: 'No milestones set for this project yet.',
+    feedsIntoMilestoneHint: 'Shown to the partner/team member as "Needed for: [milestone]" on this task.',
     devShort: 'dev', supShort: 'supervised',
     addActionTitle: 'Add Action', editActionTitle: 'Edit Action',
     fieldActionType: 'Action Type *', fieldActionTitle: 'Task Title *',
@@ -5881,6 +5887,22 @@ function migrateBilingualContent() {
   });
   (state.team || []).forEach(m => {
     mig(m, 'name');
+  });
+}
+
+// One-time-per-project capture of a "scope baseline" — the task count at
+// the moment this was first computed. Used by the milestone/progress
+// redesign to detect when a project's scope has genuinely grown (tasks
+// added since the baseline was set) and show an honest note explaining
+// why the percentage moved, instead of a silent, unexplained shift.
+// Safe to re-run: only sets the baseline if one doesn't already exist —
+// never overwrites it, since overwriting would defeat its whole purpose.
+function migrateScopeBaseline() {
+  (state.projects || []).forEach(p => {
+    if (typeof p.scopeBaselineTaskCount === 'number') return; // already captured
+    const total = state.actions.filter(a => a.projectId === p.id && a.type !== 'meeting' && !a.parentId).length;
+    p.scopeBaselineTaskCount = total;
+    p.scopeBaselineDate = todayDate();
   });
 }
 
@@ -9639,6 +9661,21 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('criticalNoteHint')}</div>
     </div>
     <div class="form-row">
+      <label>${t('fieldFeedsIntoMilestone')}</label>
+      ${(() => {
+        const forProjectId = editing ? editing.projectId : defaultProjectId;
+        const milestoneOptions = state.actions.filter(a => a.projectId === forProjectId && a.isMilestone && a.id !== actionId);
+        if (milestoneOptions.length === 0) {
+          return `<div style="font-size:12px;color:var(--ink-faint);padding:8px 0">${t('noMilestonesInProject')}</div>`;
+        }
+        return `<select id="f-feeds-into-milestone">
+          <option value="">${t('noneOption')}</option>
+          ${milestoneOptions.map(m => `<option value="${m.id}" ${editing && editing.feedsIntoMilestoneId === m.id ? 'selected' : ''}>${escapeHtml(m.title)} — ${fmtDate(m.dueDate)}</option>`).join('')}
+        </select>`;
+      })()}
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('feedsIntoMilestoneHint')}</div>
+    </div>
+    <div class="form-row">
       <label>${t('fieldProjectName')}</label>
       <select id="f-project">
         ${projects.map(p => `<option value="${p.id}" data-partner="${p.partnerId}" ${(editing?.projectId||defaultProjectId)===p.id?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(getPartner(p.partnerId)?.name || '')}</option>`).join('')}
@@ -9983,6 +10020,7 @@ function saveAction(id) {
     startDate: document.getElementById('f-start-date')?.value || todayDate(),
     dueDate,
     criticalNote: (document.getElementById('f-critical-note')?.value || '').trim(),
+    feedsIntoMilestoneId: document.getElementById('f-feeds-into-milestone')?.value || null,
     meetingTime: type === 'meeting' ? document.getElementById('f-time').value : null,
     priority: document.getElementById('f-priority').value,
     status,
@@ -12232,6 +12270,7 @@ function importData(file) {
       state.projects.forEach(p => { if (!Array.isArray(p.attachments)) p.attachments = []; });
       if (typeof migrateProjectsToContributions === 'function') migrateProjectsToContributions();
       if (typeof migrateBilingualContent === 'function') migrateBilingualContent();
+      if (typeof migrateScopeBaseline === 'function') migrateScopeBaseline();
       saveState();
 
       // Now delete from Supabase anything that existed BEFORE the import but is
@@ -13847,6 +13886,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
     } else { state.currentView = 'dashboard'; }
   } catch (e) { state.currentView = 'dashboard'; }
   try { migrateBilingualContent(); } catch (e) {}
+  try { migrateScopeBaseline(); } catch (e) {}
   try { renderSidebar(); } catch (e) { console.error('renderSidebar failed:', e); }
   try { render(state.detailParam); } catch (e) { console.error('render failed:', e); }
   // Correct canonical title/name fields to match the active UI language RIGHT
@@ -13869,6 +13909,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
       // partners, and no risk of polluting the cloud with sample rows on a transient sync failure.
       // The seedIfEmpty() function still exists in the file but is no longer called anywhere.
       try { migrateBilingualContent(); } catch (e) {}
+      try { migrateScopeBaseline(); } catch (e) {}
       await withTimeout(loadConfig(), 12000, 'loadConfig');
       try { await withTimeout(_tlLoadInternalColor(), 8000, '_tlLoadInternalColor'); } catch (e) {}
       // If we arrived via a deep link, route to the partner detail now that the partner
