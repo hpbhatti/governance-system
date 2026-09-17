@@ -435,6 +435,77 @@ function renderSubtasks(subtasks) {
   }).join('') + '</div>';
 }
 
+// Always shown, regardless of the overview privilege — personalization
+// isn't sensitive project-wide data, it's just about this person's own
+// contribution, so it shouldn't require the same admin toggle as
+// milestones/progress do.
+function renderContributionLine(p) {
+  var total = (p.bigPicture && p.bigPicture.totalTasks) || null;
+  if (total) {
+    return '<div class="contribution-line">' + t('yourContribution', p.yourTaskCount || 0, total) + '</div>';
+  }
+  // No overview privilege granted — still personalize using only this
+  // member's own task count for the project, no project-wide totals exposed.
+  return '<div class="contribution-line">' + t('yourTaskCountOnly', p.yourTaskCount || 0) + '</div>';
+}
+
+function renderBigPicture(p) {
+  var bp = p.bigPicture;
+  if (!bp || !bp.totalTasks) return '';
+  var lightConfig = {
+    onTrack: { color: 'var(--green)', bg: 'var(--green-bg)', label: t('statusOnTrack') },
+    atRisk: { color: 'var(--amber)', bg: 'var(--amber-bg)', label: t('statusAtRisk') },
+    delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
+  };
+  var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
+
+  var milestones = bp.milestones || [];
+  var completed = milestones.filter(function(m){ return m.completed; });
+  var upcoming = milestones.filter(function(m){ return !m.completed; });
+  var shown = [];
+  if (completed.length) shown.push(completed[completed.length - 1]);
+  if (upcoming.length) shown.push(upcoming[0]);
+
+  var milestoneBoxesHtml = shown.map(function(m) {
+    if (m.completed) {
+      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
+    }
+    return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+      '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
+  }).join('');
+
+  var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
+    ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
+    : '';
+
+  return '<div class="big-picture">' +
+    '<div class="bp-row">' +
+      '<div class="bp-progress-label">' + (milestones.length ? t('upcomingMilestones') : t('overallProgress')) + '</div>' +
+      '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
+    '</div>' +
+    (milestones.length ? '<div class="bp-caption">' + t('milestonesCaption') + '</div>' : '') +
+    (milestoneBoxesHtml ? '<div class="ms-row">' + milestoneBoxesHtml + '</div>' : '') +
+    '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
+    '<div class="bp-footer">' +
+      '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
+      (bp.targetDate ? '<span>' + t('targeting') + ' ' + fmtDate(bp.targetDate) + '</span>' : '') +
+    '</div>' +
+    scopeCaption +
+  '</div>';
+}
+
+function renderForwardLookingLine(p) {
+  var pct = p.projectedPercentIfYouFinish;
+  if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
+  return '<div class="fwd-line">📈 ' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>';
+}
+
+function milestoneTitle(m) {
+  if (currentLang === 'ar') return m.titleAr || m.titleRaw || m.titleEn || '';
+  return m.titleEn || m.titleRaw || m.titleAr || '';
+}
+
 function renderTaskCard(task, subtasks) {
   var cls = taskStatusClass(task);
   var delay = task.dueDate ? daysBetween(task.dueDate, todayStr()) : 0;
@@ -548,77 +619,6 @@ function render(data) {
         }
         return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
       });
-// Always shown, regardless of the overview privilege — personalization
-// isn't sensitive project-wide data, it's just about this person's own
-// contribution, so it shouldn't require the same admin toggle as
-// milestones/progress do.
-function renderContributionLine(p) {
-  var total = (p.bigPicture && p.bigPicture.totalTasks) || null;
-  if (total) {
-    return '<div class="contribution-line">' + t('yourContribution', p.yourTaskCount || 0, total) + '</div>';
-  }
-  // No overview privilege granted — still personalize using only this
-  // member's own task count for the project, no project-wide totals exposed.
-  return '<div class="contribution-line">' + t('yourTaskCountOnly', p.yourTaskCount || 0) + '</div>';
-}
-
-function renderBigPicture(p) {
-  var bp = p.bigPicture;
-  if (!bp || !bp.totalTasks) return '';
-  var lightConfig = {
-    onTrack: { color: 'var(--green)', bg: 'var(--green-bg)', label: t('statusOnTrack') },
-    atRisk: { color: 'var(--amber)', bg: 'var(--amber-bg)', label: t('statusAtRisk') },
-    delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
-  };
-  var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
-
-  var milestones = bp.milestones || [];
-  var completed = milestones.filter(function(m){ return m.completed; });
-  var upcoming = milestones.filter(function(m){ return !m.completed; });
-  var shown = [];
-  if (completed.length) shown.push(completed[completed.length - 1]);
-  if (upcoming.length) shown.push(upcoming[0]);
-
-  var milestoneBoxesHtml = shown.map(function(m) {
-    if (m.completed) {
-      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
-    }
-    return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-      '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
-  }).join('');
-
-  var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
-    ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
-    : '';
-
-  return '<div class="big-picture">' +
-    '<div class="bp-row">' +
-      '<div class="bp-progress-label">' + (milestones.length ? t('upcomingMilestones') : t('overallProgress')) + '</div>' +
-      '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
-    '</div>' +
-    (milestones.length ? '<div class="bp-caption">' + t('milestonesCaption') + '</div>' : '') +
-    (milestoneBoxesHtml ? '<div class="ms-row">' + milestoneBoxesHtml + '</div>' : '') +
-    '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
-    '<div class="bp-footer">' +
-      '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
-      (bp.targetDate ? '<span>' + t('targeting') + ' ' + fmtDate(bp.targetDate) + '</span>' : '') +
-    '</div>' +
-    scopeCaption +
-  '</div>';
-}
-
-function renderForwardLookingLine(p) {
-  var pct = p.projectedPercentIfYouFinish;
-  if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
-  return '<div class="fwd-line">📈 ' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>';
-}
-
-function milestoneTitle(m) {
-  if (currentLang === 'ar') return m.titleAr || m.titleRaw || m.titleEn || '';
-  return m.titleEn || m.titleRaw || m.titleAr || '';
-}
-
       var cardsHtml = items.map(function(tk) {
         var subtasks = tasks.filter(function(st){ return st.parentId === tk.id; });
         return renderTaskCard(tk, subtasks);
