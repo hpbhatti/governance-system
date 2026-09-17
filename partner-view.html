@@ -78,15 +78,20 @@
   .bp-footer { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); }
   .bp-caption { font-size: 11px; color: var(--ink-faint); margin-bottom: 10px; }
   .ms-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .ms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
   .ms-box { flex: 1; padding: 9px 10px; border-radius: 8px; }
   .ms-box.ms-done { background: var(--green-bg); }
   .ms-box.ms-next { background: var(--blue-bg, #e6f1fb); }
+  .ms-box.ms-future { background: transparent; border: 1px dashed var(--line); }
   .ms-box .ms-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
   .ms-box.ms-done .ms-title { color: var(--green); }
   .ms-box.ms-next .ms-title { color: var(--accent); }
+  .ms-box.ms-future .ms-title { color: var(--ink-muted); }
   .ms-box .ms-date { font-size: 10.5px; }
   .ms-box.ms-done .ms-date { color: var(--green); }
   .ms-box.ms-next .ms-date { color: var(--accent); }
+  .ms-box.ms-future .ms-date { color: var(--ink-faint); }
+  .ms-toggle-link { font-size: 11.5px; color: var(--accent); cursor: pointer; margin-top: 2px; margin-bottom: 8px; }
   .bp-scope-note { font-size: 10.5px; color: var(--amber); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
   .fwd-line { background: var(--blue-bg, #e6f1fb); color: var(--accent); font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
   .task-milestone-line { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; background: var(--blue-bg, #e6f1fb); color: var(--accent); font-size: 11.5px; margin-bottom: 8px; }
@@ -203,6 +208,8 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     scopeRevised: function(date){ return 'Scope revised ' + date; },
     forwardLookingLine: function(count, pct){ return 'Completing your remaining ' + count + ' task' + (count===1?'':'s') + ' moves this to ' + pct + '%'; },
     neededFor: 'Needed for',
+    viewAllMilestones: function(count){ return 'View all ' + count + ' milestones →'; },
+    showLessMilestones: 'Show less ↑',
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
@@ -239,6 +246,8 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     scopeRevised: function(date){ return 'تمت مراجعة النطاق في ' + date; },
     forwardLookingLine: function(count, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + pct + '%'; },
     neededFor: 'مطلوب لـ',
+    viewAllMilestones: function(count){ return 'عرض جميع المعالم (' + count + ') ←'; },
+    showLessMilestones: 'عرض أقل ↑',
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
@@ -443,24 +452,40 @@ function renderBigPicture(p) {
   };
   var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
 
-  // Show at most the most recently completed milestone + the next
-  // upcoming one — a bounded, scannable pair rather than every milestone
-  // the project has, which could grow indefinitely over a long project.
+  // Collapsed default: most recently completed + next upcoming (or, if
+  // nothing's completed yet, the next two upcoming) — a bounded,
+  // scannable pair rather than every milestone the project has.
   var milestones = bp.milestones || [];
   var completed = milestones.filter(function(m){ return m.completed; });
   var upcoming = milestones.filter(function(m){ return !m.completed; });
   var shown = [];
   if (completed.length) shown.push(completed[completed.length - 1]);
   if (upcoming.length) shown.push(upcoming[0]);
+  if (!completed.length && upcoming.length > 1) shown.push(upcoming[1]);
+  var nextMilestoneId = upcoming.length ? upcoming[0].id : null;
 
-  var milestoneBoxesHtml = shown.map(function(m) {
+  function boxHtml(m) {
     if (m.completed) {
       return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
         '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
     }
-    return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
-      '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
-  }).join('');
+    if (m.id === nextMilestoneId) {
+      return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+        '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
+    }
+    return '<div class="ms-box ms-future"><div class="ms-title">○ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+      '<div class="ms-date">' + fmtDate(m.dueDate) + '</div></div>';
+  }
+
+  var collapsedHtml = shown.map(boxHtml).join('');
+  var expandedHtml = milestones.map(boxHtml).join('');
+  var pid = p.id;
+  // Only worth offering when there's genuinely more to see than the
+  // collapsed view already shows — otherwise the link would be a dead end.
+  var toggleLink = milestones.length > shown.length
+    ? '<div class="ms-toggle-link" id="ms-toggle-link-' + pid + '" onclick="toggleMilestones(\'' + pid + '\')">' +
+        t('viewAllMilestones', milestones.length) + '</div>'
+    : '';
 
   var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
     ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
@@ -472,7 +497,9 @@ function renderBigPicture(p) {
       '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
     '</div>' +
     (milestones.length ? '<div class="bp-caption">' + t('milestonesCaption') + '</div>' : '') +
-    (milestoneBoxesHtml ? '<div class="ms-row">' + milestoneBoxesHtml + '</div>' : '') +
+    (collapsedHtml ? '<div class="ms-row" id="ms-collapsed-' + pid + '">' + collapsedHtml + '</div>' : '') +
+    (expandedHtml ? '<div class="ms-grid" id="ms-expanded-' + pid + '" style="display:none">' + expandedHtml + '</div>' : '') +
+    toggleLink +
     '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
     '<div class="bp-footer">' +
       '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
@@ -480,6 +507,18 @@ function renderBigPicture(p) {
     '</div>' +
     scopeCaption +
   '</div>';
+}
+
+function toggleMilestones(pid) {
+  var collapsed = document.getElementById('ms-collapsed-' + pid);
+  var expanded = document.getElementById('ms-expanded-' + pid);
+  var link = document.getElementById('ms-toggle-link-' + pid);
+  if (!expanded || !link) return;
+  var isExpanded = expanded.style.display !== 'none';
+  if (collapsed) collapsed.style.display = isExpanded ? '' : 'none';
+  expanded.style.display = isExpanded ? 'none' : '';
+  var totalCount = expanded.querySelectorAll('.ms-box').length;
+  link.textContent = isExpanded ? t('viewAllMilestones', totalCount) : t('showLessMilestones');
 }
 
 function renderForwardLookingLine(p) {
