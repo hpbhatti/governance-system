@@ -76,6 +76,20 @@
   .bp-bar-track { height: 8px; background: #eee8dc; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
   .bp-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
   .bp-footer { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); }
+  .bp-caption { font-size: 11px; color: var(--ink-faint); margin-bottom: 10px; }
+  .ms-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .ms-box { flex: 1; padding: 9px 10px; border-radius: 8px; }
+  .ms-box.ms-done { background: var(--green-bg); }
+  .ms-box.ms-next { background: var(--blue-bg, #e6f1fb); }
+  .ms-box .ms-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .ms-box.ms-done .ms-title { color: var(--green); }
+  .ms-box.ms-next .ms-title { color: var(--accent); }
+  .ms-box .ms-date { font-size: 10.5px; }
+  .ms-box.ms-done .ms-date { color: var(--green); }
+  .ms-box.ms-next .ms-date { color: var(--accent); }
+  .bp-scope-note { font-size: 10.5px; color: var(--amber); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .fwd-line { background: var(--blue-bg, #e6f1fb); color: var(--accent); font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+  .task-milestone-line { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; background: var(--blue-bg, #e6f1fb); color: var(--accent); font-size: 11.5px; margin-bottom: 8px; }
   .delay-impact-box .icon { flex-shrink: 0; font-size: 15px; line-height: 1.3; }
 
   .task-card { background: var(--bg-card); border: 1px solid var(--line); border-inline-start: 4px solid var(--line-strong); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow); }
@@ -175,6 +189,7 @@ const STR = {
     closeBtn: 'Close',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
     proposalNotePlaceholder: 'Add a note or delay reason…',
+    proposalCompleteNotePlaceholder: 'Optional: anything the reviewer should know (e.g. what was done, any links)…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
     proposalSubmitted: 'Submitted for cross-checking', proposalError: 'Could not submit — please try again.',
 proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
@@ -183,6 +198,11 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     overallProgress: 'Overall Project Progress', complete: 'complete',
     statusOnTrack: 'On Track', statusAtRisk: 'At Risk', statusDelayed: 'Delayed',
     yourShare: function(yours, total){ return 'Your team: ' + yours + ' of ' + total + ' tasks'; },
+    upcomingMilestones: 'Upcoming milestones', milestonesCaption: 'Key checkpoints agreed for this project',
+    doneOn: 'Done', nextLabel: 'Next', overallProgressLabel: 'overall progress', targeting: 'Targeting',
+    scopeRevised: function(date){ return 'Scope revised ' + date; },
+    forwardLookingLine: function(count, pct){ return 'Completing your remaining ' + count + ' task' + (count===1?'':'s') + ' moves this to ' + pct + '%'; },
+    neededFor: 'Needed for',
     noAccess: 'No access link provided.', noAccessSub: 'Please use the full link you were given.',
     invalidLink: 'This link is invalid or has been revoked.', contactSoe: 'Please contact SOE for a new link.',
     loadError: 'Could not load your tasks right now.', tryAgain: 'Please try again in a moment.',
@@ -205,6 +225,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     closeBtn: 'إغلاق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
     proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
+    proposalCompleteNotePlaceholder: 'اختياري: أي شيء يجب أن يعرفه المراجع (مثل ما تم إنجازه، أو أي روابط)…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
     proposalSubmitted: 'تم الإرسال للتحقق', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
 proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
@@ -213,6 +234,11 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     overallProgress: 'التقدم الإجمالي للمشروع', complete: 'مكتمل',
     statusOnTrack: 'على المسار الصحيح', statusAtRisk: 'يحتاج متابعة', statusDelayed: 'متأخر',
     yourShare: function(yours, total){ return 'فريقكم: ' + yours + ' من أصل ' + total + ' مهمة'; },
+    upcomingMilestones: 'المعالم القادمة', milestonesCaption: 'نقاط التحقق الرئيسية المتفق عليها لهذا المشروع',
+    doneOn: 'اكتمل في', nextLabel: 'التالي', overallProgressLabel: 'التقدم الإجمالي', targeting: 'الهدف',
+    scopeRevised: function(date){ return 'تمت مراجعة النطاق في ' + date; },
+    forwardLookingLine: function(count, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + pct + '%'; },
+    neededFor: 'مطلوب لـ',
     noAccess: 'لم يتم توفير رابط وصول.', noAccessSub: 'يرجى استخدام الرابط الكامل الذي تم إرساله لك.',
     invalidLink: 'هذا الرابط غير صالح أو تم إلغاؤه.', contactSoe: 'يرجى التواصل مع SOE للحصول على رابط جديد.',
     loadError: 'تعذر تحميل مهامك حالياً.', tryAgain: 'يرجى المحاولة مرة أخرى بعد قليل.',
@@ -409,6 +435,7 @@ function renderTaskCard(task, subtasks) {
   var canPropose = task.status !== 'completed' && task.status !== 'missed';
   return '<div class="task-card st-' + cls + '">' +
     (criticalNoteText(task) ? '<div class="critical-note-banner"><span class="icon">📌</span><span><strong>' + t('criticalLabel') + ':</strong> ' + escapeHtml(criticalNoteText(task)) + '</span></div>' : '') +
+    (task.feedsIntoMilestone ? '<div class="task-milestone-line">🚩 ' + t('neededFor') + ': ' + escapeHtml(milestoneTitle(task.feedsIntoMilestone)) + ' (' + fmtDate(task.feedsIntoMilestone.dueDate) + ')</div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     (task.stakeholder ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(stakeholderDisplayName(task.stakeholder)) + '</strong></div>' : '') +
     '<div class="task-meta">' +
@@ -515,6 +542,11 @@ function render(data) {
         }
         return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
       });
+function milestoneTitle(m) {
+  if (currentLang === 'ar') return m.titleAr || m.titleRaw || m.titleEn || '';
+  return m.titleEn || m.titleRaw || m.titleAr || '';
+}
+
 function renderBigPicture(p) {
   var bp = p.bigPicture;
   if (!bp || !bp.totalTasks) return '';
@@ -524,18 +556,52 @@ function renderBigPicture(p) {
     delayed: { color: 'var(--red)', bg: 'var(--red-bg)', label: t('statusDelayed') },
   };
   var cfg = lightConfig[bp.statusLight] || lightConfig.onTrack;
+
+  // Show at most the most recently completed milestone + the next
+  // upcoming one — a bounded, scannable pair rather than every milestone
+  // the project has, which could grow indefinitely over a long project.
+  var milestones = bp.milestones || [];
+  var completed = milestones.filter(function(m){ return m.completed; });
+  var upcoming = milestones.filter(function(m){ return !m.completed; });
+  var shown = [];
+  if (completed.length) shown.push(completed[completed.length - 1]);
+  if (upcoming.length) shown.push(upcoming[0]);
+
+  var milestoneBoxesHtml = shown.map(function(m) {
+    if (m.completed) {
+      return '<div class="ms-box ms-done"><div class="ms-title">✓ ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+        '<div class="ms-date">' + t('doneOn') + ' ' + fmtDate(m.completedDate) + '</div></div>';
+    }
+    return '<div class="ms-box ms-next"><div class="ms-title">🚩 ' + escapeHtml(milestoneTitle(m)) + '</div>' +
+      '<div class="ms-date">' + t('nextLabel') + ' &middot; ' + fmtDate(m.dueDate) + '</div></div>';
+  }).join('');
+
+  var scopeCaption = bp.scopeRevision && bp.scopeRevision.date
+    ? '<div class="bp-scope-note">ⓘ ' + t('scopeRevised', fmtDate(bp.scopeRevision.date)) + '</div>'
+    : '';
+
   return '<div class="big-picture">' +
     '<div class="bp-row">' +
-      '<div class="bp-progress-label">' + t('overallProgress') + '</div>' +
+      '<div class="bp-progress-label">' + (milestones.length ? t('upcomingMilestones') : t('overallProgress')) + '</div>' +
       '<span class="bp-status-badge" style="background:' + cfg.bg + ';color:' + cfg.color + '">● ' + cfg.label + '</span>' +
     '</div>' +
+    (milestones.length ? '<div class="bp-caption">' + t('milestonesCaption') + '</div>' : '') +
+    (milestoneBoxesHtml ? '<div class="ms-row">' + milestoneBoxesHtml + '</div>' : '') +
     '<div class="bp-bar-track"><div class="bp-bar-fill" style="width:' + bp.progressPercent + '%;background:' + cfg.color + '"></div></div>' +
     '<div class="bp-footer">' +
-      '<span>' + bp.progressPercent + '% ' + t('complete') + ' (' + bp.completedTasks + '/' + bp.totalTasks + ')</span>' +
-      '<span>' + t('yourShare', p.yourTaskCount || 0, bp.totalTasks) + '</span>' +
+      '<span>' + bp.progressPercent + '% ' + t('overallProgressLabel') + '</span>' +
+      (bp.targetDate ? '<span>' + t('targeting') + ' ' + fmtDate(bp.targetDate) + '</span>' : '') +
     '</div>' +
+    scopeCaption +
   '</div>';
 }
+
+function renderForwardLookingLine(p) {
+  var pct = p.projectedPercentIfYouFinish;
+  if (pct === null || pct === undefined || !p.yourOpenTaskCount) return '';
+  return '<div class="fwd-line">📈 ' + t('forwardLookingLine', p.yourOpenTaskCount, pct) + '</div>';
+}
+
 
       var cardsHtml = items.map(function(tk) {
         var subtasks = tasks.filter(function(st){ return st.parentId === tk.id; });
@@ -549,6 +615,7 @@ function renderBigPicture(p) {
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
         renderProjectFiles(p.attachments) +
         renderBigPicture(p) +
+        renderForwardLookingLine(p) +
         delayBox +
         cardsHtml +
       '</div>';
@@ -603,7 +670,7 @@ function openProposeComplete(taskId) {
   overlay.innerHTML =
     '<div class="modal-box">' +
       '<div style="font-weight:600;margin-bottom:10px">' + t('markCompleteBtn') + '</div>' +
-      '<textarea id="propose-complete-note" placeholder="' + t('proposalNotePlaceholder') + '"></textarea>' +
+      '<textarea id="propose-complete-note" placeholder="' + t('proposalCompleteNotePlaceholder') + '"></textarea>' +
       '<input id="propose-complete-link" type="url" placeholder="' + t('proposalLinkPlaceholder') + '" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:4px">' +
       '<div class="modal-actions" style="margin-top:12px">' +
         '<button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('proposalCancelBtn') + '</button>' +
