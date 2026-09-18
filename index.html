@@ -2505,6 +2505,10 @@ const T = {
     canSeeOverviewLabel: 'يمكنه رؤية نظرة عامة على المشروع', canSeeOverviewHint: 'يعرض التقدم العام للمشروع (للاطلاع فقط) إلى جانب مهامه الخاصة',
     toastOverviewEnabled: 'تم تفعيل نظرة عامة على المشروع لهذا العضو', toastOverviewDisabled: 'تم تعطيل نظرة عامة على المشروع لهذا العضو',
     pendingApprovals: 'الموافقات المعلقة', pendingApprovalsEmpty: 'لا توجد موافقات معلقة حالياً.',
+    pmoInChargeLabel: 'مسؤول PMO', pmoInChargeHint: 'حدد مسؤول الموافقة على إتمام المهام. سيتلقى إشعاراً عند تقديم طلبات الإتمام.',
+    pmoNotAssigned: '— غير محدد —',
+    pmoTabUnassigned: 'غير محدد',
+    approvalCounterSentToast: 'تم إرسال الإشعار إلى مقدم الطلب.',
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
     approveBtn: 'موافقة', rejectBtn: 'رفض',
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
@@ -3214,6 +3218,10 @@ const T = {
     canSeeOverviewLabel: 'Can see project overview', canSeeOverviewHint: 'Shows overall project progress (view-only) alongside their own tasks',
     toastOverviewEnabled: 'Project overview enabled for this member', toastOverviewDisabled: 'Project overview disabled for this member',
     pendingApprovals: 'Pending Approvals', pendingApprovalsEmpty: 'No pending approvals right now.',
+    pmoInChargeLabel: 'PMO In-Charge', pmoInChargeHint: 'Assign the approver for task completion requests. They will be notified by email when a task is submitted.',
+    pmoNotAssigned: '— Not assigned —',
+    pmoTabUnassigned: 'Unassigned',
+    approvalCounterSentToast: 'Notification sent to submitter.',
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
     approveBtn: 'Approve', rejectBtn: 'Reject',
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
@@ -6918,59 +6926,105 @@ views.pendingApprovals = () => {
     refreshPendingApprovals();
     return `<div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div><div class="empty">${t('loadingEllipsis')}</div>`;
   }
-  const tab = state.filters.pendingApprovalsTab || 'pending';
   const all = _pendingApprovalsCache;
-  const items = tab === 'all' ? all : all.filter(r => r.status === tab);
-  const tabCount = (s) => all.filter(r => r.status === s).length;
 
-  const tabs = [
-    { key: 'pending', label: t('statusPending'), count: tabCount('pending') },
-    { key: 'approved', label: t('statusApproved'), count: tabCount('approved') },
-    { key: 'rejected', label: t('statusRejected'), count: tabCount('rejected') },
-    { key: 'all', label: t('tabAll'), count: all.length },
-  ];
+  // ── Build PMO tab groups dynamically from project.pmoInChargeId ──
+  // Each submission is bucketed by the PMO of its project.
+  // Submissions whose project has no PMO land in 'unassigned'.
+  const pmoGroups = {};   // pmoId → { name, items[] }
+  const unassigned = [];
+
+  all.forEach(row => {
+    const task = state.actions.find(a => a.id === row.task_id);
+    const proj = task ? getProject(task.projectId) : null;
+    const pmoId = proj ? (proj.pmoInChargeId || null) : null;
+    if (pmoId) {
+      const member = (state.team || []).find(m => m.id === pmoId);
+      if (!pmoGroups[pmoId]) pmoGroups[pmoId] = { name: member ? (member.name || pmoId) : pmoId, items: [] };
+      pmoGroups[pmoId].items.push(row);
+    } else {
+      unassigned.push(row);
+    }
+  });
+
+  // Build ordered tab list: one per PMO (alphabetical) + Unassigned last
+  const pmoTabList = Object.entries(pmoGroups)
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .map(([id, g]) => ({ key: id, label: g.name, items: g.items }));
+  if (unassigned.length > 0 || pmoTabList.length === 0) {
+    pmoTabList.push({ key: '_unassigned', label: t('pmoTabUnassigned'), items: unassigned });
+  }
+
+  const activeTab = state.filters.pendingApprovalsPmoTab ||
+    (pmoTabList.length > 0 ? pmoTabList[0].key : '_unassigned');
+  const activeGroup = pmoTabList.find(t => t.key === activeTab) || pmoTabList[0] || { items: [] };
+  const items = activeGroup ? activeGroup.items : [];
+
+  // Within each PMO tab: pending first, then reviewed
+  const pending  = items.filter(r => r.status === 'pending');
+  const reviewed = items.filter(r => r.status !== 'pending');
+
+  function renderCard(row) {
+    const task = state.actions.find(a => a.id === row.task_id);
+    const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(task deleted)</em>`;
+    const proj = task ? getProject(task.projectId) : null;
+    const changeLabel = row.change_type === 'complete' ? t('proposalMarkComplete') : t('proposalAddNote');
+    const statusColors = { pending: 'amber', approved: 'green', rejected: 'red' };
+    const fileSection = row.attachment_file_path
+      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+           <button class="btn ghost sm" onclick="downloadSubmissionFile('${escapeHtml(row.attachment_file_path)}')">⬇ Download file</button>
+           ${row.status === 'pending' && proj ? `<button class="btn ghost sm" style="color:var(--green)" onclick="promoteSubmissionFile('${row.id}','${proj.id}','${escapeHtml(row.attachment_file_path)}')">📁 Promote to project files</button>` : ''}
+         </div>` : '';
+    const linkSection = row.attachment_link
+      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+           <a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent)">🔗 ${t('viewAttachedLink')}</a>
+           ${row.status === 'pending' && proj ? `<button class="btn ghost sm" style="color:var(--green)" onclick="promoteSubmissionLink('${row.id}','${proj.id}','${escapeHtml(row.attachment_link)}')">📁 Promote to project files</button>` : ''}
+         </div>` : '';
+    return `
+      <div class="pending-approval-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${escapeHtml(changeLabel)}</span>
+              <span class="badge ${statusColors[row.status] || ''}" style="font-size:10px">${row.status === 'pending' ? t('statusPending') : row.status === 'approved' ? t('statusApproved') : t('statusRejected')}</span>
+            </div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
+            ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
+            ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
+            ${fileSection}
+            ${linkSection}
+            ${row.status === 'rejected' && row.rejection_reason ? `<div class="submission-reject-reason" style="margin-top:6px">${t('rejectionReasonLabel')}: ${escapeHtml(row.rejection_reason)}</div>` : ''}
+            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${row.status === 'pending' ? `
+              <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
+              <button class="btn ghost sm" onclick="rejectProposal('${row.id}')">✕ ${t('rejectBtn')}</button>
+            ` : `
+              <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
+            `}
+          </div>
+        </div>
+      </div>`;
+  }
 
   return `
     <div class="page-head"><h1 class="page-title">${t('pendingApprovals')}</h1></div>
-    <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:0">
-      ${tabs.map(tb => `
-        <button class="btn ${tab === tb.key ? '' : 'ghost'} sm" style="border-radius:8px 8px 0 0;border-bottom:none"
-          onclick="setPendingApprovalsTab('${tb.key}')">${escapeHtml(tb.label)} (${tb.count})</button>
+    <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:0;flex-wrap:wrap">
+      ${pmoTabList.map(tb => `
+        <button class="btn ${activeTab === tb.key ? '' : 'ghost'} sm" style="border-radius:8px 8px 0 0;border-bottom:none"
+          onclick="state.filters.pendingApprovalsPmoTab='${tb.key}';renderPreserveScroll()">
+          ${escapeHtml(tb.label)} <span style="font-size:10px;background:var(--amber);color:#fff;border-radius:8px;padding:1px 5px;margin-inline-start:4px">${tb.items.filter(r => r.status === 'pending').length || ''}</span>
+        </button>
       `).join('')}
     </div>
-    ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : items.map(row => {
-      const task = state.actions.find(a => a.id === row.task_id);
-      const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(task not found — may have been deleted)</em>`;
-      const proj = task ? getProject(task.projectId) : null;
-      const changeLabel = row.change_type === 'complete' ? t('proposalMarkComplete') : t('proposalAddNote');
-      const statusBadgeColors = { pending: 'amber', approved: 'green', rejected: 'red' };
-      return `
-        <div class="pending-approval-card">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                <span style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${escapeHtml(changeLabel)}</span>
-                ${tab === 'all' ? `<span class="badge ${statusBadgeColors[row.status] || ''}" style="font-size:10px">${row.status === 'pending' ? t('statusPending') : row.status === 'approved' ? t('statusApproved') : t('statusRejected')}</span>` : ''}
-              </div>
-              <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
-              ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
-              ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
-              ${row.attachment_link ? `<div style="margin-top:6px"><a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent)">🔗 ${t('viewAttachedLink')}</a></div>` : ''}
-              ${row.status === 'rejected' && row.rejection_reason ? `<div class="submission-reject-reason" style="margin-top:6px">${t('rejectionReasonLabel')}: ${escapeHtml(row.rejection_reason)}</div>` : ''}
-              <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-shrink:0">
-              ${row.status === 'pending' ? `
-                <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
-                <button class="btn ghost sm" onclick="rejectProposal('${row.id}')">✕ ${t('rejectBtn')}</button>
-              ` : `
-                <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
-              `}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('')}
+    ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : `
+      ${pending.length > 0 ? pending.map(renderCard).join('') : ''}
+      ${reviewed.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Reviewed</div>
+        ${reviewed.map(renderCard).join('')}
+      ` : ''}
+    `}
   `;
 };
 
@@ -6980,16 +7034,14 @@ async function approveProposal(id) {
   if (!row) return;
   const task = state.actions.find(a => a.id === row.task_id);
   if (task) {
-    // Preserve any note/link the submitter included, regardless of change
-    // type, so it isn't lost once the proposal is approved and archived.
     const trackingText = [row.note_text, row.attachment_link ? '🔗 ' + row.attachment_link : ''].filter(Boolean).join(' — ');
     if (trackingText) {
       if (!task.tracking) task.tracking = [];
       task.tracking.push({ date: new Date().toISOString(), text: trackingText });
-      saveState(); // persist the note immediately — independent of whether completion below succeeds or is blocked by open dependencies
+      saveState();
     }
     if (row.change_type === 'complete') {
-      completeAction(task.id); // reuses the existing, already-correct completion logic (status, completedDate, saveState)
+      completeAction(task.id);
     }
   }
   try {
@@ -6997,6 +7049,8 @@ async function approveProposal(id) {
       status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
     }).eq('id', id);
   } catch (e) {}
+  // ── Counter-notification back to submitter ──
+  sendSubmissionCounterNotification(row, 'approved', null);
   toast(t('toastProposalApproved'));
   refreshPendingApprovals();
 }
@@ -7004,7 +7058,7 @@ async function approveProposal(id) {
 async function rejectProposal(id) {
   if (!supabaseClient) return;
   const reason = prompt(t('rejectionReasonPrompt'));
-  if (reason === null) return; // cancelled
+  if (reason === null) return;
   if (!reason.trim()) { alert(t('rejectionReasonRequired')); return; }
   try {
     await supabaseClient.from('pending_changes').update({
@@ -7012,8 +7066,123 @@ async function rejectProposal(id) {
       reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
     }).eq('id', id);
   } catch (e) {}
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (row) sendSubmissionCounterNotification(row, 'rejected', reason.trim());
   toast(t('toastProposalRejected'));
   refreshPendingApprovals();
+}
+
+// ── Counter-notification to the submitter after PMO approves or rejects ──
+async function sendSubmissionCounterNotification(row, status, rejectionReason) {
+  if (!supabaseClient) return;
+  try {
+    const task = state.actions.find(a => a.id === row.task_id);
+    const proj = task ? getProject(task.projectId) : null;
+    const taskTitle = task ? task.title : '';
+    const projectName = proj ? proj.name : '';
+
+    let recipients = [];
+    let recipientName = row.proposed_by_name || '';
+    let linkUrl = '';
+
+    if (row.proposed_by_type === 'partner') {
+      // Send to whoever was configured to receive emails on this partner link
+      const { data: linkRows } = await supabaseClient
+        .from('partner_links')
+        .select('token')
+        .eq('partner_id', row.proposed_by_id)
+        .eq('revoked', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (linkRows && linkRows.length > 0) {
+        linkUrl = PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token;
+      }
+      const partner = state.partners.find(p => p.id === row.proposed_by_id);
+      if (partner) {
+        const lastSelected = Array.isArray(partner.lastEmailRecipients) ? partner.lastEmailRecipients : null;
+        if (lastSelected && lastSelected.length > 0) {
+          recipients = lastSelected;
+        } else if (partner.email) {
+          recipients = [partner.email];
+        }
+        recipientName = partner.contact || partner.name || recipientName;
+      }
+    } else {
+      // Team member — send directly to their email
+      const member = (state.team || []).find(m => m.id === row.proposed_by_id);
+      if (member && member.email) {
+        recipients = [member.email];
+        recipientName = member.name || recipientName;
+      }
+      const { data: linkRows } = await supabaseClient
+        .from('team_member_links')
+        .select('token')
+        .eq('member_id', row.proposed_by_id)
+        .eq('revoked', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (linkRows && linkRows.length > 0) {
+        linkUrl = TEAM_MEMBER_VIEW_BASE_URL + '?token=' + linkRows[0].token;
+      }
+    }
+
+    if (recipients.length === 0 || !linkUrl) return; // no email on file or no link
+
+    const recipientType = status === 'approved' ? 'task_confirmed' : 'task_not_confirmed';
+    const res = await fetch(SEND_EMAIL_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipients, recipientName, recipientType,
+        taskTitle, projectName, rejectionReason: rejectionReason || '',
+        linkUrl, lang: currentLang
+      }),
+    });
+    if (res.ok) toast(t('approvalCounterSentToast'));
+  } catch (e) { /* silent — counter-notification is best-effort */ }
+}
+
+// ── Download an attached file from Supabase Storage via signed URL ──
+async function downloadSubmissionFile(storagePath) {
+  if (!supabaseClient) return;
+  try {
+    const { data, error } = await supabaseClient.storage
+      .from('submission-attachments')
+      .createSignedUrl(storagePath, 120); // 2-minute window
+    if (error || !data) { alert('Could not generate download link. Please try again.'); return; }
+    window.open(data.signedUrl, '_blank');
+  } catch (e) { alert('Download failed. Please try again.'); }
+}
+
+// ── Promote an attached file into the project's permanent files ──
+async function promoteSubmissionFile(rowId, projectId, storagePath) {
+  if (!supabaseClient) return;
+  const proj = getProject(projectId);
+  if (!proj) return;
+  try {
+    // Generate a long-lived signed URL (365 days) for the project file record
+    const { data, error } = await supabaseClient.storage
+      .from('submission-attachments')
+      .createSignedUrl(storagePath, 31536000);
+    if (error || !data) { alert('Could not promote file. Please try again.'); return; }
+    const fileName = storagePath.split('/').pop() || 'attachment';
+    if (!proj.attachments) proj.attachments = [];
+    proj.attachments.push({ id: uid(), name: fileName, url: data.signedUrl, isLink: true, isPromotedFile: true, addedAt: new Date().toISOString() });
+    saveState();
+    toast('📁 File added to project files.');
+  } catch (e) { alert('Promote failed. Please try again.'); }
+}
+
+// ── Promote a Google Drive link into the project's permanent files ──
+function promoteSubmissionLink(rowId, projectId, linkUrl) {
+  const proj = getProject(projectId);
+  if (!proj) return;
+  const label = prompt('Label for this link in project files:', 'Task completion document');
+  if (!label) return;
+  if (!proj.attachments) proj.attachments = [];
+  proj.attachments.push({ id: uid(), name: label.trim(), url: linkUrl, isLink: true, addedAt: new Date().toISOString() });
+  saveState();
+  toast('📁 Link added to project files.');
 }
 
 views.reports = () => {
@@ -9285,7 +9454,15 @@ function showProjectForm(projectId, defaultPartnerId) {
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('fieldProjectTeamHint')}</div>
     </div>
     <div class="form-row">
-      <label>${t('fieldDescription')}</label>
+      <label>${t('pmoInChargeLabel')}</label>
+      <select id="f-pmo-incharge">
+        <option value="">${t('pmoNotAssigned')}</option>
+        ${(state.team||[]).map(m =>
+          `<option value="${m.id}" ${editing?.pmoInChargeId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${m.role ? ' — ' + escapeHtml(m.role) : ''}</option>`
+        ).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('pmoInChargeHint')}</div>
+    </div>
       <textarea id="f-desc">${escapeHtml(editing ? (editing['description' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
     </div>
     <div class="form-row row-2">
@@ -9419,7 +9596,8 @@ function saveProject(id) {
     // derived display-only fields (importance no longer depends on these)
     partnershipModel: derivedModel,
     partnershipValue: derivedValue,
-    partnershipCustomType: ''
+    partnershipCustomType: '',
+    pmoInChargeId: document.getElementById('f-pmo-incharge')?.value || null,
   };
   if (id) {
     const p = getProject(id);
