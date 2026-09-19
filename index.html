@@ -1763,6 +1763,29 @@ function invalidateCache(){ syncMeta.everSynced=false; syncMeta.tableTs={}; sync
 /* ---- Online/offline status + exponential backoff retry (1s,2s,4s,8s,16s,30s) ---- */
 let _syncOnline = true, _retryTimer = null, _retryStep = 0;
 const _BACKOFF_MS = [1000,2000,4000,8000,16000,30000];
+// Independent retry state for the cross-device sync stamp — completely separate
+// from the data-write retry so a stamp failure never causes a data re-upload,
+// never shows a stuck badge, and never sets the red offline dot.
+let _stampRetryTimer = null;
+let _stampRetryStep = 0;
+let _pendingStampTables = new Set(); // accumulates tables needing a stamp update
+
+function scheduleStampRetry() {
+  if (_stampRetryTimer) clearTimeout(_stampRetryTimer);
+  const delay = _BACKOFF_MS[Math.min(_stampRetryStep, _BACKOFF_MS.length - 1)];
+  _stampRetryStep++;
+  _stampRetryTimer = setTimeout(() => {
+    _stampRetryTimer = null;
+    if (_pendingStampTables.size === 0) return;
+    const tables = Array.from(_pendingStampTables);
+    bumpCloudTimestamps(tables).then(() => {
+      _pendingStampTables.clear();
+      _stampRetryStep = 0;
+    }).catch(() => {
+      scheduleStampRetry(); // keep retrying silently
+    });
+  }, delay);
+}
 function setSyncOnline(v){ if (_syncOnline !== v){ _syncOnline = v; try { updateSyncIndicator(); } catch(e){} } if (v){ _retryStep = 0; if (_retryTimer){ clearTimeout(_retryTimer); _retryTimer = null; } } }
 function scheduleRetry(fn){ const delay = _BACKOFF_MS[Math.min(_retryStep, _BACKOFF_MS.length-1)]; _retryStep++; if (_retryTimer) clearTimeout(_retryTimer); _retryTimer = setTimeout(() => { _retryTimer = null; fn(); }, delay); }
 /* ---- debounced background write ---- */
@@ -3959,16 +3982,39 @@ async function _flushWritesInner() {
       const errored = results.find(r => r && r.error);
       if (errored) throw errored.error;
     }
-    // Bump stamps for every table we changed so other devices re-pull just those.
-    const changed = Array.from(new Set([...dirtyList, ...delTables]));
-    if (changed.length) await bumpCloudTimestamps(changed);
-    // Record the new synced snapshot and clear the queues.
-    dirtyList.forEach(table => { syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || [])); clearDirtyTable(table); });
+
+    // ── PATH 1: Data write succeeded ──
+    // Clear dirty queues and mark online immediately — data is in Supabase.
+    // Do this BEFORE attempting the stamp so a stamp failure can never cause
+    // a re-upload of data that already arrived, never shows a stuck badge,
+    // and never sets the red offline dot.
+    dirtyList.forEach(table => {
+      syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || []));
+      clearDirtyTable(table);
+    });
     pendingDeletes = {};
-    syncMeta.everSynced = true; // a successful upload + stamp read means we're in sync → next load can go incremental
+    syncMeta.everSynced = true;
     persistSyncMeta();
     setSyncOnline(true);
+
+    // ── PATH 2: Stamp update — independent retry, no badge involvement ──
+    // Tells other devices which tables changed so their next incremental sync
+    // is efficient. Important for cross-device freshness but not for data safety.
+    // If it fails it retries silently on its own schedule until it succeeds.
+    const changed = Array.from(new Set([...dirtyList, ...delTables]));
+    if (changed.length) {
+      changed.forEach(tb => _pendingStampTables.add(tb));
+      bumpCloudTimestamps(Array.from(_pendingStampTables)).then(() => {
+        _pendingStampTables.clear();
+        _stampRetryStep = 0;
+      }).catch(() => {
+        // Stamp failed — schedule its own silent retry. Data is already safe.
+        scheduleStampRetry();
+      });
+    }
+
   } catch (e) {
+    // ── PATH 3: Data write failed — retry the whole write as before ──
     console.error('Supabase write failed — queued for retry:', describeSupabaseError(e));
     setSyncOnline(false);
     persistSyncMeta();              // keep dirty tables + pending deletes for the retry
@@ -9490,9 +9536,12 @@ function showProjectForm(projectId, defaultPartnerId) {
         ${(()=>{
           // Restrict to the two global admins identified by their known emails.
           // Falls back to all team members if neither email is found (safe default).
+          // Show team members whose email matches a known admin email.
+          // Falls back to ALL team members if the email field is missing or
+          // doesn't match — avoids an empty dropdown on misconfigured records.
           const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karhasmoh@gmail.com'];
-          const admins = (state.team||[]).filter(m => m.email && ADMIN_EMAILS.includes(m.email.toLowerCase().trim()));
-          const list = admins.length > 0 ? admins : (state.team||[]);
+          const admins = (state.team||[]).filter(m => m.email && ADMIN_EMAILS.includes((m.email||'').toLowerCase().trim()));
+          const list = admins.length >= 2 ? admins : (state.team||[]);
           return list.map(m =>
             `<option value="${m.id}" ${editing?.pmoInChargeId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${m.role ? ' — ' + escapeHtml(m.role) : ''}</option>`
           ).join('');
