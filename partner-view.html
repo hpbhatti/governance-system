@@ -268,6 +268,9 @@ const STR = {
     rejectionReasonLabel: 'Reason', submissionChangeComplete: 'Marked Complete', submissionChangeNote: 'Added Note',
     closeBtn: 'Close',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
+    submittedPendingLabel: 'Completion submitted — awaiting confirmation',
+    resubmitBtn: 'Resubmit',
+    submittedRejectedLabel: 'Previously rejected — you may resubmit',
     proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalCompleteNotePlaceholder: 'Optional: anything the reviewer should know (e.g. what was done, any links)…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
@@ -327,6 +330,9 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     rejectionReasonLabel: 'السبب', submissionChangeComplete: 'تم وضعها كمكتملة', submissionChangeNote: 'إضافة ملاحظة',
     closeBtn: 'إغلاق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
+    submittedPendingLabel: 'تم تقديم الإنجاز — في انتظار التأكيد',
+    resubmitBtn: 'إعادة التقديم',
+    submittedRejectedLabel: 'تم الرفض سابقاً — يمكنك إعادة التقديم',
     proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalCompleteNotePlaceholder: 'اختياري: أي شيء يجب أن يعرفه المراجع (مثل ما تم إنجازه، أو أي روابط)…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
@@ -391,6 +397,10 @@ function normalizeTaskTitles(task) {
 
 var currentLang = localStorage.getItem('partnerViewLang') || 'en';
 var lastData = null;
+// Maps taskId → proposal status ('pending' | 'rejected') for tasks this user
+// has already submitted — used to replace the Mark Complete button with a
+// status indicator so they cannot submit twice while pending.
+var _pendingTaskIds = {};
 
 // No third-party translation. This page shows ONLY what the main governance
 // system itself has already translated (titleEn/titleAr). If a task was
@@ -781,8 +791,19 @@ function renderTaskCard(task, subtasks) {
     renderSubtasks(subtasks) +
     (canPropose ?
       '<div class="propose-row">' +
-        '<button class="propose-btn" onclick="openProposeComplete(\'' + task.id + '\')">✓ ' + t('markCompleteBtn') + '</button>' +
-        '<button class="propose-btn secondary" onclick="openProposeNote(\'' + task.id + '\')">📝 ' + t('addNoteBtn') + '</button>' +
+        (_pendingTaskIds[task.id] === 'pending'
+          // Already submitted and awaiting PMO confirmation — block re-submission
+          ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--amber-bg,#fdf8ec);border:1px solid var(--amber,#c9a84c);border-radius:8px;font-size:12.5px;color:var(--amber-dark,#7a5c00);width:100%">⏳ ' + t('submittedPendingLabel') + '</div>'
+          : _pendingTaskIds[task.id] === 'rejected'
+          // Previously rejected — allow resubmission with a clear label
+          ? '<div style="width:100%">' +
+              '<div style="font-size:11.5px;color:var(--red,#b04540);margin-bottom:6px">↩ ' + t('submittedRejectedLabel') + '</div>' +
+              '<button class="propose-btn" onclick="openProposeComplete(\'' + task.id + '\')">✓ ' + t('resubmitBtn') + '</button>' +
+              '<button class="propose-btn secondary" onclick="openProposeNote(\'' + task.id + '\')">📝 ' + t('addNoteBtn') + '</button>' +
+            '</div>'
+          // Normal — not yet submitted
+          : '<button class="propose-btn" onclick="openProposeComplete(\'' + task.id + '\')">✓ ' + t('markCompleteBtn') + '</button>' +
+            '<button class="propose-btn secondary" onclick="openProposeNote(\'' + task.id + '\')">📝 ' + t('addNoteBtn') + '</button>') +
       '</div>' : '') +
   '</div>';
 }
@@ -832,8 +853,26 @@ function loadPartnerView() {
     if (!data) return;
     lastData = data;
     (data.tasks || []).forEach(normalizeTaskTitles);
-    render(data);
-    // Fill in whichever slot is missing for the current language, in the background.
+    // Fetch this user's own proposals in parallel so renderTaskCard can block
+    // re-submission on tasks that are already pending confirmation.
+    var proposalToken = (new URLSearchParams(window.location.search)).get('token');
+    fetch(FUNCTION_URL + '?token=' + encodeURIComponent(proposalToken) + '&myProposals=1', {
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
+    }).then(function(r){ return r.ok ? r.json() : null; }).then(function(pd){
+      _pendingTaskIds = {};
+      if (pd && pd.proposals) {
+        pd.proposals.forEach(function(p) {
+          // Only track the most relevant status per task:
+          // pending > rejected (if both exist, pending takes precedence)
+          if (!_pendingTaskIds[p.task_id] || p.status === 'pending') {
+            if (p.status === 'pending' || p.status === 'rejected') {
+              _pendingTaskIds[p.task_id] = p.status;
+            }
+          }
+        });
+      }
+      render(data);
+    }).catch(function(){ render(data); });
     ensureTitlesForLang(data, currentLang).then(function() { render(data); });
   }).catch(function(err) {
     clearTimeout(timeoutId);
