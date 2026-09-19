@@ -2512,6 +2512,7 @@ const T = {
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
     approveBtn: 'موافقة', rejectBtn: 'رفض',
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
+    statusPending: 'قيد المراجعة', statusApproved: 'مقبول', statusRejected: 'مرفوض',
     rejectionReasonPrompt: 'لماذا ترفض هذا؟', rejectionReasonRequired: 'السبب مطلوب للرفض.',
     viewAttachedLink: 'عرض الرابط المرفق',
     tabAll: 'الكل', deleteBtn: 'حذف',
@@ -3225,6 +3226,7 @@ const T = {
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
     approveBtn: 'Approve', rejectBtn: 'Reject',
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
+    statusPending: 'Pending', statusApproved: 'Approved', statusRejected: 'Rejected',
     rejectionReasonPrompt: 'Why are you rejecting this?', rejectionReasonRequired: 'A reason is required to reject.',
     viewAttachedLink: 'View attached link',
     tabAll: 'All', deleteBtn: 'Delete',
@@ -6167,10 +6169,13 @@ async function deleteTeamMember(id) {
     if (a.ownerKind === 'internal' && a.ownerId === id) { a.ownerId = ''; a.ownerKind = ''; }
   });
   state.team = state.team.filter(m => m.id !== id);
-  saveState(); // upserts the actions whose owner was cleared + refreshes local cache
+  saveState();
   toast(t('toastDeleted'));
   if (state.currentView === 'teamMemberDetail') navigate('team');
   else render();
+  if (supabaseClient) {
+    try { await supabaseClient.from('internal_team').delete().eq('id', id); } catch(e) {}
+  }
   await syncCloudDeletes({ internal_team: [id] });
 }
 
@@ -6960,9 +6965,10 @@ views.pendingApprovals = () => {
   const activeGroup = pmoTabList.find(t => t.key === activeTab) || pmoTabList[0] || { items: [] };
   const items = activeGroup ? activeGroup.items : [];
 
-  // Within each PMO tab: pending first, then reviewed
+  // Within each PMO tab: three clear sub-sections
   const pending  = items.filter(r => r.status === 'pending');
-  const reviewed = items.filter(r => r.status !== 'pending');
+  const approved = items.filter(r => r.status === 'approved');
+  const rejected = items.filter(r => r.status === 'rejected');
 
   function renderCard(row) {
     const task = state.actions.find(a => a.id === row.task_id);
@@ -7019,10 +7025,17 @@ views.pendingApprovals = () => {
       `).join('')}
     </div>
     ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : `
-      ${pending.length > 0 ? pending.map(renderCard).join('') : ''}
-      ${reviewed.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Reviewed</div>
-        ${reviewed.map(renderCard).join('')}
+      ${pending.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">${t('statusPending')} (${pending.length})</div>
+        ${pending.map(renderCard).join('')}
+      ` : `<div style="font-size:13px;color:var(--ink-faint);margin-bottom:16px">No pending approvals in this section.</div>`}
+      ${approved.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusApproved')} (${approved.length})</div>
+        ${approved.map(renderCard).join('')}
+      ` : ''}
+      ${rejected.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusRejected')} (${rejected.length})</div>
+        ${rejected.map(renderCard).join('')}
       ` : ''}
     `}
   `;
@@ -9372,6 +9385,23 @@ async function deletePartner(id) {
   saveState();
   toast(t('toastDeleted'));
   render();
+
+  // ── Immediate direct delete from Supabase — does not rely on the debounced
+  // queue so the record is gone even if the user closes the browser or a new
+  // version is deployed before the background sync fires. ──
+  if (supabaseClient) {
+    const removedProjectIds = diffRemovedIds(beforeProjects, state.projects);
+    const removedActionIds  = diffRemovedIds(beforeActions,  state.actions);
+    try {
+      const deleteJobs = [supabaseClient.from('partners').delete().eq('id', id)];
+      if (removedProjectIds.length) deleteJobs.push(supabaseClient.from('projects').delete().in('id', removedProjectIds));
+      if (removedActionIds.length)  deleteJobs.push(supabaseClient.from('actions').delete().in('id', removedActionIds));
+      await Promise.all(deleteJobs);
+    } catch(e) {
+      // Silent — the queue-based syncCloudDeletes below will retry on next sync.
+    }
+  }
+
   await syncCloudDeletes({
     partners: [id],
     projects: diffRemovedIds(beforeProjects, state.projects),
@@ -9457,9 +9487,16 @@ function showProjectForm(projectId, defaultPartnerId) {
       <label>${t('pmoInChargeLabel')}</label>
       <select id="f-pmo-incharge">
         <option value="">${t('pmoNotAssigned')}</option>
-        ${(state.team||[]).map(m =>
-          `<option value="${m.id}" ${editing?.pmoInChargeId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${m.role ? ' — ' + escapeHtml(m.role) : ''}</option>`
-        ).join('')}
+        ${(()=>{
+          // Restrict to the two global admins identified by their known emails.
+          // Falls back to all team members if neither email is found (safe default).
+          const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karhasmoh@gmail.com'];
+          const admins = (state.team||[]).filter(m => m.email && ADMIN_EMAILS.includes(m.email.toLowerCase().trim()));
+          const list = admins.length > 0 ? admins : (state.team||[]);
+          return list.map(m =>
+            `<option value="${m.id}" ${editing?.pmoInChargeId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${m.role ? ' — ' + escapeHtml(m.role) : ''}</option>`
+          ).join('');
+        })()}
       </select>
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('pmoInChargeHint')}</div>
     </div>
@@ -9649,9 +9686,18 @@ async function deleteProject(id) {
   saveState();
   toast(t('toastDeleted'));
   render();
+  const removedActionIdsForProj = diffRemovedIds(beforeActions, state.actions);
+  if (supabaseClient) {
+    try {
+      const jobs = [supabaseClient.from('projects').delete().eq('id', id)];
+      if (removedActionIdsForProj.length === 1) jobs.push(supabaseClient.from('actions').delete().eq('id', removedActionIdsForProj[0]));
+      else if (removedActionIdsForProj.length > 1) jobs.push(supabaseClient.from('actions').delete().in('id', removedActionIdsForProj));
+      await Promise.all(jobs);
+    } catch(e) {}
+  }
   await syncCloudDeletes({
     projects: [id],
-    actions: diffRemovedIds(beforeActions, state.actions)
+    actions: removedActionIdsForProj
   });
 }
 
@@ -10332,6 +10378,12 @@ async function deleteAction(id) {
   saveState();
   toast(t('toastDeleted'));
   render(state.detailParam);
+  if (supabaseClient) {
+    try {
+      if (allIds.length === 1) await supabaseClient.from('actions').delete().eq('id', allIds[0]);
+      else await supabaseClient.from('actions').delete().in('id', allIds);
+    } catch(e) {}
+  }
   await syncCloudDeletes({ actions: allIds });
 }
 
@@ -10346,10 +10398,17 @@ async function confirmDeleteAction(id, scope) {
     state.actions = state.actions.filter(x => x.id !== id);
     toast(t('toastDeleted'));
   }
+  const removedConfirmIds = diffRemovedIds(beforeActions, state.actions);
   saveState();
   closeModal();
   render(state.detailParam);
-  await syncCloudDeletes({ actions: diffRemovedIds(beforeActions, state.actions) });
+  if (supabaseClient && removedConfirmIds.length) {
+    try {
+      if (removedConfirmIds.length === 1) await supabaseClient.from('actions').delete().eq('id', removedConfirmIds[0]);
+      else await supabaseClient.from('actions').delete().in('id', removedConfirmIds);
+    } catch(e) {}
+  }
+  await syncCloudDeletes({ actions: removedConfirmIds });
 }
 
 function completeAction(id) {
@@ -12191,6 +12250,9 @@ async function deleteReportEntry(entryId) {
   saveState();
   toast(t('toastReportDeleted'));
   render();
+  if (supabaseClient) {
+    try { await supabaseClient.from('reports').delete().eq('id', entryId); } catch(e) {}
+  }
   await syncCloudDeletes({ reports: [entryId] });
 }
 
