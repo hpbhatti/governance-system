@@ -1032,6 +1032,7 @@ function openProposeComplete(taskId) {
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('propose-complete-submit').onclick = async function() {
+    this.disabled = true; // prevent double-submit immediately
     var note = document.getElementById('propose-complete-note').value.trim();
     var link = document.getElementById('propose-complete-link').value.trim();
     var fileInput = document.getElementById('propose-complete-file');
@@ -1064,6 +1065,7 @@ function openProposeComplete(taskId) {
       overlay.remove();
       alert(t('proposalSubmitted'));
     }).catch(function() {
+      document.getElementById('propose-complete-submit').disabled = false;
       alert(t('proposalError'));
     });
   };
