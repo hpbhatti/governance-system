@@ -4003,11 +4003,29 @@ async function _flushWritesInner() {
       if (errored) throw errored.error;
     }
 
-    // ── PATH 1: Data write succeeded ──
-    // Clear dirty queues and mark online immediately — data is in Supabase.
-    // Do this BEFORE attempting the stamp so a stamp failure can never cause
-    // a re-upload of data that already arrived, never shows a stuck badge,
-    // and never sets the red offline dot.
+    // ── Data write succeeded ──
+    // Attempt the stamp first — this updates tableTs correctly so other devices
+    // know exactly which tables changed. If the stamp succeeds everything is
+    // clean. If it fails the data is safe and we clear queues anyway, then
+    // retry the stamp silently on its own schedule.
+    const changed = Array.from(new Set([...dirtyList, ...delTables]));
+    if (changed.length) {
+      changed.forEach(tb => _pendingStampTables.add(tb));
+      try {
+        await bumpCloudTimestamps(Array.from(_pendingStampTables));
+        // Stamp succeeded — tableTs is now correct on disk for all devices.
+        _pendingStampTables.clear();
+        _stampRetryStep = 0;
+      } catch (stampErr) {
+        // Stamp failed — schedule its own silent retry. Data is already in
+        // Supabase. We continue below to clear queues and show Updated ✓.
+        // The retry will update tableTs when it eventually succeeds.
+        scheduleStampRetry();
+      }
+    }
+
+    // Clear dirty queues and mark online — whether stamp succeeded or not,
+    // the data write is done and the UI should reflect that immediately.
     dirtyList.forEach(table => {
       syncMeta.syncedHash[table] = quickHash(JSON.stringify(state[tableKeyOf(table)] || []));
       clearDirtyTable(table);
@@ -4017,24 +4035,8 @@ async function _flushWritesInner() {
     persistSyncMeta();
     setSyncOnline(true);
 
-    // ── PATH 2: Stamp update — independent retry, no badge involvement ──
-    // Tells other devices which tables changed so their next incremental sync
-    // is efficient. Important for cross-device freshness but not for data safety.
-    // If it fails it retries silently on its own schedule until it succeeds.
-    const changed = Array.from(new Set([...dirtyList, ...delTables]));
-    if (changed.length) {
-      changed.forEach(tb => _pendingStampTables.add(tb));
-      bumpCloudTimestamps(Array.from(_pendingStampTables)).then(() => {
-        _pendingStampTables.clear();
-        _stampRetryStep = 0;
-      }).catch(() => {
-        // Stamp failed — schedule its own silent retry. Data is already safe.
-        scheduleStampRetry();
-      });
-    }
-
   } catch (e) {
-    // ── PATH 3: Data write failed — retry the whole write as before ──
+    // Data write failed — retry the whole write as before.
     console.error('Supabase write failed — queued for retry:', describeSupabaseError(e));
     setSyncOnline(false);
     persistSyncMeta();              // keep dirty tables + pending deletes for the retry
@@ -6235,6 +6237,9 @@ async function deleteTeamMember(id) {
     if (a.ownerKind === 'internal' && a.ownerId === id) { a.ownerId = ''; a.ownerKind = ''; }
   });
   state.team = state.team.filter(m => m.id !== id);
+  if (!pendingDeletes['internal_team']) pendingDeletes['internal_team'] = [];
+  pendingDeletes['internal_team'] = [...new Set([...pendingDeletes['internal_team'], id])];
+  persistSyncMeta();
   saveState();
   toast(t('toastDeleted'));
   if (state.currentView === 'teamMemberDetail') navigate('team');
@@ -9448,6 +9453,11 @@ async function deletePartner(id) {
   if (memberIds.length) {
     state.actions.forEach(a => { if (a.ownerKind === 'partner' && memberIds.includes(a.ownerId)) { a.ownerId = ''; a.ownerKind = ''; } });
   }
+  // Mark as pending delete BEFORE saveState/render so loadState's filter always
+  // excludes this record even if a Realtime event fires before Supabase delete completes.
+  if (!pendingDeletes['partners']) pendingDeletes['partners'] = [];
+  pendingDeletes['partners'] = [...new Set([...pendingDeletes['partners'], id])];
+  persistSyncMeta();
   saveState();
   toast(t('toastDeleted'));
   render();
@@ -9752,6 +9762,9 @@ async function deleteProject(id) {
   const beforeActions = state.actions.slice();
   state.actions = state.actions.filter(a => a.projectId !== id);
   state.projects = state.projects.filter(p => p.id !== id);
+  if (!pendingDeletes['projects']) pendingDeletes['projects'] = [];
+  pendingDeletes['projects'] = [...new Set([...pendingDeletes['projects'], id])];
+  persistSyncMeta();
   saveState();
   toast(t('toastDeleted'));
   render();
@@ -10444,6 +10457,9 @@ async function deleteAction(id) {
   const subtaskIds = getSubtasks(id).map(s => s.id);
   const allIds = [id, ...subtaskIds];
   state.actions = state.actions.filter(x => !allIds.includes(x.id));
+  if (!pendingDeletes['actions']) pendingDeletes['actions'] = [];
+  pendingDeletes['actions'] = [...new Set([...pendingDeletes['actions'], ...allIds])];
+  persistSyncMeta();
   saveState();
   toast(t('toastDeleted'));
   render(state.detailParam);
@@ -12316,6 +12332,9 @@ async function deleteReportEntry(entryId) {
   if (!entry) return;
   if (!confirm(t('confirmDeleteReport', entry.title || entry.number))) return;
   state.reports = state.reports.filter(r => r.id !== entryId);
+  if (!pendingDeletes['reports']) pendingDeletes['reports'] = [];
+  pendingDeletes['reports'] = [...new Set([...pendingDeletes['reports'], entryId])];
+  persistSyncMeta();
   saveState();
   toast(t('toastReportDeleted'));
   render();
@@ -12608,30 +12627,26 @@ function importData(file) {
 async function resetData() {
   if (!confirm(t('confirmClearAll1'))) return;
   if (!confirm(t('confirmClearAll2'))) return;
-  // Delete ALL rows from every Supabase table (partners, internal_team, projects, actions, reports)
-  if (supabaseClient) {
-    try {
-      const results = await Promise.all(
-        SUPABASE_TABLES.map(t => supabaseClient.from(t.table).delete().not('id', 'is', null))
-      );
-      const errored = results.find(r => r && r.error);
-      if (errored) throw errored.error;
-      try { await bumpCloudTimestamps(SUPABASE_TABLES.map(t => t.table)); } catch (e2) {}
-    } catch (e) {
-      console.error('Supabase clear-all failed:', describeSupabaseError(e));
-      if (typeof toast === 'function') toast(t('offlineSaveWarning'));
-    }
-  }
-  // Clear local state + cache
+  // ── SAFE RESET: clears the LOCAL browser cache only ──
+  // Does NOT delete anything from Supabase. All data remains safe on the server.
+  // On next load, loadState() will re-fetch everything fresh from Supabase.
+  // This is intentional — "Clear All Data" means "clear my local session",
+  // not "destroy production data". A Supabase wipe would require an explicit
+  // admin action with multiple strong warnings, not a sidebar button.
   state.partners = [];
   state.projects = [];
   state.actions = [];
   state.team = [];
   state.reports = [];
   localStorage.removeItem(STORE_KEY);
-  invalidateCache(); // drop the TTL stamp so any future data re-fetches cleanly
+  invalidateCache();
   toast(t('toastDataCleared'));
+  // Re-fetch everything from Supabase immediately so the app is not left empty
+  loadState(true).then(function() { render(); }).catch(function() {});
   navigate('dashboard');
+  // Re-fetch everything from Supabase immediately — without this the app
+  // shows empty state until a Realtime event or manual reload triggers loadState.
+  loadState(true).then(function() { render(); }).catch(function() {});
 }
 
 /* ============================================================ */
