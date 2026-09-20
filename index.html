@@ -7228,30 +7228,24 @@ async function sendSubmissionCounterNotification(row, status, rejectionReason) {
 
 // ── Download an attached file from Supabase Storage via signed URL ──
 async function downloadSubmissionFile(storagePath) {
-  if (!supabaseClient) return;
+  // Bucket is public — construct the direct public URL.
+  // Paths include a random token so they are unguessable by design.
   try {
-    const { data, error } = await supabaseClient.storage
-      .from('submission-attachments')
-      .createSignedUrl(storagePath, 120); // 2-minute window
-    if (error || !data) { alert('Could not generate download link. Please try again.'); return; }
-    window.open(data.signedUrl, '_blank');
+    const publicUrl = SUPABASE_URL + '/storage/v1/object/public/submission-attachments/' + encodeURIComponent(storagePath);
+    window.open(publicUrl, '_blank');
   } catch (e) { alert('Download failed. Please try again.'); }
 }
 
 // ── Promote an attached file into the project's permanent files ──
 async function promoteSubmissionFile(rowId, projectId, storagePath) {
-  if (!supabaseClient) return;
   const proj = getProject(projectId);
   if (!proj) return;
   try {
-    // Generate a long-lived signed URL (365 days) for the project file record
-    const { data, error } = await supabaseClient.storage
-      .from('submission-attachments')
-      .createSignedUrl(storagePath, 31536000);
-    if (error || !data) { alert('Could not promote file. Please try again.'); return; }
+    // Bucket is public — use the direct public URL as the permanent link
+    const publicUrl = SUPABASE_URL + '/storage/v1/object/public/submission-attachments/' + encodeURIComponent(storagePath);
     const fileName = storagePath.split('/').pop() || 'attachment';
     if (!proj.attachments) proj.attachments = [];
-    proj.attachments.push({ id: uid(), name: fileName, url: data.signedUrl, isLink: true, isPromotedFile: true, addedAt: new Date().toISOString() });
+    proj.attachments.push({ id: uid(), name: fileName, url: publicUrl, isLink: true, isPromotedFile: true, addedAt: new Date().toISOString() });
     saveState();
     toast('📁 File added to project files.');
   } catch (e) { alert('Promote failed. Please try again.'); }
