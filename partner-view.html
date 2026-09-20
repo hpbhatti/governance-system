@@ -853,8 +853,11 @@ function loadPartnerView() {
     if (!data) return;
     lastData = data;
     (data.tasks || []).forEach(normalizeTaskTitles);
-    // Fetch this user's own proposals in parallel so renderTaskCard can block
-    // re-submission on tasks that are already pending confirmation.
+    // Render immediately so the page appears at once — never wait for proposals.
+    render(data);
+    // Then fetch this user's own proposals in the background and re-render once
+    // we know which tasks already have a pending submission — this replaces the
+    // Mark Complete button with the "awaiting confirmation" status indicator.
     var proposalToken = (new URLSearchParams(window.location.search)).get('token');
     fetch(FUNCTION_URL + '?token=' + encodeURIComponent(proposalToken) + '&myProposals=1', {
       headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
@@ -862,8 +865,6 @@ function loadPartnerView() {
       _pendingTaskIds = {};
       if (pd && pd.proposals) {
         pd.proposals.forEach(function(p) {
-          // Only track the most relevant status per task:
-          // pending > rejected (if both exist, pending takes precedence)
           if (!_pendingTaskIds[p.task_id] || p.status === 'pending') {
             if (p.status === 'pending' || p.status === 'rejected') {
               _pendingTaskIds[p.task_id] = p.status;
@@ -871,8 +872,8 @@ function loadPartnerView() {
           }
         });
       }
-      render(data);
-    }).catch(function(){ render(data); });
+      render(data); // re-render with submission state now known
+    }).catch(function(){}); // silent — page already rendered, no update needed on failure
     ensureTitlesForLang(data, currentLang).then(function() { render(data); });
   }).catch(function(err) {
     clearTimeout(timeoutId);
