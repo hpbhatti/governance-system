@@ -7054,7 +7054,7 @@ views.pendingApprovals = () => {
             ${fileSection}
             ${linkSection}
             ${row.status === 'rejected' && row.rejection_reason ? `<div class="submission-reject-reason" style="margin-top:6px">${t('rejectionReasonLabel')}: ${escapeHtml(row.rejection_reason)}</div>` : ''}
-            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}</div>
+            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
             ${row.status === 'pending' ? `
