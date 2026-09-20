@@ -1786,7 +1786,15 @@ function scheduleStampRetry() {
     });
   }, delay);
 }
-function setSyncOnline(v){ if (_syncOnline !== v){ _syncOnline = v; try { updateSyncIndicator(); } catch(e){} } if (v){ _retryStep = 0; if (_retryTimer){ clearTimeout(_retryTimer); _retryTimer = null; } } }
+function setSyncOnline(v){
+  const changed = _syncOnline !== v;
+  _syncOnline = v;
+  // Always call updateSyncIndicator when coming back online — never skip it,
+  // even if the flag didn't change, so stale offline DOM state from a previous
+  // session is cleared on the first successful write after page load.
+  if (v || changed) { try { updateSyncIndicator(); } catch(e){} }
+  if (v){ _retryStep = 0; if (_retryTimer){ clearTimeout(_retryTimer); _retryTimer = null; } }
+}
 function scheduleRetry(fn){ const delay = _BACKOFF_MS[Math.min(_retryStep, _BACKOFF_MS.length-1)]; _retryStep++; if (_retryTimer) clearTimeout(_retryTimer); _retryTimer = setTimeout(() => { _retryTimer = null; fn(); }, delay); }
 /* ---- debounced background write ---- */
 let _writeTimer = null;
