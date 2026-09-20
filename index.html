@@ -2148,7 +2148,7 @@ const T = {
     sectionAttachments: 'المرفقات والمراجع', uploadAttachment: '＋ رفع مرفق',
     uploadHint1: 'اسحب الملفات هنا أو اضغط للرفع',
     uploadHint2: 'صور، PDF، Word، Excel — حد أقصى ٣ م.ب لكل ملف',
-    noAttachments: 'لا توجد مرفقات بعد', uploadedOn: 'رُفع في {0}',
+    noAttachments: 'لا توجد مرفقات بعد', uploadedOn: 'رُفع في {0}', renameAttachment: 'إعادة التسمية', renameAttachmentPrompt: 'أدخل الاسم الجديد:', storageUsed: 'المساحة المستخدمة', checkStorage: 'فحص المساحة',
     preview: 'معاينة', download: 'تحميل', noteAction: 'ملاحظة',
     sectionOpenActions: 'المهام المفتوحة', addAction: '＋ مهمة',
     noOpenActionsShort: 'لا توجد مهام مفتوحة',
@@ -2862,7 +2862,7 @@ const T = {
     sectionAttachments: 'Attachments & References', uploadAttachment: '＋ Upload File',
     uploadHint1: 'Drag files here or click to upload',
     uploadHint2: 'Images, PDF, Word, Excel — max 3 MB per file',
-    noAttachments: 'No attachments yet', uploadedOn: 'Uploaded {0}',
+    noAttachments: 'No attachments yet', uploadedOn: 'Uploaded {0}', renameAttachment: 'Rename', renameAttachmentPrompt: 'Enter new name:', storageUsed: 'Storage used', checkStorage: 'Check storage',
     preview: 'Preview', download: 'Download', noteAction: 'Note',
     sectionOpenActions: 'Open Tasks', addAction: '＋ Task',
     noOpenActionsShort: 'No open tasks',
@@ -4114,6 +4114,7 @@ function saveReportEntry(type, params, title) {
     params: params || {}
   };
   state.reports.unshift(entry); // newest first
+  markRowDirty('reports', entry.id);
   saveState();
   return entry;
 }
@@ -5341,6 +5342,7 @@ function confirmExtendAction(taskId) {
   if (!newDate) return;
   const reason = document.getElementById('f-extend-reason').value.trim();
   extendTaskDueDate(taskId, newDate, reason, null);
+  markRowDirty('actions', taskId);
   saveState();
   toast(t('toastSaved'));
   closeModal();
@@ -5362,6 +5364,7 @@ function toggleProjectSuspend(projectId) {
     p.suspended = false;
     toast(currentLang === 'ar' ? 'تم استئناف المشروع' : 'Project resumed');
   }
+  markRowDirty('projects', p.id);
   saveState();
   render();
 }
@@ -6220,11 +6223,13 @@ function saveTeamMember(id) {
     Object.assign(m, data);
     if (m.name) setBilingualField(m, 'name', m.name);
     toast(t('toastSavedChanges'));
+    markRowDirty('internal_team', id);
   } else {
     const newM = { id: 'tm_' + uid(), ...data, createdAt: todayDate() };
     if (newM.name) setBilingualField(newM, 'name', newM.name);
     state.team.push(newM);
     toast(t('toastSavedChanges'));
+    markRowDirty('internal_team', newM.id);
   }
   saveState();
   closeModal();
@@ -7122,6 +7127,7 @@ async function approveProposal(id) {
     if (trackingText) {
       if (!task.tracking) task.tracking = [];
       task.tracking.push({ date: new Date().toISOString(), text: trackingText });
+      markRowDirty('actions', task.id);
       saveState();
     }
     if (row.change_type === 'complete') {
@@ -7246,6 +7252,7 @@ async function promoteSubmissionFile(rowId, projectId, storagePath) {
     const fileName = storagePath.split('/').pop() || 'attachment';
     if (!proj.attachments) proj.attachments = [];
     proj.attachments.push({ id: uid(), name: fileName, url: publicUrl, isLink: true, isPromotedFile: true, addedAt: new Date().toISOString() });
+    markRowDirty('projects', projectId); // target only this project row — prevents all projects uploading
     saveState();
     toast('📁 File added to project files.');
   } catch (e) { alert('Promote failed. Please try again.'); }
@@ -7259,6 +7266,7 @@ function promoteSubmissionLink(rowId, projectId, linkUrl) {
   if (!label) return;
   if (!proj.attachments) proj.attachments = [];
   proj.attachments.push({ id: uid(), name: label.trim(), url: linkUrl, isLink: true, addedAt: new Date().toISOString() });
+  markRowDirty('projects', proj.id); // target only this project row
   saveState();
   toast('📁 Link added to project files.');
 }
@@ -7664,7 +7672,15 @@ views.projectDetail = (projectId) => {
 
     <div class="section">
       <div class="section-head">
-        <div class="section-title">${t('sectionAttachments')}<span class="accent-line"></span></div>
+        <div class="section-title">${t('sectionAttachments')}<span class="accent-line"></span>
+          ${(() => {
+            const totalBytes = (p.attachments||[]).reduce((sum, a) => sum + (a.size || 0), 0);
+            if (!totalBytes) return '';
+            const mb = (totalBytes / (1024*1024)).toFixed(1);
+            const pct = Math.min(100, (totalBytes / (1*1024*1024*1024)) * 100).toFixed(1);
+            return `<span style="font-size:11px;color:var(--ink-faint);font-weight:400;margin-inline-start:8px">${mb} MB (${pct}% of 1 GB)</span>`;
+          })()}
+        </div>
         <button class="btn" onclick="showAddLinkForm('${p.id}')">${t('addLink')}</button>
       </div>
       <div id="link-form-${p.id}" style="display:none;margin-bottom:12px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--bg-card)">
@@ -7693,6 +7709,7 @@ views.projectDetail = (projectId) => {
                 </div>
                 <div class="attach-actions">
                   <button class="row-btn" onclick="window.open('${att.url}','_blank')">${t('openLink')}</button>
+                  <button class="row-btn" onclick="renameAttachment('${p.id}','${att.id}')">${t('renameAttachment')}</button>
                   <button class="row-btn danger" onclick="deleteAttachment('${p.id}','${att.id}')">${t('delete')}</button>
                 </div>
               </div>`;
@@ -7709,6 +7726,7 @@ views.projectDetail = (projectId) => {
                 <div class="attach-actions">
                   <button class="row-btn" onclick="previewAttachment('${p.id}','${att.id}')">${t('preview')}</button>
                   <button class="row-btn" onclick="downloadAttachment('${p.id}','${att.id}')">${t('download')}</button>
+                  <button class="row-btn" onclick="renameAttachment('${p.id}','${att.id}')">${t('renameAttachment')}</button>
                   <button class="row-btn" onclick="editAttachmentNote('${p.id}','${att.id}')">${t('noteAction')}</button>
                   <button class="row-btn danger" onclick="deleteAttachment('${p.id}','${att.id}')">${t('delete')}</button>
                 </div>
@@ -9268,11 +9286,13 @@ function savePartner(id) {
     Object.assign(p, data);
     if (p.name) setBilingualField(p, 'name', p.name);
     toast(t('toastSavedChanges'));
+    markRowDirty('partners', id);
   } else {
     const newP = { id: uid(), ...data, createdAt: todayDate() };
     if (newP.name) setBilingualField(newP, 'name', newP.name);
     state.partners.push(newP);
     toast(t('toastPartnerAdded'));
+    markRowDirty('partners', newP.id);
   }
   saveState();
   closeModal();
@@ -9743,6 +9763,14 @@ function saveProject(id) {
         });
       });
   }
+  // Target the affected project row (and any milestone tasks just created).
+  if (id) {
+    markRowDirty('projects', id);
+  } else if (typeof newId !== 'undefined') {
+    markRowDirty('projects', newId);
+    (window._editingProjectMilestones || []).forEach(() => {}); // milestones marked below via state.actions push loop
+    state.actions.filter(a => a.projectId === newId && a.isMilestone).forEach(a => markRowDirty('actions', a.id));
+  }
   saveState();
   toast(t('toastSaved'));
   closeModal();
@@ -9818,6 +9846,7 @@ function handleAttachUpload(projectId, files) {
 
 function finishUpload(projectId) {
   try {
+    markRowDirty('projects', projectId);
     saveState();
     toast(t('toastUploaded'));
   } catch (err) {
@@ -9878,10 +9907,25 @@ function saveAttachmentNote(projectId, attachmentId) {
   const project = getProject(projectId);
   const att = project.attachments.find(a => a.id === attachmentId);
   att.description = document.getElementById('f-attach-note').value.trim();
+  markRowDirty('projects', projectId);
   saveState();
   toast(t('toastNoteSaved'));
   closeModal();
   render(state.detailParam);
+}
+
+function renameAttachment(projectId, attachmentId) {
+  const proj = getProject(projectId);
+  if (!proj) return;
+  const att = (proj.attachments || []).find(a => a.id === attachmentId);
+  if (!att) return;
+  const newName = prompt(t('renameAttachmentPrompt'), att.name || '');
+  if (!newName || !newName.trim()) return;
+  att.name = newName.trim();
+  markRowDirty('projects', projectId);
+  saveState();
+  toast('✏ Renamed successfully.');
+  renderPreserveScroll();
 }
 
 function deleteAttachment(projectId, attachmentId) {
@@ -9889,6 +9933,7 @@ function deleteAttachment(projectId, attachmentId) {
   const att = project.attachments.find(a => a.id === attachmentId);
   if (!confirm(t('confirmDeleteAttachment', att.name))) return;
   project.attachments = project.attachments.filter(a => a.id !== attachmentId);
+  markRowDirty('projects', projectId);
   saveState();
   toast(t('toastAttachDeleted'));
   render(state.detailParam);
@@ -9916,6 +9961,7 @@ function saveLink(projectId) {
     isLink: true,
     addedAt: todayDate()
   });
+  markRowDirty('projects', projectId);
   saveState();
   toast(t('toastSaved'));
   render(state.detailParam);
@@ -10295,6 +10341,7 @@ window.toggleMeetingTaskLink = function(meetingId, taskId, checked) {
   const m = state.actions.find(x => x.id === meetingId);
   if (!m) return;
   m.linkedTaskId = checked ? taskId : '';
+  markRowDirty('actions', meetingId);
   saveState();
   if (typeof window._renderRelatedMeetingsBox === 'function') window._renderRelatedMeetingsBox();
 };
@@ -10423,6 +10470,8 @@ function saveAction(id) {
     }
   }
   window._pendingParentId = null;
+  if (typeof a !== 'undefined' && a && a.id) markRowDirty('actions', a.id);
+  if (typeof newA !== 'undefined' && newA && newA.id) markRowDirty('actions', newA.id);
   saveState();
   toast(t('toastSaved'));
   closeModal();
@@ -10511,6 +10560,7 @@ function completeAction(id) {
   }
   a.status = 'completed';
   a.completedDate = todayDate();
+  markRowDirty('actions', a.id);
   saveState();
   toast(t('toastActionCompleted'));
   render(state.detailParam);
@@ -10533,6 +10583,7 @@ function setMeetingStatus(id, status) {
   const a = state.actions.find(x => x.id === id);
   a.status = status;
   if (status === 'completed') a.completedDate = todayDate();
+  markRowDirty('actions', id);
   saveState();
   toast(status === 'completed' ? t('toastMeetingDone') : t('toastMeetingMissed'));
   closeModal();
@@ -10586,6 +10637,7 @@ function confirmPostpone(id) {
   const byLabel = postponedBy === 'us' ? t('postponedByUs') : t('postponedByPartner');
   const trackText = `⏰ ${t('postponeMeeting')} → ${fmtDate(newDate)} (${byLabel})${postReason ? ` — ${postReason}` : ''}`;
   a.tracking.push({ id: 'tr_' + uid(), text: trackText, date: new Date().toISOString() });
+  markRowDirty('actions', a.id);
   saveState();
   toast(t('toastMeetingPostponed'));
   closeModal();
@@ -11836,6 +11888,7 @@ async function confirmSendPartnerEmail(partnerId, candidateCount) {
     // Remember this exact selection for next time — stays as-is until
     // deliberately changed, per the requested behavior.
     p.lastEmailRecipients = selected;
+    markRowDirty('partners', partnerId);
     saveState();
 
     const projectBreakdown = computeProjectBreakdownForPartner(partnerId);
