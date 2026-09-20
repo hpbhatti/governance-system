@@ -3733,6 +3733,18 @@ async function _loadStateInner(force) {
   // Make sure no table key is left undefined (use cache for anything not in memory).
   SUPABASE_TABLES.forEach(t => { if (!Array.isArray(state[t.key])) state[t.key] = Array.isArray(cache[t.key]) ? cache[t.key] : []; });
 
+  // ── Permanent delete guard ──
+  // Strip any record that is locally queued for deletion from the freshly-fetched
+  // Supabase data BEFORE it merges into state. This closes the race condition where
+  // a Realtime event triggers loadState() between the local state filter and the
+  // Supabase delete completing, causing a deleted record to reappear in the UI.
+  SUPABASE_TABLES.forEach(t => {
+    const queuedIds = (pendingDeletes[t.table] || []).filter(Boolean);
+    if (queuedIds.length && Array.isArray(state[t.key])) {
+      state[t.key] = state[t.key].filter(row => !queuedIds.includes(row.id));
+    }
+  });
+
   state.lastReportNumber = computeLastReportNumber(state.reports);
   if (!state.translationCache) state.translationCache = cache.translationCache || {};
   applyDataMigrations();
