@@ -275,6 +275,7 @@ const STR = {
     proposalCompleteNotePlaceholder: 'Optional: anything the reviewer should know (e.g. what was done, any links)…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
     proposalSubmitted: 'Submitted for cross-checking', proposalError: 'Could not submit — please try again.',
+    proposalSubmittingLabel: 'Submitting…',
 proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     proposalFilePlaceholder: 'Attach a file (PDF, Word, Excel, PowerPoint, image — max 10 MB)',
     proposalFileUploading: 'Uploading file…',
@@ -337,6 +338,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     proposalCompleteNotePlaceholder: 'اختياري: أي شيء يجب أن يعرفه المراجع (مثل ما تم إنجازه، أو أي روابط)…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
     proposalSubmitted: 'تم الإرسال للتحقق', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
+    proposalSubmittingLabel: 'جارٍ الإرسال…',
 proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     proposalFilePlaceholder: 'إرفاق ملف (PDF، Word، Excel، PowerPoint، صورة — حد أقصى 10 ميغابايت)',
     proposalFileUploading: 'جارٍ رفع الملف…',
@@ -1022,6 +1024,11 @@ function submitProposal(taskId, changeType, noteText, attachmentLink, attachment
 // comment, optional link to a file (e.g. Google Drive) — instead of a bare
 // yes/no confirmation with zero context.
 function openProposeComplete(taskId) {
+  // Block re-submission if a pending approval already exists for this task
+  if (_pendingTaskIds[taskId] === 'pending') {
+    alert(t('submittedPendingLabel'));
+    return;
+  }
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML =
@@ -1070,11 +1077,17 @@ function openProposeComplete(taskId) {
       }
       document.getElementById('propose-complete-submit').disabled = false;
     }
+    var submitBtn = document.getElementById('propose-complete-submit');
+    submitBtn.textContent = t('proposalSubmittingLabel') || 'Submitting…';
     submitProposal(taskId, 'complete', note, link, filePath).then(function() {
       overlay.remove();
+      // Immediately reflect submission state on the task card — no reload needed
+      _pendingTaskIds[taskId] = 'pending';
+      if (lastData) render(lastData);
       alert(t('proposalSubmitted'));
     }).catch(function() {
-      document.getElementById('propose-complete-submit').disabled = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = t('proposalSubmitBtn');
       alert(t('proposalError'));
     });
   };
@@ -1095,10 +1108,17 @@ function openProposeNote(taskId) {
   document.getElementById('propose-note-submit').onclick = function() {
     var text = document.getElementById('propose-note-text').value.trim();
     if (!text) return;
+    var noteBtn = document.getElementById('propose-note-submit');
+    noteBtn.disabled = true;
+    noteBtn.textContent = t('proposalSubmittingLabel') || 'Submitting…';
     submitProposal(taskId, 'note', text).then(function() {
       overlay.remove();
+      _pendingTaskIds[taskId] = 'pending';
+      if (lastData) render(lastData);
       alert(t('proposalSubmitted'));
     }).catch(function() {
+      noteBtn.disabled = false;
+      noteBtn.textContent = t('proposalSubmitBtn');
       alert(t('proposalError'));
     });
   };
