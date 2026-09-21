@@ -3707,10 +3707,25 @@ async function _loadStateInner(force) {
     try {
       const lastSeen = syncMeta.tableTs[t.table];
       let query = supabaseClient.from(t.table).select('id, data, updated_at, version');
-      if (lastSeen && syncMeta.everSynced) query = query.gt('updated_at', new Date(lastSeen).toISOString());
+      const isIncremental = !!(lastSeen && syncMeta.everSynced);
+      if (isIncremental) query = query.gt('updated_at', new Date(lastSeen).toISOString());
       const { data, error } = await withRequestTimeout(query);
       if (error) return { t, error };
-      return { t, rows: data||[], incremental: !!(lastSeen && syncMeta.everSynced) };
+      // ── Deletion reconciliation ──
+      // Incremental fetch only returns rows with a newer updated_at — a DELETE
+      // never produces one, so a row removed on another device would otherwise
+      // never be detected here and would persist locally forever. To close this,
+      // every incremental fetch also pulls a lightweight id-only list of what
+      // currently exists on the server (negligible egress — no row payload) so
+      // any local row no longer present there can be dropped below.
+      let liveIds = null;
+      if (isIncremental) {
+        try {
+          const { data: idRows } = await withRequestTimeout(supabaseClient.from(t.table).select('id'));
+          liveIds = new Set((idRows || []).map(r => r.id));
+        } catch (e) { liveIds = null; } // reconciliation is best-effort — never blocks the load
+      }
+      return { t, rows: data||[], incremental: isIncremental, liveIds };
     } catch (e) { return { t, error: e }; }
   }));
 
@@ -3725,12 +3740,17 @@ async function _loadStateInner(force) {
 
   ok.forEach(r => {
     if (!syncMeta.rowVersions[r.t.table]) syncMeta.rowVersions[r.t.table]={};
-    if (r.incremental && r.rows.length===0) { /* nothing changed */ }
+    if (r.incremental && r.rows.length===0 && !r.liveIds) { /* nothing changed, no reconciliation data */ }
     else if (r.incremental) {
       _lastLoadHadRealChanges = true;
       const inc={}; (r.rows||[]).forEach(row=>{if(row.data)inc[row.id]=row;});
       const exist=state[r.t.key]||[]; const existIds=new Set(exist.map(x=>x.id));
-      const merged=exist.map(item=>{ const i=inc[item.id]; if(!i)return item; if((i.version||1)>(syncMeta.rowVersions[r.t.table][item.id]||0)){syncMeta.rowVersions[r.t.table][item.id]=i.version||1;return i.data;} return item; });
+      // ── Drop any local row no longer present on the server ──
+      // This is what actually closes the cross-device deletion gap: without
+      // it, a row deleted on another device would never be removed here since
+      // incremental fetch alone cannot detect deletions.
+      const survivors = r.liveIds ? exist.filter(item => r.liveIds.has(item.id)) : exist;
+      const merged=survivors.map(item=>{ const i=inc[item.id]; if(!i)return item; if((i.version||1)>(syncMeta.rowVersions[r.t.table][item.id]||0)){syncMeta.rowVersions[r.t.table][item.id]=i.version||1;return i.data;} return item; });
       Object.keys(inc).forEach(id=>{ if(!existIds.has(id)){syncMeta.rowVersions[r.t.table][id]=inc[id].version||1;merged.push(inc[id].data);} });
       state[r.t.key]=merged.filter(Boolean);
     } else {
@@ -11971,7 +11991,8 @@ async function createManagerLink(memberId, memberName) {
     if (insertErr) throw insertErr;
     renderManagerLinkModal(memberId, memberName, token, email, true);
   } catch (e) {
-    alert(t('partnerLinkError'));
+    console.error('createManagerLink failed:', e && e.message ? e.message : e);
+    alert((e && e.message) ? e.message : t('partnerLinkError'));
   }
 }
 
