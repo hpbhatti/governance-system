@@ -2528,6 +2528,11 @@ const T = {
     teamMemberReportBtn: '📄 تقرير الأداء', teamMemberReportTitle: 'تقرير عضو الفريق',
     partnerLinkBtn: 'رابط الشريك', partnerLinkModalTitle: 'رابط عرض الشريك (للاطلاع فقط)',
     memberLinkBtn: 'رابط العضو', memberLinkModalTitle: 'رابط عضو الفريق',
+    managerLinkBtn: 'رابط المدير', managerLinkModalTitle: 'رابط المدير',
+    managerLinkEmailHint: 'أدخل بريد المدير الإلكتروني — يُستخدم لإرسال إشعارات الموافقة والرفض على التعيينات.',
+    managerLinkGenerateBtn: 'إنشاء الرابط', managerLinkEmailRequired: 'يرجى إدخال بريد إلكتروني صالح.',
+    managerLinkEmailLabel: 'البريد الإلكتروني للمدير', managerLinkUpdateEmailBtn: 'تحديث البريد الإلكتروني',
+    managerLinkNote: 'يمكن لأي شخص لديه هذا الرابط عرض مهام {0} واقتراح تعيينات مهام جديدة — دون تسجيل دخول ودون الوصول لأي بيانات أخرى.',
     sendUpdateEmailBtn: 'إرسال بريد تحديث', alertNoEmailOnFile: 'لا يوجد بريد إلكتروني مسجل — أضف واحداً أولاً.',
     toastEmailSent: 'تم إرسال البريد إلى {0}', toastEmailSentCount: 'تم إرسال البريد إلى {0} مستلم',
     alertEmailSendFailed: 'تعذر إرسال البريد. يرجى المحاولة مرة أخرى.',
@@ -2540,7 +2545,10 @@ const T = {
     pmoNotAssigned: '— غير محدد —',
     pmoTabUnassigned: 'غير محدد',
     approvalCounterSentToast: 'تم إرسال الإشعار إلى مقدم الطلب.',
+    rejectionReasonLabel: 'سبب الرفض',
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
+    proposalNewAssignment: 'تعيين مهمة جديدة', proposalTaskAssignment: 'تعيين المهام', proposalTaskCompletion: 'إكمال المهام',
+    proposedByManagerFor: 'مقترح من المدير لـ',
     approveBtn: 'موافقة', rejectBtn: 'رفض',
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
     statusPending: 'قيد المراجعة', statusApproved: 'مقبول', statusRejected: 'مرفوض',
@@ -3242,6 +3250,11 @@ const T = {
     teamMemberReportBtn: '📄 Performance Report', teamMemberReportTitle: 'Team Member Report',
     partnerLinkBtn: 'Partner Link', partnerLinkModalTitle: 'Partner View-Only Link',
     memberLinkBtn: 'Member Link', memberLinkModalTitle: 'Team Member Link',
+    managerLinkBtn: 'Manager Link', managerLinkModalTitle: 'Manager Link',
+    managerLinkEmailHint: "Enter the manager's email — used to send assignment approval and rejection notifications.",
+    managerLinkGenerateBtn: 'Generate link', managerLinkEmailRequired: 'Please enter a valid email address.',
+    managerLinkEmailLabel: "Manager's email", managerLinkUpdateEmailBtn: 'Update email',
+    managerLinkNote: "Anyone with this link can view {0}'s tasks and propose new task assignments — no login required, no access to any other data.",
     sendUpdateEmailBtn: 'Send Update Email', alertNoEmailOnFile: 'No email address on file — add one first.',
     toastEmailSent: 'Email sent to {0}', toastEmailSentCount: 'Email sent to {0} recipient(s)',
     alertEmailSendFailed: 'Could not send the email. Please try again.',
@@ -3254,7 +3267,10 @@ const T = {
     pmoNotAssigned: '— Not assigned —',
     pmoTabUnassigned: 'Unassigned',
     approvalCounterSentToast: 'Notification sent to submitter.',
+    rejectionReasonLabel: 'Rejection reason',
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
+    proposalNewAssignment: 'New task assignment', proposalTaskAssignment: 'Task assignment', proposalTaskCompletion: 'Task completion',
+    proposedByManagerFor: 'Proposed by manager for',
     approveBtn: 'Approve', rejectBtn: 'Reject',
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
     statusPending: 'Pending', statusApproved: 'Approved', statusRejected: 'Rejected',
@@ -6160,6 +6176,7 @@ views.teamMemberDetail = (memberId) => {
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" onclick="manageTeamMemberLink('${memberId}')">🔗 ${t('memberLinkBtn')}</button>
+        <button class="btn ghost" onclick="manageManagerLink('${memberId}')">👤 ${t('managerLinkBtn')}</button>
         <button class="btn ghost" onclick="sendStatusEmail('${memberId}')">📧 ${t('sendUpdateEmailBtn')}</button>
         <button class="btn ghost" onclick="printTeamMemberReport('${memberId}')">📄 ${t('teamMemberReportBtn')}</button>
       </div>
@@ -7016,8 +7033,16 @@ views.pendingApprovals = () => {
   const unassigned = [];
 
   all.forEach(row => {
-    const task = state.actions.find(a => a.id === row.task_id);
-    const proj = task ? getProject(task.projectId) : null;
+    // Assignment proposals (change_type 'assign') have no task_id yet — the
+    // project comes from proposed_project_id instead. Completion/note
+    // proposals resolve the project via their existing task as before.
+    let proj = null;
+    if (row.change_type === 'assign') {
+      proj = row.proposed_project_id ? getProject(row.proposed_project_id) : null;
+    } else {
+      const task = state.actions.find(a => a.id === row.task_id);
+      proj = task ? getProject(task.projectId) : null;
+    }
     const pmoId = proj ? (proj.pmoInChargeId || null) : null;
     if (pmoId) {
       const member = (state.team || []).find(m => m.id === pmoId);
@@ -7045,6 +7070,39 @@ views.pendingApprovals = () => {
   const pending  = items.filter(r => r.status === 'pending');
   const approved = items.filter(r => r.status === 'approved');
   const rejected = items.filter(r => r.status === 'rejected');
+  // Further split PENDING items by type — assignment proposals need attention
+  // for a fundamentally different reason (new task) than completions do.
+  const pendingAssign = pending.filter(r => r.change_type === 'assign');
+  const pendingComplete = pending.filter(r => r.change_type !== 'assign');
+
+  function renderAssignCard(row) {
+    const proj = row.proposed_project_id ? getProject(row.proposed_project_id) : null;
+    const member = (state.team || []).find(m => m.id === row.proposed_by_id);
+    const milestone = row.proposed_milestone_id && proj ? state.actions.find(a => a.id === row.proposed_milestone_id) : null;
+    return `
+      <div class="pending-approval-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:11px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${t('proposalNewAssignment')}</span>
+              <span class="badge amber" style="font-size:10px">${t('statusPending')}</span>
+            </div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:4px">${escapeHtml(row.proposed_title || '')}</div>
+            ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
+            <div style="font-size:12px;color:var(--ink-muted);margin-top:4px">
+              ${row.proposed_due_date ? `${t('assignDueLabel')}: ${escapeHtml(fmtDate(row.proposed_due_date))}` : ''}
+              ${row.proposed_priority ? ` · ${t('assignPriorityLabel')}: ${escapeHtml(row.proposed_priority)}` : ''}
+            </div>
+            ${milestone ? `<div style="font-size:12px;color:var(--ink-faint);margin-top:2px">🎯 ${t('assignMilestoneLabel')}: ${escapeHtml(milestone.title)}</div>` : ''}
+            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedByManagerFor')}: ${escapeHtml(member ? member.name : (row.proposed_by_name || row.proposed_by_id))} · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn sm" onclick="approveAssignment('${row.id}')">✓ ${t('approveBtn')}</button>
+            <button class="btn ghost sm" onclick="rejectAssignment('${row.id}')">✕ ${t('rejectBtn')}</button>
+          </div>
+        </div>
+      </div>`;
+  }
 
   function renderCard(row) {
     const task = state.actions.find(a => a.id === row.task_id);
@@ -7075,7 +7133,12 @@ views.pendingApprovals = () => {
             ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
             ${fileSection}
             ${linkSection}
-            ${row.status === 'rejected' && row.rejection_reason ? `<div class="submission-reject-reason" style="margin-top:6px">${t('rejectionReasonLabel')}: ${escapeHtml(row.rejection_reason)}</div>` : ''}
+            ${row.status === 'rejected' && row.rejection_reason ? `
+              <div style="background:var(--bg-danger,#fcebeb);border-radius:8px;padding:10px 12px;margin-top:8px">
+                <div style="font-size:10.5px;font-weight:600;color:var(--text-danger,#a32d2d);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">${t('rejectionReasonLabel')}</div>
+                <div style="font-size:13px;color:var(--ink);line-height:1.5">${escapeHtml(row.rejection_reason)}</div>
+              </div>
+            ` : ''}
             <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
@@ -7101,21 +7164,133 @@ views.pendingApprovals = () => {
       `).join('')}
     </div>
     ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : `
-      ${pending.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">${t('statusPending')} (${pending.length})</div>
-        ${pending.map(renderCard).join('')}
-      ` : `<div style="font-size:13px;color:var(--ink-faint);margin-bottom:16px">No pending approvals in this section.</div>`}
+      ${pendingAssign.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">${t('proposalTaskAssignment')} (${pendingAssign.length})</div>
+        ${pendingAssign.map(renderAssignCard).join('')}
+      ` : ''}
+      ${pendingComplete.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:${pendingAssign.length ? '20px' : '0'} 0 10px;${pendingAssign.length ? 'padding-top:14px;border-top:1px solid var(--line)' : ''}">${t('proposalTaskCompletion')} (${pendingComplete.length})</div>
+        ${pendingComplete.map(renderCard).join('')}
+      ` : ''}
+      ${pending.length === 0 ? `<div style="font-size:13px;color:var(--ink-faint);margin-bottom:16px">No pending approvals in this section.</div>` : ''}
       ${approved.length > 0 ? `
         <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusApproved')} (${approved.length})</div>
-        ${approved.map(renderCard).join('')}
+        ${approved.map(r => r.change_type === 'assign' ? renderAssignCard(r) : renderCard(r)).join('')}
       ` : ''}
       ${rejected.length > 0 ? `
         <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusRejected')} (${rejected.length})</div>
-        ${rejected.map(renderCard).join('')}
+        ${rejected.map(r => r.change_type === 'assign' ? renderAssignCard(r) : renderCard(r)).join('')}
       ` : ''}
     `}
   `;
 };
+
+// ── Approve a task ASSIGNMENT proposal — creates the real task, assigns it
+// to the team member, and sends them a confirmation email. Distinct from
+// approveProposal (which handles existing-task completions/notes). ──
+async function approveAssignment(id) {
+  if (!supabaseClient) return;
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (!row) return;
+
+  const newTask = {
+    id: uid(),
+    type: 'task',
+    title: row.proposed_title,
+    projectId: row.proposed_project_id,
+    ownerKind: 'internal',
+    ownerId: row.proposed_by_id, // the team member this was assigned FOR
+    status: 'open',
+    priority: row.proposed_priority || 'medium',
+    startDate: row.proposed_start_date || null,
+    dueDate: row.proposed_due_date,
+    completedDate: null,
+    reason: '', tracking: [],
+    dependsOnIds: [],
+    feedsIntoMilestoneId: row.proposed_milestone_id || null,
+    createdAt: todayDate(),
+  };
+  state.actions.push(newTask);
+  markRowDirty('actions', newTask.id);
+  saveState();
+
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
+
+  // Confirmation email to the team member — their own email on record, plus
+  // their own team-member view link (same pattern as the completion flow).
+  (async () => {
+    try {
+      const member = (state.team || []).find(m => m.id === row.proposed_by_id);
+      const proj = getProject(row.proposed_project_id);
+      if (!member || !member.email || !proj) return;
+      const { data: linkRows } = await supabaseClient
+        .from('team_member_links').select('token').eq('member_id', row.proposed_by_id).eq('revoked', false)
+        .order('created_at', { ascending: false }).limit(1);
+      const linkUrl = (linkRows && linkRows.length > 0) ? TEAM_MEMBER_VIEW_BASE_URL + '?token=' + linkRows[0].token : null;
+      if (!linkUrl) return;
+      await fetch(SEND_EMAIL_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: [member.email], recipientName: member.name || '', recipientType: 'task_assigned',
+          taskTitle: row.proposed_title, projectName: proj.name, dueDate: fmtDate(row.proposed_due_date),
+          priority: row.proposed_priority || 'medium', linkUrl, lang: currentLang,
+        }),
+      });
+    } catch (e) { /* silent — best effort */ }
+  })();
+
+  toast(t('toastProposalApproved'));
+  refreshPendingApprovals();
+}
+
+async function rejectAssignment(id) {
+  if (!supabaseClient) return;
+  const reason = prompt(t('rejectionReasonPrompt'));
+  if (reason === null) return;
+  if (!reason.trim()) { alert(t('rejectionReasonRequired')); return; }
+
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'rejected', rejection_reason: reason.trim(),
+      reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
+
+  // Rejection notice to the MANAGER's stored email — no login, so the
+  // manager link URL itself is the only way back in for them to resubmit.
+  (async () => {
+    try {
+      if (!row) return;
+      const proj = getProject(row.proposed_project_id);
+      const member = (state.team || []).find(m => m.id === row.proposed_by_id);
+      const { data: linkRows } = await supabaseClient
+        .from('manager_links').select('token, manager_email').eq('member_id', row.proposed_by_id).eq('revoked', false)
+        .order('created_at', { ascending: false }).limit(1);
+      if (!linkRows || linkRows.length === 0 || !linkRows[0].manager_email) return;
+      const linkUrl = MANAGER_VIEW_BASE_URL + '?token=' + linkRows[0].token;
+      await fetch(SEND_EMAIL_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: [linkRows[0].manager_email], recipientType: 'assignment_rejected',
+          submitterName: member ? member.name : (row.proposed_by_name || ''),
+          taskTitle: row.proposed_title, projectName: proj ? proj.name : '',
+          rejectionReason: reason.trim(), linkUrl, lang: 'en',
+        }),
+      });
+    } catch (e) { /* silent */ }
+  })();
+
+  toast(t('toastProposalRejected'));
+  refreshPendingApprovals();
+}
 
 async function approveProposal(id) {
   if (!supabaseClient) return;
@@ -11693,16 +11868,6 @@ function renderTeamMemberLinkModal(memberId, memberName, token, isNew) {
     <div style="font-size:12px;color:var(--ink-faint);margin-bottom:14px">
       ${t('partnerLinkNote', escapeHtml(memberName))}
     </div>
-    <div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:13px;font-weight:500">${t('canSeeOverviewLabel')}</div>
-        <div style="font-size:11.5px;color:var(--ink-faint)">${t('canSeeOverviewHint')}</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" ${canSeeOverview ? 'checked' : ''} onchange="toggleMemberOverview('${memberId}', this.checked)">
-        <span class="slider"></span>
-      </label>
-    </div>
     <div style="padding-top:4px">
       <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="revokeTeamMemberLink('${memberId}')">🗑 ${t('revokeLink')}</button>
     </div>
@@ -11747,6 +11912,141 @@ function toggleMemberOverview(memberId, checked) {
   m.canSeeProjectOverview = checked;
   saveState({ internal_team: [m] });
   toast(checked ? t('toastOverviewEnabled') : t('toastOverviewDisabled'));
+}
+
+// ── Manager Link management — same pattern as Team Member Link, separate
+// isolated table (manager_links) and a separate view-only + write-only page
+// (manager-view.html). The manager's email is stored on the link record and
+// used to send assignment approval/rejection notifications — no login. ──
+const MANAGER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/manager-view.html';
+
+async function manageManagerLink(memberId) {
+  if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
+  const m = getTeamMember(memberId);
+  if (!m) return;
+
+  openModal(t('managerLinkModalTitle'), `<div style="text-align:center;padding:24px 0;color:var(--ink-muted);font-size:13px">${t('loadingEllipsis')}</div>`, '');
+
+  try {
+    const { data: existing, error: fetchErr } = await supabaseClient
+      .from('manager_links')
+      .select('token, manager_email, revoked, created_at')
+      .eq('member_id', memberId)
+      .eq('revoked', false)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fetchErr) throw fetchErr;
+
+    if (existing && existing.length > 0) {
+      renderManagerLinkModal(memberId, m.name, existing[0].token, existing[0].manager_email, false);
+    } else {
+      renderManagerLinkEmailPrompt(memberId, m.name);
+    }
+  } catch (e) {
+    openModal(t('managerLinkModalTitle'), `<div style="color:var(--red);padding:20px 0;text-align:center">${t('partnerLinkError')}</div>`, '');
+  }
+}
+
+// First-time setup: ask for the manager's email before generating the link.
+function renderManagerLinkEmailPrompt(memberId, memberName) {
+  const html = `
+    <div style="font-size:13px;color:var(--ink-muted);margin-bottom:14px">${t('managerLinkEmailHint')}</div>
+    <input id="manager-link-email-input" type="email" placeholder="manager@company.com"
+      style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:16px">
+    <button class="btn" style="width:100%" onclick="createManagerLink('${memberId}', '${escapeHtml(memberName).replace(/'/g,"\\'")}')">${t('managerLinkGenerateBtn')}</button>
+  `;
+  openModal(t('managerLinkModalTitle') + ' — ' + escapeHtml(memberName), html, '');
+}
+
+async function createManagerLink(memberId, memberName) {
+  const emailInput = document.getElementById('manager-link-email-input');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email || !email.includes('@')) { alert(t('managerLinkEmailRequired')); return; }
+  try {
+    const token = _generateToken();
+    const { error: insertErr } = await supabaseClient
+      .from('manager_links')
+      .insert({ token, member_id: memberId, manager_email: email, created_by: (_authUser && _authUser.email) || null });
+    if (insertErr) throw insertErr;
+    renderManagerLinkModal(memberId, memberName, token, email, true);
+  } catch (e) {
+    alert(t('partnerLinkError'));
+  }
+}
+
+function renderManagerLinkModal(memberId, memberName, token, managerEmail, isNew) {
+  const fullUrl = MANAGER_VIEW_BASE_URL + '?token=' + token;
+  const html = `
+    <div style="font-size:13px;color:var(--ink-muted);margin-bottom:14px">
+      ${isNew ? t('partnerLinkNewHint') : t('partnerLinkExistingHint')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input id="manager-link-url" type="text" readonly value="${escapeHtml(fullUrl)}"
+        style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12px;font-family:monospace;color:var(--ink)">
+      <button class="btn sm" onclick="copyManagerLink()">${t('copyLink')}</button>
+    </div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">
+      ${t('managerLinkNote', escapeHtml(memberName))}
+    </div>
+    <div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:500;margin-bottom:6px">${t('managerLinkEmailLabel')}</div>
+      <input id="manager-link-email-edit" type="email" value="${escapeHtml(managerEmail || '')}"
+        style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:8px">
+      <button class="btn ghost sm" onclick="updateManagerLinkEmail('${memberId}')">${t('managerLinkUpdateEmailBtn')}</button>
+    </div>
+    <div style="padding-top:4px">
+      <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="revokeManagerLink('${memberId}')">🗑 ${t('revokeLink')}</button>
+    </div>
+  `;
+  openModal(t('managerLinkModalTitle') + ' — ' + escapeHtml(memberName), html, '');
+}
+
+function copyManagerLink() {
+  const input = document.getElementById('manager-link-url');
+  if (!input) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    toast(t('toastLinkCopied'));
+  }).catch(() => {
+    document.execCommand('copy');
+    toast(t('toastLinkCopied'));
+  });
+}
+
+async function updateManagerLinkEmail(memberId) {
+  const emailInput = document.getElementById('manager-link-email-edit');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email || !email.includes('@')) { alert(t('managerLinkEmailRequired')); return; }
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient
+      .from('manager_links')
+      .update({ manager_email: email })
+      .eq('member_id', memberId)
+      .eq('revoked', false);
+    if (error) throw error;
+    toast(t('toastSavedChanges'));
+  } catch (e) {
+    alert(t('partnerLinkError'));
+  }
+}
+
+async function revokeManagerLink(memberId) {
+  if (!confirm(t('confirmRevokeLink'))) return;
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient
+      .from('manager_links')
+      .update({ revoked: true, revoked_at: new Date().toISOString() })
+      .eq('member_id', memberId)
+      .eq('revoked', false);
+    if (error) throw error;
+    toast(t('toastLinkRevoked'));
+    closeModal();
+  } catch (e) {
+    alert(t('partnerLinkError'));
+  }
 }
 
 // ── Send a lightweight status-nudge email — never embeds the task list
