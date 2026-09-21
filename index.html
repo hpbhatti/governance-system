@@ -1845,8 +1845,23 @@ const SUPABASE_ENABLED =
   SUPABASE_ANON_KEY !== 'YOUR_ANON_KEY' &&
   typeof window !== 'undefined' && window.supabase &&
   typeof window.supabase.createClient === 'function';
+// ── Cache-bypass fetch wrapper ──
+// Every Supabase GET request otherwise uses a deterministic URL (same table,
+// same filters), which some layer between browser and server — the browser's
+// own HTTP cache, or an intermediate edge cache — can serve as a stale
+// response even after a hard refresh. This forces every single request this
+// client makes, on every table, to always hit Supabase fresh and never be
+// served from any cache. This is what was silently causing changes to take
+// 3-5 minutes (a cache TTL) to appear on other devices regardless of refresh.
+function _noCacheFetch(url, options) {
+  return fetch(url, {
+    ...options,
+    cache: 'no-store',
+    headers: { ...(options && options.headers), 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
+  });
+}
 const supabaseClient = SUPABASE_ENABLED
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: _noCacheFetch } })
   : null;
 // Map each cloud table to its in-memory state key.
 // Early auth state (needed by sidebar render before auth functions are defined)
