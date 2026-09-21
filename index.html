@@ -3674,14 +3674,29 @@ async function _loadStateInner(force) {
   if (!supabaseClient) return loadStateFromLocalStorage();
   _lastLoadHadRealChanges = false; // reset for this call — only flipped true where a genuine change is found below
 
-  // 1) Fetch ONLY the tiny per-table stamps (one small row).
+  // 1) Determine what actually changed on the server, per table — queried
+  // DIRECTLY from each table's own most recent updated_at, not from a shared
+  // coordination stamp. The old design relied on bumpCloudTimestamps
+  // successfully writing a side-channel row after every save; if that second
+  // write ever failed silently, no other device would ever learn anything
+  // changed, since they only compared against that row. Querying each
+  // table's own real data removes that single point of failure entirely —
+  // this is a tiny, cheap query per table (one row, no payload) and is
+  // always the ground truth, regardless of whether any stamp write succeeded.
   let cloudTs = {};
   try {
-    const { data, error } = await withRequestTimeout(supabaseClient.from('config').select('settings').eq('id', SYNC_META_ID).maybeSingle());
-    if (error) throw error;
-    cloudTs = (data && data.settings && typeof data.settings === 'object') ? data.settings : {};
+    const tsResults = await Promise.all(SUPABASE_TABLES.map(async t => {
+      try {
+        const { data, error } = await withRequestTimeout(
+          supabaseClient.from(t.table).select('updated_at').order('updated_at', { ascending: false }).limit(1).maybeSingle()
+        );
+        if (error) throw error;
+        return { table: t.table, ts: data && data.updated_at ? new Date(data.updated_at).getTime() : 0 };
+      } catch (e) { return { table: t.table, ts: null }; } // null = query failed, don't trust this table's timestamp
+    }));
+    tsResults.forEach(r => { if (r.ts !== null) cloudTs[r.table] = r.ts; });
   } catch (e) {
-    console.error('Supabase stamp fetch failed — using local cache:', describeSupabaseError(e));
+    console.error('Supabase timestamp fetch failed — using local cache:', describeSupabaseError(e));
     setSyncOnline(false);
     return loadStateFromLocalStorage();
   }
