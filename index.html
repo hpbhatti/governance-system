@@ -1854,10 +1854,18 @@ const SUPABASE_ENABLED =
 // served from any cache. This is what was silently causing changes to take
 // 3-5 minutes (a cache TTL) to appear on other devices regardless of refresh.
 function _noCacheFetch(url, options) {
+  // supabase-js may pass headers as a Headers instance rather than a plain
+  // object — spreading a Headers instance with {...headers} silently drops
+  // every entry (including Authorization and apikey), since Headers stores
+  // its values via accessor methods, not own enumerable properties. Using
+  // the Headers constructor here correctly merges either shape.
+  const mergedHeaders = new Headers(options && options.headers);
+  mergedHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  mergedHeaders.set('Pragma', 'no-cache');
   return fetch(url, {
     ...options,
     cache: 'no-store',
-    headers: { ...(options && options.headers), 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
+    headers: mergedHeaders,
   });
 }
 const supabaseClient = SUPABASE_ENABLED
