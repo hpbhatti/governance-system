@@ -1122,7 +1122,13 @@ function submitAssignment() {
     headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: token, projectId: projectId, title: title, startDate: startDate, dueDate: dueDate, priority: priority, milestoneId: milestoneId || null }),
   }).then(function(res) {
-    if (!res.ok) throw new Error('failed');
+    if (!res.ok) {
+      return res.json().then(function(body) {
+        throw new Error((body && body.error) || 'failed');
+      }).catch(function() {
+        throw new Error('failed');
+      });
+    }
     return res.json();
   }).then(function() {
     btn.disabled = false;
@@ -1131,11 +1137,11 @@ function submitAssignment() {
     document.getElementById('assign-start').value = '';
     document.getElementById('assign-due').value = '';
     alert(t('assignSubmitted'));
-  }).catch(function() {
+  }).catch(function(err) {
     btn.disabled = false;
     btn.textContent = t('assignSubmitBtn');
     statusEl.style.color = 'var(--red, #b04540)';
-    statusEl.textContent = t('assignError');
+    statusEl.textContent = (err && err.message && err.message !== 'failed') ? err.message : t('assignError');
   });
 }
 
