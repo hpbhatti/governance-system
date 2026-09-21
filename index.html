@@ -1516,8 +1516,9 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .pv-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .pv-for-label { font-size: 11px; color: var(--ink-faint); }
   .pv-for-name { font-size: 13px; font-weight: 600; color: var(--ink); }
-  .pv-meta-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ink-muted); margin-bottom: 6px; }
-  .pv-meta-lbl { color: var(--ink-faint); margin-right: 3px; }
+  .pv-meta-row { display: flex; flex-wrap: wrap; gap: 18px; font-size: 12.5px; color: var(--ink-muted); margin-bottom: 6px; }
+  .pv-meta-row .pv-meta-item { display: flex; gap: 5px; align-items: baseline; } /* gap sits between label and value and flips correctly for RTL, unlike a physical margin */
+  .pv-meta-lbl { color: var(--ink-faint); font-weight: 500; }
   .pv-overdue-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--red); background: rgba(176,69,64,0.1); padding: 2px 9px; border-radius: 999px; margin-top: 2px; margin-bottom: 6px; }
   .pv-ontime-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #3b6d11; background: rgba(59,109,17,0.1); padding: 2px 9px; border-radius: 999px; margin-top: 2px; margin-bottom: 6px; }
   .pv-file-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; margin-top: 8px; font-size: 12.5px; color: var(--ink); flex-wrap: wrap; }
@@ -7190,11 +7191,11 @@ views.pendingApprovals = () => {
           <div><span class="pv-for-label">${t('assigningToLabel')}</span> <span class="pv-for-name">${escapeHtml(assigneeName)}</span></div>
         </div>
         <div class="pv-meta-row">
-          ${row.proposed_start_date ? `<div><span class="pv-meta-lbl">${t('assignStartLabel')}</span>${escapeHtml(fmtDate(row.proposed_start_date))}</div>` : ''}
-          ${row.proposed_due_date ? `<div><span class="pv-meta-lbl">${t('assignDueLabel')}</span>${escapeHtml(fmtDate(row.proposed_due_date))}</div>` : ''}
-          ${row.proposed_priority ? `<div><span class="pv-meta-lbl">${t('assignPriorityLabel')}</span>${escapeHtml(row.proposed_priority)}</div>` : ''}
+          ${row.proposed_start_date ? `<div class="pv-meta-item"><span class="pv-meta-lbl">${t('assignStartLabel')}</span><span>${escapeHtml(fmtDate(row.proposed_start_date))}</span></div>` : ''}
+          ${row.proposed_due_date ? `<div class="pv-meta-item"><span class="pv-meta-lbl">${t('assignDueLabel')}</span><span>${escapeHtml(fmtDate(row.proposed_due_date))}</span></div>` : ''}
+          ${row.proposed_priority ? `<div class="pv-meta-item"><span class="pv-meta-lbl">${t('assignPriorityLabel')}</span><span>${escapeHtml(({high:t('priorityHigh'),medium:t('priorityMedium'),low:t('priorityLow')})[row.proposed_priority] || row.proposed_priority)}</span></div>` : ''}
         </div>
-        ${milestone ? `<div class="pv-meta-row" style="margin-top:-4px"><div>🎯 <span class="pv-meta-lbl">${t('assignMilestoneLabel')}</span>${escapeHtml(milestone.title)}</div></div>` : ''}
+        ${milestone ? `<div class="pv-meta-row" style="margin-top:-4px"><div class="pv-meta-item">🎯 <span class="pv-meta-lbl">${t('assignMilestoneLabel')}</span><span>${escapeHtml(milestone.title)}</span></div></div>` : ''}
         ${row.status === 'rejected' && row.rejection_reason ? `
           <div class="pv-reject-box">
             <div class="pv-reject-lbl">${t('rejectionReasonLabel')}</div>
@@ -7229,8 +7230,8 @@ views.pendingApprovals = () => {
       const diffDays = Math.round((submittedDate - dueDate) / 86400000);
       dueDateRow = `
         <div class="pv-meta-row">
-          <div><span class="pv-meta-lbl">${t('originallyDueLabel')}</span>${escapeHtml(fmtDate(task.dueDate))}</div>
-          <div><span class="pv-meta-lbl">${t('submittedLabel')}</span>${escapeHtml(fmtDate(row.created_at ? row.created_at.slice(0,10) : ''))}</div>
+          <div class="pv-meta-item"><span class="pv-meta-lbl">${t('originallyDueLabel')}</span><span>${escapeHtml(fmtDate(task.dueDate))}</span></div>
+          <div class="pv-meta-item"><span class="pv-meta-lbl">${t('submittedLabel')}</span><span>${escapeHtml(fmtDate(row.created_at ? row.created_at.slice(0,10) : ''))}</span></div>
         </div>
         ${diffDays > 0 ? `<span class="pv-overdue-pill">⚠ ${diffDays} ${diffDays === 1 ? t('dayOverdueSingular') : t('daysOverdueLabel')}</span>`
                         : `<span class="pv-ontime-pill">✓ ${t('onTimeLabel')}</span>`}
@@ -7344,6 +7345,18 @@ async function approveAssignment(id) {
     feedsIntoMilestoneId: row.proposed_milestone_id || null,
     createdAt: todayDate(),
   };
+  // Slot the title by its ACTUAL detected language, not the approver's current
+  // UI language — the manager who typed this may be using a different language
+  // than whoever clicks Approve. Using currentLang here would misfile the text
+  // into the wrong slot, marking it "manually verified" in a language it isn't,
+  // and leaving the correct slot permanently empty — that empty slot is exactly
+  // what re-queues this task for live translation on every future language
+  // toggle, forever, compounding the delay as more assignments get approved.
+  if (newTask.title) {
+    const cap = detectContentLang(newTask.title) === 'ar' ? 'Ar' : 'En';
+    newTask[`title${cap}`] = newTask.title;
+    newTask[`titleManual${cap}`] = false; // not manually verified — eligible for background translation to fill the OTHER slot
+  }
   state.actions.push(newTask);
   markRowDirty('actions', newTask.id);
   saveState();
@@ -7373,6 +7386,32 @@ async function approveAssignment(id) {
           recipients: [member.email], recipientName: member.name || '', recipientType: 'task_assigned',
           taskTitle: row.proposed_title, projectName: proj.name, dueDate: fmtDate(row.proposed_due_date),
           priority: row.proposed_priority || 'medium', linkUrl, lang: currentLang,
+        }),
+      });
+    } catch (e) { /* silent — best effort */ }
+  })();
+
+  // Confirmation email to the MANAGER who proposed this — previously missing
+  // entirely, meaning a manager had no way of knowing their proposal succeeded
+  // unless they revisited the link themselves. Mirrors the same lookup pattern
+  // rejectAssignment already uses to find their stored email and link.
+  (async () => {
+    try {
+      const proj = getProject(row.proposed_project_id);
+      const member = (state.team || []).find(m => m.id === row.proposed_by_id);
+      const { data: linkRows } = await supabaseClient
+        .from('manager_links').select('token, manager_email').eq('member_id', row.proposed_by_id).eq('revoked', false)
+        .order('created_at', { ascending: false }).limit(1);
+      if (!linkRows || linkRows.length === 0 || !linkRows[0].manager_email) return;
+      const linkUrl = MANAGER_VIEW_BASE_URL + '?token=' + linkRows[0].token;
+      await fetch(SEND_EMAIL_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: [linkRows[0].manager_email], recipientType: 'assignment_approved',
+          submitterName: member ? member.name : (row.proposed_by_name || ''),
+          taskTitle: row.proposed_title, projectName: proj ? proj.name : '',
+          dueDate: fmtDate(row.proposed_due_date), linkUrl, lang: currentLang,
         }),
       });
     } catch (e) { /* silent — best effort */ }
@@ -7416,7 +7455,7 @@ async function rejectAssignment(id) {
           recipients: [linkRows[0].manager_email], recipientType: 'assignment_rejected',
           submitterName: member ? member.name : (row.proposed_by_name || ''),
           taskTitle: row.proposed_title, projectName: proj ? proj.name : '',
-          rejectionReason: reason.trim(), linkUrl, lang: 'en',
+          rejectionReason: reason.trim(), linkUrl, lang: currentLang,
         }),
       });
     } catch (e) { /* silent */ }
