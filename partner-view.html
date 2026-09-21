@@ -838,7 +838,8 @@ function loadPartnerView() {
 
   fetch(FUNCTION_URL + '?token=' + encodeURIComponent(token), {
     headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY },
-    signal: controller.signal
+    signal: controller.signal,
+    cache: 'no-store' // never serve a stale cached response — always fetch fresh
   }).then(function(res) {
     clearTimeout(timeoutId);
     if (!res.ok) {
