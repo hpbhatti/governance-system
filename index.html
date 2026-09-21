@@ -1505,6 +1505,26 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .switch input:checked + .slider { background-color: var(--accent); }
   .switch input:checked + .slider:before { transform: translateX(18px); }
   .pending-approval-card { background: var(--bg-card); border: 1px solid var(--line); border-left: 4px solid var(--accent-warm); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .pending-approval-card.approved-card { border-left-color: #3b6d11; }
+  .pending-approval-card.rejected-card { border-left-color: var(--red); }
+  .pv-status-heading { font-size: 12px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+  .pv-subgroup { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 8px; display: flex; align-items: center; gap: 6px; }
+  .pv-subgroup.assign { color: var(--accent); }
+  .pv-subgroup.complete { color: var(--accent-warm); }
+  .pv-subgroup-count { font-weight: 400; color: var(--ink-faint); text-transform: none; }
+  .pv-for-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: 8px; padding: 7px 11px; margin-bottom: 10px; }
+  .pv-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .pv-for-label { font-size: 11px; color: var(--ink-faint); }
+  .pv-for-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .pv-meta-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ink-muted); margin-bottom: 6px; }
+  .pv-meta-lbl { color: var(--ink-faint); margin-right: 3px; }
+  .pv-overdue-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--red); background: rgba(176,69,64,0.1); padding: 2px 9px; border-radius: 999px; margin-top: 2px; margin-bottom: 6px; }
+  .pv-ontime-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #3b6d11; background: rgba(59,109,17,0.1); padding: 2px 9px; border-radius: 999px; margin-top: 2px; margin-bottom: 6px; }
+  .pv-file-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; margin-top: 8px; font-size: 12.5px; color: var(--ink); flex-wrap: wrap; }
+  .pv-file-row .pv-fname { font-weight: 600; flex: 1; min-width: 100px; }
+  .pv-file-row button { font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  .pv-reject-box { background: var(--bg-danger,#fcebeb); border-radius: 8px; padding: 9px 11px; margin-top: 8px; font-size: 12.5px; color: var(--text-danger,#7a2b25); }
+  .pv-reject-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-danger,#a32d2d); margin-bottom: 2px; }
   .field-fallback-note { font-size: 11.5px; color: var(--amber); margin-top: 5px; }
   .drift-chip {
     display: inline-block; padding: 1px 7px; border-radius: 8px;
@@ -2571,7 +2591,12 @@ const T = {
     rejectionReasonLabel: 'سبب الرفض',
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
     proposalNewAssignment: 'تعيين مهمة جديدة', proposalTaskAssignment: 'تعيين المهام', proposalTaskCompletion: 'إكمال المهام',
-    proposedByManagerFor: 'مقترح من المدير لـ',
+    proposedByManagerFor: 'مقترح من المدير',
+    assignDueLabel: 'الاستحقاق', assignStartLabel: 'البدء', assignPriorityLabel: 'الأولوية', assignMilestoneLabel: 'يغذي',
+    assigningToLabel: 'تعيين إلى', completedByLabel: 'أنجزها', completedByPartnerLabel: 'أنجزها',
+    originallyDueLabel: 'الاستحقاق الأصلي', submittedLabel: 'تم التقديم',
+    daysOverdueLabel: 'يوماً متأخراً', dayOverdueSingular: 'يوم متأخر', onTimeLabel: 'في الوقت المحدد',
+    downloadBtn: 'تنزيل', promoteBtn: 'ترقية', taskDeletedLabel: 'تم حذف المهمة',
     approveBtn: 'موافقة', rejectBtn: 'رفض',
     toastProposalApproved: 'تمت الموافقة والتطبيق', toastProposalRejected: 'تم الرفض',
     statusPending: 'قيد المراجعة', statusApproved: 'مقبول', statusRejected: 'مرفوض',
@@ -3293,7 +3318,12 @@ const T = {
     rejectionReasonLabel: 'Rejection reason',
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
     proposalNewAssignment: 'New task assignment', proposalTaskAssignment: 'Task assignment', proposalTaskCompletion: 'Task completion',
-    proposedByManagerFor: 'Proposed by manager for',
+    proposedByManagerFor: 'Proposed by manager',
+    assignDueLabel: 'Due', assignStartLabel: 'Start', assignPriorityLabel: 'Priority', assignMilestoneLabel: 'Feeds into',
+    assigningToLabel: 'Assigning to', completedByLabel: 'Completed by', completedByPartnerLabel: 'Completed by',
+    originallyDueLabel: 'Originally due', submittedLabel: 'Submitted',
+    daysOverdueLabel: 'days overdue', dayOverdueSingular: 'day overdue', onTimeLabel: 'On time',
+    downloadBtn: 'Download', promoteBtn: 'Promote', taskDeletedLabel: 'task deleted',
     approveBtn: 'Approve', rejectBtn: 'Reject',
     toastProposalApproved: 'Approved and applied', toastProposalRejected: 'Rejected',
     statusPending: 'Pending', statusApproved: 'Approved', statusRejected: 'Rejected',
@@ -7124,81 +7154,103 @@ views.pendingApprovals = () => {
   const activeGroup = pmoTabList.find(t => t.key === activeTab) || pmoTabList[0] || { items: [] };
   const items = activeGroup ? activeGroup.items : [];
 
-  // Within each PMO tab: three clear sub-sections
+  // Within each PMO tab: split by status first, then by type within each status —
+  // applied consistently to Pending, Approved, AND Rejected (not just Pending).
   const pending  = items.filter(r => r.status === 'pending');
   const approved = items.filter(r => r.status === 'approved');
   const rejected = items.filter(r => r.status === 'rejected');
-  // Further split PENDING items by type — assignment proposals need attention
-  // for a fundamentally different reason (new task) than completions do.
-  const pendingAssign = pending.filter(r => r.change_type === 'assign');
-  const pendingComplete = pending.filter(r => r.change_type !== 'assign');
 
   function renderAssignCard(row) {
     const proj = row.proposed_project_id ? getProject(row.proposed_project_id) : null;
     const member = (state.team || []).find(m => m.id === row.proposed_by_id);
     const milestone = row.proposed_milestone_id && proj ? state.actions.find(a => a.id === row.proposed_milestone_id) : null;
+    const assigneeName = member ? member.name : (row.proposed_by_name || row.proposed_by_id);
+    const initial = (assigneeName || '?').trim().charAt(0).toUpperCase();
+    const statusPillClass = row.status === 'approved' ? 'green' : row.status === 'rejected' ? 'red' : 'amber';
+    const statusLabel = row.status === 'approved' ? t('statusApproved') : row.status === 'rejected' ? t('statusRejected') : t('statusPending');
+    const cardStateClass = row.status === 'approved' ? ' approved-card' : row.status === 'rejected' ? ' rejected-card' : '';
+
     return `
-      <div class="pending-approval-card">
+      <div class="pending-approval-card${cardStateClass}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <span style="font-size:11px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${t('proposalNewAssignment')}</span>
-              <span class="badge amber" style="font-size:10px">${t('statusPending')}</span>
-            </div>
-            <div style="font-size:14px;font-weight:500;margin-bottom:4px">${escapeHtml(row.proposed_title || '')}</div>
-            ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
-            <div style="font-size:12px;color:var(--ink-muted);margin-top:4px">
-              ${row.proposed_due_date ? `${t('assignDueLabel')}: ${escapeHtml(fmtDate(row.proposed_due_date))}` : ''}
-              ${row.proposed_priority ? ` · ${t('assignPriorityLabel')}: ${escapeHtml(row.proposed_priority)}` : ''}
-            </div>
-            ${milestone ? `<div style="font-size:12px;color:var(--ink-faint);margin-top:2px">🎯 ${t('assignMilestoneLabel')}: ${escapeHtml(milestone.title)}</div>` : ''}
-            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedByManagerFor')}: ${escapeHtml(member ? member.name : (row.proposed_by_name || row.proposed_by_id))} · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
-          </div>
+          <span class="badge ${statusPillClass}" style="font-size:10px">${statusLabel}</span>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="btn sm" onclick="approveAssignment('${row.id}')">✓ ${t('approveBtn')}</button>
-            <button class="btn ghost sm" onclick="rejectAssignment('${row.id}')">✕ ${t('rejectBtn')}</button>
+            ${row.status === 'pending' ? `
+              <button class="btn sm" onclick="approveAssignment('${row.id}')">✓ ${t('approveBtn')}</button>
+              <button class="btn ghost sm" onclick="rejectAssignment('${row.id}')">✕ ${t('rejectBtn')}</button>
+            ` : `
+              <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
+            `}
           </div>
         </div>
+        <div style="font-size:15px;font-weight:700;margin:8px 0 4px">${escapeHtml(row.proposed_title || '')}</div>
+        ${proj ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">📁 ${escapeHtml(proj.name)}</div>` : ''}
+        <div class="pv-for-row">
+          <div class="pv-avatar">${escapeHtml(initial)}</div>
+          <div><span class="pv-for-label">${t('assigningToLabel')}</span> <span class="pv-for-name">${escapeHtml(assigneeName)}</span></div>
+        </div>
+        <div class="pv-meta-row">
+          ${row.proposed_start_date ? `<div><span class="pv-meta-lbl">${t('assignStartLabel')}</span>${escapeHtml(fmtDate(row.proposed_start_date))}</div>` : ''}
+          ${row.proposed_due_date ? `<div><span class="pv-meta-lbl">${t('assignDueLabel')}</span>${escapeHtml(fmtDate(row.proposed_due_date))}</div>` : ''}
+          ${row.proposed_priority ? `<div><span class="pv-meta-lbl">${t('assignPriorityLabel')}</span>${escapeHtml(row.proposed_priority)}</div>` : ''}
+        </div>
+        ${milestone ? `<div class="pv-meta-row" style="margin-top:-4px"><div>🎯 <span class="pv-meta-lbl">${t('assignMilestoneLabel')}</span>${escapeHtml(milestone.title)}</div></div>` : ''}
+        ${row.status === 'rejected' && row.rejection_reason ? `
+          <div class="pv-reject-box">
+            <div class="pv-reject-lbl">${t('rejectionReasonLabel')}</div>
+            <div>${escapeHtml(row.rejection_reason)}</div>
+          </div>
+        ` : ''}
+        <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedByManagerFor')} · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
       </div>`;
   }
 
   function renderCard(row) {
     const task = state.actions.find(a => a.id === row.task_id);
-    const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(task deleted)</em>`;
+    const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(${t('taskDeletedLabel')})</em>`;
     const proj = task ? getProject(task.projectId) : null;
     const changeLabel = row.change_type === 'complete' ? t('proposalMarkComplete') : t('proposalAddNote');
-    const statusColors = { pending: 'amber', approved: 'green', rejected: 'red' };
+    const statusPillClass = row.status === 'approved' ? 'green' : row.status === 'rejected' ? 'red' : 'amber';
+    const statusLabel = row.status === 'approved' ? t('statusApproved') : row.status === 'rejected' ? t('statusRejected') : t('statusPending');
+    const cardStateClass = row.status === 'approved' ? ' approved-card' : row.status === 'rejected' ? ' rejected-card' : '';
+
+    const submitterName = row.proposed_by_name || row.proposed_by_id;
+    const isPartner = row.proposed_by_type === 'partner';
+    const initial = (submitterName || '?').trim().charAt(0).toUpperCase();
+    const completedByLabel = isPartner ? t('completedByPartnerLabel') : t('completedByLabel');
+    const submitterTag = isPartner ? t('colPartner') : t('internalTeam');
+
+    // Original due date vs submission date — tells the approver at a glance
+    // whether this was on time or overdue, and by how much.
+    let dueDateRow = '';
+    if (task && task.dueDate) {
+      const dueDate = new Date(task.dueDate);
+      const submittedDate = row.created_at ? new Date(row.created_at) : new Date();
+      const diffDays = Math.round((submittedDate - dueDate) / 86400000);
+      dueDateRow = `
+        <div class="pv-meta-row">
+          <div><span class="pv-meta-lbl">${t('originallyDueLabel')}</span>${escapeHtml(fmtDate(task.dueDate))}</div>
+          <div><span class="pv-meta-lbl">${t('submittedLabel')}</span>${escapeHtml(fmtDate(row.created_at ? row.created_at.slice(0,10) : ''))}</div>
+        </div>
+        ${diffDays > 0 ? `<span class="pv-overdue-pill">⚠ ${diffDays} ${diffDays === 1 ? t('dayOverdueSingular') : t('daysOverdueLabel')}</span>`
+                        : `<span class="pv-ontime-pill">✓ ${t('onTimeLabel')}</span>`}
+      `;
+    }
+
     const fileSection = row.attachment_file_path
-      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-           <button class="btn ghost sm" onclick="downloadSubmissionFile('${escapeHtml(row.attachment_file_path)}')">⬇ Download file</button>
-           ${row.status === 'pending' && proj ? `<button class="btn ghost sm" style="color:var(--green)" onclick="promoteSubmissionFile('${row.id}','${proj.id}','${escapeHtml(row.attachment_file_path)}')">📁 Promote to project files</button>` : ''}
+      ? `<div class="pv-file-row">📄 <span class="pv-fname">${escapeHtml(row.attachment_file_path.split('/').pop())}</span>
+           <button onclick="downloadSubmissionFile('${escapeHtml(row.attachment_file_path)}')">⬇ ${t('downloadBtn')}</button>
+           ${row.status === 'pending' && proj ? `<button onclick="promoteSubmissionFile('${row.id}','${proj.id}','${escapeHtml(row.attachment_file_path)}')">📁 ${t('promoteBtn')}</button>` : ''}
          </div>` : '';
     const linkSection = row.attachment_link
-      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-           <a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent)">🔗 ${t('viewAttachedLink')}</a>
-           ${row.status === 'pending' && proj ? `<button class="btn ghost sm" style="color:var(--green)" onclick="promoteSubmissionLink('${row.id}','${proj.id}','${escapeHtml(row.attachment_link)}')">📁 Promote to project files</button>` : ''}
+      ? `<div class="pv-file-row">🔗 <a href="${escapeHtml(row.attachment_link)}" target="_blank" rel="noopener" class="pv-fname" style="color:var(--accent)">${t('viewAttachedLink')}</a>
+           ${row.status === 'pending' && proj ? `<button onclick="promoteSubmissionLink('${row.id}','${proj.id}','${escapeHtml(row.attachment_link)}')">📁 ${t('promoteBtn')}</button>` : ''}
          </div>` : '';
+
     return `
-      <div class="pending-approval-card">
+      <div class="pending-approval-card${cardStateClass}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <span style="font-size:11px;color:var(--accent-warm);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">${escapeHtml(changeLabel)}</span>
-              <span class="badge ${statusColors[row.status] || ''}" style="font-size:10px">${row.status === 'pending' ? t('statusPending') : row.status === 'approved' ? t('statusApproved') : t('statusRejected')}</span>
-            </div>
-            <div style="font-size:14px;font-weight:500;margin-bottom:4px">${taskTitle}</div>
-            ${proj ? `<div style="font-size:12px;color:var(--ink-muted)">📁 ${escapeHtml(proj.name)}</div>` : ''}
-            ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
-            ${fileSection}
-            ${linkSection}
-            ${row.status === 'rejected' && row.rejection_reason ? `
-              <div style="background:var(--bg-danger,#fcebeb);border-radius:8px;padding:10px 12px;margin-top:8px">
-                <div style="font-size:10.5px;font-weight:600;color:var(--text-danger,#a32d2d);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">${t('rejectionReasonLabel')}</div>
-                <div style="font-size:13px;color:var(--ink);line-height:1.5">${escapeHtml(row.rejection_reason)}</div>
-              </div>
-            ` : ''}
-            <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${t('proposedBy')}: ${escapeHtml(row.proposed_by_name || row.proposed_by_id)} (${row.proposed_by_type === 'partner' ? t('colPartner') : t('internalTeam')}) · ${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
-          </div>
+          <span class="badge ${statusPillClass}" style="font-size:10px">${statusLabel}</span>
           <div style="display:flex;gap:6px;flex-shrink:0">
             ${row.status === 'pending' ? `
               <button class="btn sm" onclick="approveProposal('${row.id}')">✓ ${t('approveBtn')}</button>
@@ -7208,6 +7260,44 @@ views.pendingApprovals = () => {
             `}
           </div>
         </div>
+        <div style="font-size:15px;font-weight:700;margin:8px 0 4px">${taskTitle}</div>
+        ${proj ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">📁 ${escapeHtml(proj.name)}</div>` : ''}
+        <div class="pv-for-row">
+          <div class="pv-avatar">${escapeHtml(initial)}</div>
+          <div><span class="pv-for-label">${completedByLabel}</span> <span class="pv-for-name">${escapeHtml(submitterName)}</span> <span style="font-size:10px;color:var(--ink-faint)">(${submitterTag})</span></div>
+        </div>
+        ${dueDateRow}
+        ${row.note_text ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:6px">${escapeHtml(row.note_text)}</div>` : ''}
+        ${fileSection}
+        ${linkSection}
+        ${row.status === 'rejected' && row.rejection_reason ? `
+          <div class="pv-reject-box">
+            <div class="pv-reject-lbl">${t('rejectionReasonLabel')}</div>
+            <div>${escapeHtml(row.rejection_reason)}</div>
+          </div>
+        ` : ''}
+        <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
+      </div>`;
+  }
+
+  // Renders one status group (Pending / Approved / Rejected), itself split
+  // into Task Assignment and Task Completion sub-groups — consistent at
+  // every status level, not just Pending.
+  function renderStatusGroup(rows, statusLabel, isFirst) {
+    if (rows.length === 0) return '';
+    const assignRows = rows.filter(r => r.change_type === 'assign');
+    const completeRows = rows.filter(r => r.change_type !== 'assign');
+    return `
+      <div class="pv-status-group" style="${isFirst ? '' : 'margin-top:24px;padding-top:16px;border-top:1px solid var(--line)'}">
+        <div class="pv-status-heading">${statusLabel} (${rows.length})</div>
+        ${assignRows.length > 0 ? `
+          <div class="pv-subgroup assign">🆕 ${t('proposalTaskAssignment')} <span class="pv-subgroup-count">(${assignRows.length})</span></div>
+          ${assignRows.map(renderAssignCard).join('')}
+        ` : ''}
+        ${completeRows.length > 0 ? `
+          <div class="pv-subgroup complete">✓ ${t('proposalTaskCompletion')} <span class="pv-subgroup-count">(${completeRows.length})</span></div>
+          ${completeRows.map(renderCard).join('')}
+        ` : ''}
       </div>`;
   }
 
@@ -7222,23 +7312,9 @@ views.pendingApprovals = () => {
       `).join('')}
     </div>
     ${items.length === 0 ? `<div class="empty">${t('pendingApprovalsEmpty')}</div>` : `
-      ${pendingAssign.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">${t('proposalTaskAssignment')} (${pendingAssign.length})</div>
-        ${pendingAssign.map(renderAssignCard).join('')}
-      ` : ''}
-      ${pendingComplete.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:${pendingAssign.length ? '20px' : '0'} 0 10px;${pendingAssign.length ? 'padding-top:14px;border-top:1px solid var(--line)' : ''}">${t('proposalTaskCompletion')} (${pendingComplete.length})</div>
-        ${pendingComplete.map(renderCard).join('')}
-      ` : ''}
-      ${pending.length === 0 ? `<div style="font-size:13px;color:var(--ink-faint);margin-bottom:16px">No pending approvals in this section.</div>` : ''}
-      ${approved.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusApproved')} (${approved.length})</div>
-        ${approved.map(r => r.change_type === 'assign' ? renderAssignCard(r) : renderCard(r)).join('')}
-      ` : ''}
-      ${rejected.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line)">${t('statusRejected')} (${rejected.length})</div>
-        ${rejected.map(r => r.change_type === 'assign' ? renderAssignCard(r) : renderCard(r)).join('')}
-      ` : ''}
+      ${renderStatusGroup(pending, t('statusPending'), true)}
+      ${renderStatusGroup(approved, t('statusApproved'), pending.length === 0)}
+      ${renderStatusGroup(rejected, t('statusRejected'), pending.length === 0 && approved.length === 0)}
     `}
   `;
 };
