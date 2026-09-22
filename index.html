@@ -3765,8 +3765,38 @@ async function _loadStateInner(force) {
     toFetch = SUPABASE_TABLES.filter(t => !dirtyTables.has(t.table) && (cloudTs[t.table]||0) !== (syncMeta.tableTs[t.table]||0));
   }
 
+  // ── Unconditional deletion reconciliation — runs on EVERY load, always ──
+  // The timestamp-based toFetch check below only detects INSERTS and UPDATES
+  // (a DELETE never produces a row with a newer updated_at to notice). If a
+  // device's local state still holds a row that was deleted elsewhere, and
+  // nothing ELSE about that table has changed since, toFetch would be empty
+  // and the function would return early — meaning that stale row is NEVER
+  // reconciled, is kept forever, and gets silently re-uploaded to Supabase
+  // the next time this device saves anything that isn't precisely row-targeted.
+  // This lightweight id-only check (no row payload, negligible egress) runs
+  // regardless of the timestamp comparison, closing that gap completely.
+  if (syncMeta.everSynced && !force) {
+    try {
+      await Promise.all(SUPABASE_TABLES.map(async t => {
+        if (dirtyTables.has(t.table)) return; // has unsynced local edits — don't touch
+        const localRows = state[t.key];
+        if (!Array.isArray(localRows) || localRows.length === 0) return;
+        try {
+          const { data: idRows, error } = await withRequestTimeout(supabaseClient.from(t.table).select('id'));
+          if (error || !idRows) return; // best-effort — never blocks the load on failure
+          const liveIds = new Set(idRows.map(r => r.id));
+          const survivors = localRows.filter(row => liveIds.has(row.id));
+          if (survivors.length !== localRows.length) {
+            state[t.key] = survivors;
+            _lastLoadHadRealChanges = true;
+          }
+        } catch (e) { /* best-effort — never blocks the load */ }
+      }));
+    } catch (e) { /* best-effort — never blocks the load */ }
+  }
+
   // 3) Nothing changed → ZERO table egress; cached copy already in memory.
-  if (toFetch.length === 0) { setSyncOnline(true); persistSyncMeta(); _lastLoadHadRealChanges = false; return true; }
+  if (toFetch.length === 0) { setSyncOnline(true); persistSyncMeta(); return true; }
 
   // Baseline cache for any table that errors mid-fetch.
   let cache = {};
