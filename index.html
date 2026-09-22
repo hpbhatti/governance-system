@@ -3760,9 +3760,18 @@ async function _loadStateInner(force) {
   //    has unsynced local edits (dirty) — it will be uploaded instead.
   let toFetch;
   if (force || !syncMeta.everSynced) {
-    toFetch = SUPABASE_TABLES.filter(t => !dirtyTables.has(t.table)); // first sync / forced = full
+    toFetch = SUPABASE_TABLES.slice(); // first sync / forced = full, every table
   } else {
-    toFetch = SUPABASE_TABLES.filter(t => !dirtyTables.has(t.table) && (cloudTs[t.table]||0) !== (syncMeta.tableTs[t.table]||0));
+    // Previously excluded any table with a pending local edit from being
+    // fetched at all — meaning ANY unsaved change to a table (even something
+    // unrelated, or a write stuck retrying after a connection blip) silently
+    // blocked that device from ever seeing new remote changes to that table,
+    // for as long as the pending edit sat there — surviving even a hard
+    // refresh. The merge below already protects unsaved local rows correctly
+    // on a per-row basis via version comparison, so gating the whole table
+    // out here was unnecessary and is what caused devices to show stale
+    // task data indefinitely.
+    toFetch = SUPABASE_TABLES.filter(t => (cloudTs[t.table]||0) !== (syncMeta.tableTs[t.table]||0));
   }
 
   // ── Unconditional deletion reconciliation — runs on EVERY load, always ──
