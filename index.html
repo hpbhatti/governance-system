@@ -8772,6 +8772,17 @@ function navigate(view, param) {
   // Reset the drill-down origin when the user lands on a top-level page (dashboard/agenda).
   // This stops the "Back to Dashboard" pill from appearing on unrelated pages later.
   if (view === 'dashboard' || view === 'agenda' || view === 'team' || view === 'actions') { state.navOrigin = null; state.navOriginParam = null; }
+  // Keep the browser address bar in sync with whatever page is actually showing —
+  // previously navigate() never touched the URL at all, so it stayed frozen at
+  // whatever hash the page happened to load with (e.g. #pendingApprovals from an
+  // email deep-link) no matter where the user clicked afterward. history.replaceState
+  // is used (not pushState) so browsing the app doesn't spam the back-button history
+  // with every single click — hash still updates, refresh still lands on the right
+  // page, but Back behaves predictably rather than stepping through dozens of clicks.
+  try {
+    const hash = '#' + view + (param ? '/' + encodeURIComponent(param) : '');
+    if (window.location.hash !== hash) history.replaceState(null, '', hash);
+  } catch (e) {}
   renderSidebar();
   render(param);
   try { _consumeScrollTarget(); } catch(e) {}
@@ -11887,13 +11898,28 @@ function printProjectReport(projectId, existingEntry) {
 // task view. One stable link per partner — reused every time unless
 // explicitly revoked. Uses the isolated `partner_links` table only;
 // never touches partners/projects/actions or their RLS policies.
-const PARTNER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/partner-view.html';
+const PARTNER_VIEW_BASE_URL = 'https://govern.soe.com.sa/partner-view.html';
 
 function _generateToken() {
-  // 32-char random token, URL-safe
+  // 32-char random token, URL-safe — kept for internal use where readability doesn't matter.
   const bytes = new Uint8Array(24);
   (window.crypto || window.msCrypto).getRandomValues(bytes);
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Short, readable, still-unguessable link slugs — "waad-4f8a2c" instead of a
+// long random hex string. First name only (kept short), lowercased, stripped
+// to safe URL characters, plus a 6-character random suffix long enough that
+// it can't be feasibly guessed even knowing the name pattern. Stored in the
+// exact same `token` column as before — no schema change, fully compatible
+// with every existing lookup across all three Edge Functions.
+function _generateSlugToken(fullName) {
+  const firstName = (fullName || '').trim().split(/\s+/)[0] || 'user';
+  const safeName = firstName.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]/g, '').slice(0, 20) || 'user';
+  const bytes = new Uint8Array(4);
+  (window.crypto || window.msCrypto).getRandomValues(bytes);
+  const suffix = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').slice(0, 6);
+  return `${safeName}-${suffix}`;
 }
 
 async function managePartnerLink(partnerId) {
@@ -11919,7 +11945,7 @@ async function managePartnerLink(partnerId) {
     if (existing && existing.length > 0) {
       token = existing[0].token;
     } else {
-      token = _generateToken();
+      token = _generateSlugToken(p.name);
       const { error: insertErr } = await supabaseClient
         .from('partner_links')
         .insert({ token, partner_id: partnerId, created_by: (_authUser && _authUser.email) || null });
@@ -11986,7 +12012,7 @@ async function revokePartnerLink(partnerId) {
 // ── Team Member Link management — same pattern as Partner Link, just a
 // separate isolated table (team_member_links) and a separate view-only
 // page (team-member-view.html). ──
-const TEAM_MEMBER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/team-member-view.html';
+const TEAM_MEMBER_VIEW_BASE_URL = 'https://govern.soe.com.sa/team-member-view.html';
 
 async function manageTeamMemberLink(memberId) {
   if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
@@ -12011,7 +12037,7 @@ async function manageTeamMemberLink(memberId) {
     if (existing && existing.length > 0) {
       token = existing[0].token;
     } else {
-      token = _generateToken();
+      token = _generateSlugToken(m.name);
       const { error: insertErr } = await supabaseClient
         .from('team_member_links')
         .insert({ token, member_id: memberId, created_by: (_authUser && _authUser.email) || null });
@@ -12091,7 +12117,7 @@ function toggleMemberOverview(memberId, checked) {
 // isolated table (manager_links) and a separate view-only + write-only page
 // (manager-view.html). The manager's email is stored on the link record and
 // used to send assignment approval/rejection notifications — no login. ──
-const MANAGER_VIEW_BASE_URL = 'https://govern-soe.vercel.app/manager-view.html';
+const MANAGER_VIEW_BASE_URL = 'https://govern.soe.com.sa/manager-view.html';
 
 async function manageManagerLink(memberId) {
   if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
@@ -12137,7 +12163,7 @@ async function createManagerLink(memberId, memberName) {
   const email = emailInput ? emailInput.value.trim() : '';
   if (!email || !email.includes('@')) { alert(t('managerLinkEmailRequired')); return; }
   try {
-    const token = _generateToken();
+    const token = _generateSlugToken(memberName);
     const { error: insertErr } = await supabaseClient
       .from('manager_links')
       .insert({ token, member_id: memberId, manager_email: email, created_by: (_authUser && _authUser.email) || null });
@@ -12270,7 +12296,7 @@ function computeProjectBreakdownForPartner(partnerId) {
   return Object.values(byProject);
 }
 
-async function getOrCreateViewLink(linkTable, linkIdField, id, viewBaseUrl) {
+async function getOrCreateViewLink(linkTable, linkIdField, id, viewBaseUrl, displayName) {
   const { data: existing } = await supabaseClient
     .from(linkTable).select('token').eq(linkIdField, id).eq('revoked', false)
     .order('created_at', { ascending: false }).limit(1);
@@ -12278,7 +12304,7 @@ async function getOrCreateViewLink(linkTable, linkIdField, id, viewBaseUrl) {
   if (existing && existing.length > 0) {
     token = existing[0].token;
   } else {
-    token = _generateToken();
+    token = displayName ? _generateSlugToken(displayName) : _generateToken();
     await supabaseClient.from(linkTable).insert({
       token, [linkIdField]: id, created_by: (_authUser && _authUser.email) || null,
     });
@@ -12303,7 +12329,7 @@ async function sendStatusEmail(id) {
   if (!m.email) { alert(t('alertNoEmailOnFile')); return; }
   try {
     const projectBreakdown = computeProjectBreakdownForTeamMember(id);
-    const linkUrl = await getOrCreateViewLink('team_member_links', 'member_id', id, TEAM_MEMBER_VIEW_BASE_URL);
+    const linkUrl = await getOrCreateViewLink('team_member_links', 'member_id', id, TEAM_MEMBER_VIEW_BASE_URL, m.name);
     await dispatchStatusEmail([m.email], m.name, 'team_member', projectBreakdown, linkUrl);
     toast(t('toastEmailSent', m.email));
   } catch (e) {
@@ -12366,7 +12392,7 @@ async function confirmSendPartnerEmail(partnerId, candidateCount) {
     saveState();
 
     const projectBreakdown = computeProjectBreakdownForPartner(partnerId);
-    const linkUrl = await getOrCreateViewLink('partner_links', 'partner_id', partnerId, PARTNER_VIEW_BASE_URL);
+    const linkUrl = await getOrCreateViewLink('partner_links', 'partner_id', partnerId, PARTNER_VIEW_BASE_URL, p.name);
     await dispatchStatusEmail(selected, p.name, 'partner', projectBreakdown, linkUrl);
     closeModal();
     toast(t('toastEmailSentCount', selected.length));
@@ -14728,7 +14754,21 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
         state.currentView = 'partnerDetail';
         state.detailParam = _pid;
       } else { state.currentView = 'dashboard'; }
-    } else { state.currentView = 'dashboard'; }
+    } else {
+      // Read the URL hash on cold start — previously ignored entirely, so
+      // links like the PMO notification email's "#pendingApprovals" CTA
+      // never actually landed anywhere but the dashboard. This is the read
+      // side of the same hash that navigate() now writes on every click.
+      const _KNOWN_HASH_VIEWS = ['dashboard','agenda','reports','reportsArchive','pendingApprovals','calendar','team','partners','projects','actions','meetings','scoringSettings'];
+      const _rawHash = (window.location.hash || '').replace(/^#/, '');
+      const [_hashView, _hashParam] = _rawHash.split('/');
+      if (_hashView && _KNOWN_HASH_VIEWS.includes(_hashView)) {
+        state.currentView = _hashView;
+        if (_hashParam) state.detailParam = decodeURIComponent(_hashParam);
+      } else {
+        state.currentView = 'dashboard';
+      }
+    }
   } catch (e) { state.currentView = 'dashboard'; }
   try { migrateBilingualContent(); } catch (e) {}
   try { migrateScopeBaseline(); } catch (e) {}
