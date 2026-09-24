@@ -9976,14 +9976,22 @@ function showProjectForm(projectId, defaultPartnerId) {
       <select id="f-pmo-incharge">
         <option value="">${t('pmoNotAssigned')}</option>
         ${(()=>{
-          // Restrict to the two global admins identified by their known emails.
-          // Falls back to all team members if neither email is found (safe default).
-          // Show team members whose email matches a known admin email.
-          // Falls back to ALL team members if the email field is missing or
-          // doesn't match — avoids an empty dropdown on misconfigured records.
-          const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karhasmoh@gmail.com'];
+          // Restrict to the two known admin emails as the primary list.
+          const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karim@soe.com.sa'];
           const admins = (state.team||[]).filter(m => m.email && ADMIN_EMAILS.includes((m.email||'').toLowerCase().trim()));
-          const list = admins.length >= 2 ? admins : (state.team||[]);
+          let list = admins.length >= 2 ? admins : (state.team||[]);
+          // Critical safety net: if this project already has a PMO assigned
+          // whose ID isn't in the filtered list (email mismatch, or the
+          // assignment predates this filter), always include them anyway.
+          // Without this, the dropdown silently shows "Not assigned" for an
+          // already-assigned project — and saving the form for ANY reason,
+          // even unrelated, then permanently overwrites the real value with
+          // blank. This is the confirmed root cause of PMO assignments
+          // being silently wiped across projects during unrelated edits.
+          if (editing?.pmoInChargeId && !list.some(m => m.id === editing.pmoInChargeId)) {
+            const missingPmo = (state.team||[]).find(m => m.id === editing.pmoInChargeId);
+            if (missingPmo) list = [...list, missingPmo];
+          }
           return list.map(m =>
             `<option value="${m.id}" ${editing?.pmoInChargeId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${m.role ? ' — ' + escapeHtml(m.role) : ''}</option>`
           ).join('');
@@ -14907,6 +14915,11 @@ async function syncNow() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false); });
 window.addEventListener('focus', () => refreshFromCloud(false));
+// Mobile browsers often restore a backgrounded tab from a memory cache
+// (bfcache) without firing focus/visibilitychange reliably — pageshow with
+// event.persisted covers exactly that return-to-the-app moment, which
+// visibilitychange and focus alone can miss on iOS/Android Safari/Chrome.
+window.addEventListener('pageshow', (event) => { if (event.persisted) refreshFromCloud(false); });
 window.addEventListener('online', () => { setSyncOnline(true); flushWrites(); refreshFromCloud(true); });
 window.addEventListener('offline', () => setSyncOnline(false));
 
