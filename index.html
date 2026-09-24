@@ -11953,7 +11953,12 @@ function _generateToken() {
 // exact same `token` column as before — no schema change, fully compatible
 // with every existing lookup across all three Edge Functions.
 function _generateSlugToken(fullName) {
-  const firstName = (fullName || '').trim().split(/\s+/)[0] || 'user';
+  // Skip common honorifics/titles ("Mr.", "Mrs.", "Ms.", "Dr.", "Eng.", "Sh.")
+  // so the slug uses the actual first name, not the title — "Mr. Waad Al-Mahya"
+  // should produce "waad-xxxxxx", not "mr-xxxxxx".
+  const HONORIFICS = new Set(['mr','mrs','ms','miss','dr','eng','engr','sh','sheikh','prof','er']);
+  const words = (fullName || '').trim().split(/\s+/).map(w => w.replace(/[.,]/g, ''));
+  let firstName = words.find(w => w && !HONORIFICS.has(w.toLowerCase())) || words[0] || 'user';
   const safeName = firstName.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]/g, '').slice(0, 20) || 'user';
   const bytes = new Uint8Array(4);
   (window.crypto || window.msCrypto).getRandomValues(bytes);
@@ -12284,7 +12289,8 @@ async function revokeManagerLink(memberId) {
     toast(t('toastLinkRevoked'));
     closeModal();
   } catch (e) {
-    alert(t('partnerLinkError'));
+    console.error('revokeManagerLink failed:', e && e.message ? e.message : e);
+    alert((e && e.message) ? e.message : t('partnerLinkError'));
   }
 }
 
