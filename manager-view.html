@@ -320,6 +320,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     stCompleted: '\u2713 Completed', stOpen: 'Open', stOverdue: 'Overdue', stMissed: 'Missed',
     pHigh: 'High', pMedium: 'Medium', pLow: 'Low',
     yourTasks: 'Your Tasks', projectFilesZone: 'Project Files',
+    memberTasksLabel: function(name){ return escapeHtml(name) + "'s Tasks"; },
     milestonesTitle: 'Milestones',
     msBadgeDone: 'Done', msBadgeOverdue: 'Overdue', msBadgeNext: 'Next', msBadgeUpcoming: 'Upcoming',
     msOverdueCount: function(n){ return n + ' overdue'; },
@@ -394,6 +395,7 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     stCompleted: '\u2713 مكتملة', stOpen: 'مفتوحة', stOverdue: 'متأخرة', stMissed: 'فائتة',
     pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة',
     yourTasks: 'مهامك', projectFilesZone: 'ملفات المشروع',
+    memberTasksLabel: function(name){ return 'مهام ' + escapeHtml(name); },
     milestonesTitle: 'المعالم',
     msBadgeDone: 'مكتمل', msBadgeOverdue: 'متأخر', msBadgeNext: 'التالي', msBadgeUpcoming: 'قادم',
     msOverdueCount: function(n){ return n + ' متأخرة'; },
@@ -1021,7 +1023,7 @@ function render(data) {
         renderMilestonesZone(p, milestoneYourTasksMap) +
         renderForwardLookingLine(p, personStats) +
         delayBox +
-        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span></div>' : '') +
+        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('memberTasksLabel', (data.member && data.member.name) || '') + '</span></div>' : '') +
         cardsHtml +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
