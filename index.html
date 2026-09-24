@@ -9381,8 +9381,19 @@ function printOpenTasksReport(existingEntry) {
 
 // ── Supabase Realtime: live push from other users ──
 let _realtimeChannel = null;
-function subscribeToRealtime() {
-  if (!supabaseClient || _realtimeChannel) return;
+function subscribeToRealtime(forceReconnect) {
+  if (!supabaseClient) return;
+  if (forceReconnect && _realtimeChannel) {
+    // The underlying connection may have silently died while the device was
+    // asleep or backgrounded — the OS suspends JS execution during sleep, so
+    // the code never gets a chance to notice the disconnect and clear this
+    // reference. Without explicitly tearing it down here, subscribeToRealtime
+    // would see _realtimeChannel is still set and skip reconnecting entirely,
+    // leaving live push silently dead even after a correct one-time refresh.
+    try { supabaseClient.removeChannel(_realtimeChannel); } catch (e) {}
+    _realtimeChannel = null;
+  }
+  if (_realtimeChannel) return;
   _realtimeChannel = supabaseClient
     .channel('soe-governance-live')
     .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
@@ -14883,7 +14894,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
 // push anything pending. Skipped while a modal/form is open so edits aren't disrupted.
 let _lastCloudRefresh = 0;
 let _cloudFailUntil = 0; // short cooldown after a failed sync
-async function refreshFromCloud(force) {
+async function refreshFromCloud(force, forceReconnect) {
   if (!supabaseClient) return;
   const modal = document.getElementById('modal');
   if (!force && modal && modal.classList.contains('active')) return; // don't interrupt an open form
@@ -14896,9 +14907,9 @@ async function refreshFromCloud(force) {
     // records briefly reappear because Supabase still has them when we fetch.
     if (hasPendingDeletes()) await flushWrites();
     await loadState(force);   // row-level fetch → only changed rows
-    subscribeToRealtime();    // live push: other users' changes appear instantly
+    subscribeToRealtime(forceReconnect);    // live push: other users' changes appear instantly
     flushWrites();
-    subscribeToRealtime();
+    subscribeToRealtime(forceReconnect);
     _cloudFailUntil = 0;
     setSyncOnline(true);
     renderPreserveScroll();
@@ -14913,14 +14924,14 @@ async function syncNow() {
   try { await flushWrites(); } catch (e) {}
   await refreshFromCloud(true);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false); });
-window.addEventListener('focus', () => refreshFromCloud(false));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false, true); });
+window.addEventListener('focus', () => refreshFromCloud(false, true));
 // Mobile browsers often restore a backgrounded tab from a memory cache
 // (bfcache) without firing focus/visibilitychange reliably — pageshow with
 // event.persisted covers exactly that return-to-the-app moment, which
 // visibilitychange and focus alone can miss on iOS/Android Safari/Chrome.
-window.addEventListener('pageshow', (event) => { if (event.persisted) refreshFromCloud(false); });
-window.addEventListener('online', () => { setSyncOnline(true); flushWrites(); refreshFromCloud(true); });
+window.addEventListener('pageshow', (event) => { if (event.persisted) refreshFromCloud(false, true); });
+window.addEventListener('online', () => { setSyncOnline(true); flushWrites(); refreshFromCloud(true, true); });
 window.addEventListener('offline', () => setSyncOnline(false));
 
 /* ===================== MOBILE INTERACTIONS (additive UI only) ===================== */
