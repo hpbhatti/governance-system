@@ -14899,8 +14899,15 @@ async function refreshFromCloud(force, forceReconnect) {
   const modal = document.getElementById('modal');
   if (!force && modal && modal.classList.contains('active')) return; // don't interrupt an open form
   const now = Date.now();
-  if (!force && now < _cloudFailUntil) return;
-  if (!force && now - _lastCloudRefresh < 3000) return;   // throttle bursts
+  if (!force && !forceReconnect && now < _cloudFailUntil) return;
+  // The 3-second throttle exists to stop rapid-fire refresh spam, but a
+  // genuine "user just returned to check something" moment — tab switch,
+  // waking the device — should never be silently swallowed by it. If
+  // someone tests by quickly switching tabs and back, the throttle could
+  // eat that refresh entirely, making it look like nothing updated even
+  // though the connection itself reconnected fine underneath. forceReconnect
+  // marks exactly these return-to-app triggers, so they bypass the throttle.
+  if (!force && !forceReconnect && now - _lastCloudRefresh < 3000) return;   // throttle bursts
   _lastCloudRefresh = now;
   try {
     // Flush any queued deletes FIRST before loading from cloud — otherwise deleted
@@ -14924,13 +14931,32 @@ async function syncNow() {
   try { await flushWrites(); } catch (e) {}
   await refreshFromCloud(true);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromCloud(false, true); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { refreshFromCloud(false, true); return; }
+  // Tab is about to hide (screen locking, switching apps) — flush any
+  // pending debounced write RIGHT NOW. On mobile, saving something and
+  // immediately locking the phone is completely normal behavior, and it
+  // happens well within the 350ms debounce window — the OS then aggressively
+  // pauses the tab's timers to save battery, leaving that write stuck
+  // locally, never actually sent, until the tab is opened again. Flushing
+  // here, at the moment of hiding rather than waiting for the timer,
+  // closes that gap.
+  if (_writeTimer) { clearTimeout(_writeTimer); _writeTimer = null; flushWrites(); }
+});
 window.addEventListener('focus', () => refreshFromCloud(false, true));
 // Mobile browsers often restore a backgrounded tab from a memory cache
 // (bfcache) without firing focus/visibilitychange reliably — pageshow with
 // event.persisted covers exactly that return-to-the-app moment, which
 // visibilitychange and focus alone can miss on iOS/Android Safari/Chrome.
 window.addEventListener('pageshow', (event) => { if (event.persisted) refreshFromCloud(false, true); });
+// Backstop for visibilitychange above — some mobile browsers handle
+// app-switching and screen-lock slightly differently, and pagehide is the
+// more universally reliable "the page is going away right now" signal.
+// Same immediate flush, so a pending save is never left stranded regardless
+// of which event a given device actually fires first.
+window.addEventListener('pagehide', () => {
+  if (_writeTimer) { clearTimeout(_writeTimer); _writeTimer = null; flushWrites(); }
+});
 window.addEventListener('online', () => { setSyncOnline(true); flushWrites(); refreshFromCloud(true, true); });
 window.addEventListener('offline', () => setSyncOnline(false));
 
