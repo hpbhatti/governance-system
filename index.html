@@ -14885,6 +14885,16 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
     sendDailyNotification(false);
     setInterval(() => sendDailyNotification(false), 60 * 60 * 1000);
     setInterval(() => refreshPendingApprovals(), 5 * 60 * 1000); // keep the sidebar badge reasonably current
+    // ── Periodic connection health-check ──
+    // Every fix so far only reconnects when the user LEAVES and RETURNS to
+    // the tab (visibility, focus, pageshow, online). None of those cover a
+    // tab that stays open and visible the entire time while the underlying
+    // WebSocket silently times out or gets dropped mid-session — by an ISP,
+    // a proxy, or Supabase's own infrastructure — with no browser event ever
+    // firing to signal it happened. This runs regardless of whether the tab
+    // was ever left, proactively verifying and repairing the connection
+    // every 30 seconds, closing that gap for a continuously-open tab.
+    setInterval(() => { if (!document.hidden) refreshFromCloud(false, true); }, 30 * 1000);
     refreshPendingApprovals(); // initial check on boot
   } catch (e) {}
 })();
