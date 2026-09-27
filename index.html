@@ -6423,7 +6423,8 @@ views.dashboard = () => {
     .sort(compareByDelayThenDueDate)
     .slice(0, 5);
 
-  const today = new Date().toLocaleDateString(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    + ' · ' + new Date().toLocaleTimeString(t('locale'), { hour: '2-digit', minute: '2-digit' });
   const banner = renderNotificationBanner();
 
   return `
@@ -9245,8 +9246,15 @@ views.calendar = () => {
     const openTasks = dayActions.filter(a => isOpen(a) && !isMeeting(a));
     const delayed = openTasks.filter(a => getDelayDays(a) > 0);
     const onTime = openTasks.filter(a => getDelayDays(a) === 0);
-    const completed = dayActions.filter(isCompleted);
-    const meetings = dayActions.filter(isMeeting);
+    // Excludes meetings — a completed meeting was previously being counted
+    // into this same "completed task" bucket, inflating the green badge.
+    const completed = dayActions.filter(a => isCompleted(a) && !isMeeting(a));
+    // Meetings now get their own three-way status split — completed (green),
+    // missed (red), still scheduled (neutral) — instead of one flat blue
+    // badge that gave no indication of whether a meeting actually happened.
+    const meetingsCompleted = dayActions.filter(a => isMeeting(a) && a.status === 'completed');
+    const meetingsMissed = dayActions.filter(a => isMeeting(a) && a.status === 'missed');
+    const meetingsScheduled = dayActions.filter(a => isMeeting(a) && a.status !== 'completed' && a.status !== 'missed');
     const cls = ['calendar-cell'];
     if (dateStr === today) cls.push('today');
     if (dateStr === selectedDate) cls.push('selected');
@@ -9256,7 +9264,9 @@ views.calendar = () => {
         (delayed.length > 0 ? '<span class="cal-badge red">' + delayed.length + '</span>' : '') +
         (onTime.length > 0 ? '<span class="cal-badge amber">' + onTime.length + '</span>' : '') +
         (completed.length > 0 ? '<span class="cal-badge green">' + completed.length + '</span>' : '') +
-        (meetings.length > 0 ? '<span class="cal-badge blue">🗓 ' + meetings.length + '</span>' : '') +
+        (meetingsCompleted.length > 0 ? '<span class="cal-badge green">🗓 ' + meetingsCompleted.length + '</span>' : '') +
+        (meetingsMissed.length > 0 ? '<span class="cal-badge red">🗓 ' + meetingsMissed.length + '</span>' : '') +
+        (meetingsScheduled.length > 0 ? '<span class="cal-badge blue">🗓 ' + meetingsScheduled.length + '</span>' : '') +
         '</div>' : '') + '</div>';
   }
   const selectedTasks = selectedDate ? (actionsByDate[selectedDate] || []) : [];
