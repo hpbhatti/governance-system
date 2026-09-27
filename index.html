@@ -1431,6 +1431,14 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .cal-badge.amber { background: #fdf4d9; color: var(--amber); border: 1px solid rgba(201,149,72,0.2); }
   .cal-badge.green { background: #e3edd6; color: var(--green); border: 1px solid rgba(90,120,71,0.2); }
   .cal-badge.blue { background: #e6ecf2; color: var(--accent); border: 1px solid rgba(26,58,82,0.2); }
+  /* Meetings get their own tri-color set, visually distinct from task badges
+     via a dashed border, so even in the same small space it reads as a
+     different category, not just another task in a different color. */
+  .cal-badge.meeting-green { background: #e3edd6; color: var(--green); border: 1px dashed rgba(90,120,71,0.5); }
+  .cal-badge.meeting-red { background: #fae0de; color: var(--red); border: 1px dashed rgba(185,74,62,0.5); }
+  .cal-badge.meeting-blue { background: #e6ecf2; color: var(--accent); border: 1px dashed rgba(26,58,82,0.5); }
+  .cal-zone-tasks { margin-bottom: 3px; }
+  .cal-zone-meetings { opacity: 0.95; }
   @media (max-width: 720px) { .calendar-cell { min-height: 56px; padding: 4px; } .calendar-day-num { font-size: 12px; } .cal-badge { font-size: 9px; padding: 0 4px; } }
 
     /* === Task node cards (collapsible, project detail) === */
@@ -2645,7 +2653,7 @@ const T = {
     additionalComments: 'ملاحظات إضافية',
     commentsEditableHint: 'يمكنك الكتابة هنا مباشرة قبل الطباعة',
     commentsPlaceholder: 'اكتب ملاحظاتك هنا...',
-    calendar: 'التقويم', calendarTitle: 'تقويم المهام', calendarSub: 'اضغط على أي يوم لعرض مهامه', calendarGoToday: '📍 اليوم', tasksOnDay: 'مهام يوم {0}', noTasksOnDay: 'لا توجد مهام في هذا اليوم', selectDayHint: 'اضغط على أي يوم في التقويم لعرض المهام',
+    calendar: 'التقويم', calendarTitle: 'تقويم المهام', calendarSub: 'اضغط على أي يوم لعرض مهامه', calendarGoToday: '📍 اليوم', tasksOnDay: 'مهام يوم {0}', meetingsOnDay: 'اجتماعات يوم {0}', noTasksOnDay: 'لا توجد مهام في هذا اليوم', noMeetingsOnDay: 'لا توجد اجتماعات في هذا اليوم', selectDayHint: 'اضغط على أي يوم في التقويم لعرض المهام', addMeetingBtn: '+ إضافة اجتماع',
     sectionTracking: 'سجل المتابعة', analyticsTitle: 'التحليلات',
     suspendedBadge: 'معلّق', projectSuspended: 'تم تعليق المشروع — لن يظهر في التقارير',
     confirmSuspend: 'تعليق مشروع "{0}"؟ لن يظهر في أي تقرير حتى تستأنفه.',
@@ -3372,7 +3380,7 @@ const T = {
     additionalComments: 'Additional Comments',
     commentsEditableHint: 'Click and type here directly before printing',
     commentsPlaceholder: 'Type your notes here...',
-    calendar: 'Calendar', calendarTitle: 'Task Calendar', calendarSub: 'Click any day to see its tasks', calendarGoToday: '📍 Today', tasksOnDay: 'Tasks on {0}', noTasksOnDay: 'No tasks on this day', selectDayHint: 'Click any day in the calendar to see tasks',
+    calendar: 'Calendar', calendarTitle: 'Task Calendar', calendarSub: 'Click any day to see its tasks', calendarGoToday: '📍 Today', tasksOnDay: 'Tasks on {0}', meetingsOnDay: 'Meetings on {0}', noTasksOnDay: 'No tasks on this day', noMeetingsOnDay: 'No meetings on this day', selectDayHint: 'Click any day in the calendar to see tasks', addMeetingBtn: '+ Add Meeting',
     sectionTracking: 'Tracking Log', analyticsTitle: 'Analytics',
     suspendedBadge: 'Suspended', projectSuspended: 'Project suspended — it will not appear in reports',
     confirmSuspend: 'Suspend project "{0}"? It will not appear in any report until resumed.',
@@ -3795,9 +3803,22 @@ async function _loadStateInner(force) {
           if (error || !idRows) return; // best-effort — never blocks the load on failure
           const liveIds = new Set(idRows.map(r => r.id));
           const survivors = localRows.filter(row => liveIds.has(row.id));
-          if (survivors.length !== localRows.length) {
+          // Safety threshold: a legitimate deletion removing more than half of
+          // a table's local rows in a single pass is implausible in normal use.
+          // If that happens, it almost certainly means THIS reconciliation
+          // check itself was unreliable — a partial response, a truncated
+          // result, a timing issue — not that the data was genuinely deleted.
+          // Treating an unreliable check as truth is exactly what caused
+          // real tasks to disappear from the dashboard while Supabase still
+          // had all of them. Erring on the side of keeping local data intact
+          // and letting the next normal sync reconcile things properly is
+          // far safer than trusting a suspicious result here.
+          const strippedFraction = 1 - (survivors.length / localRows.length);
+          if (survivors.length !== localRows.length && strippedFraction <= 0.5) {
             state[t.key] = survivors;
             _lastLoadHadRealChanges = true;
+          } else if (strippedFraction > 0.5) {
+            console.warn(`Reconciliation for ${t.table} would have removed ${Math.round(strippedFraction*100)}% of local rows — skipped as unreliable, data left intact.`);
           }
         } catch (e) { /* best-effort — never blocks the load */ }
       }));
@@ -9260,16 +9281,20 @@ views.calendar = () => {
     if (dateStr === selectedDate) cls.push('selected');
     cells += '<div class="' + cls.join(' ') + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
       '<div class="calendar-day-num">' + d + '</div>' +
-      (dayActions.length > 0 ? '<div class="calendar-badges">' +
+      (delayed.length + onTime.length + completed.length > 0 ? '<div class="calendar-badges cal-zone-tasks">' +
         (delayed.length > 0 ? '<span class="cal-badge red">' + delayed.length + '</span>' : '') +
         (onTime.length > 0 ? '<span class="cal-badge amber">' + onTime.length + '</span>' : '') +
         (completed.length > 0 ? '<span class="cal-badge green">' + completed.length + '</span>' : '') +
-        (meetingsCompleted.length > 0 ? '<span class="cal-badge green">🗓 ' + meetingsCompleted.length + '</span>' : '') +
-        (meetingsMissed.length > 0 ? '<span class="cal-badge red">🗓 ' + meetingsMissed.length + '</span>' : '') +
-        (meetingsScheduled.length > 0 ? '<span class="cal-badge blue">🗓 ' + meetingsScheduled.length + '</span>' : '') +
+        '</div>' : '') +
+      (meetingsCompleted.length + meetingsMissed.length + meetingsScheduled.length > 0 ? '<div class="calendar-badges cal-zone-meetings">' +
+        (meetingsCompleted.length > 0 ? '<span class="cal-badge meeting-green">🗓 ' + meetingsCompleted.length + '</span>' : '') +
+        (meetingsMissed.length > 0 ? '<span class="cal-badge meeting-red">🗓 ' + meetingsMissed.length + '</span>' : '') +
+        (meetingsScheduled.length > 0 ? '<span class="cal-badge meeting-blue">🗓 ' + meetingsScheduled.length + '</span>' : '') +
         '</div>' : '') + '</div>';
   }
   const selectedTasks = selectedDate ? (actionsByDate[selectedDate] || []) : [];
+  const selectedRealTasks = selectedTasks.filter(a => !isMeeting(a));
+  const selectedMeetings = selectedTasks.filter(a => isMeeting(a));
   return `
     <div class="page-head">
       <div>
@@ -9293,17 +9318,26 @@ views.calendar = () => {
     ${selectedDate ? `
       <div class="section" style="margin-top:24px">
         <div class="section-head">
-          <div class="section-title">${t('tasksOnDay', fmtDate(selectedDate))} (${selectedTasks.length})<span class="accent-line"></span></div>
+          <div class="section-title">${t('tasksOnDay', fmtDate(selectedDate))} (${selectedRealTasks.length})<span class="accent-line"></span></div>
           <button class="btn sm" onclick="showActionForm(null, null, null, 'task', '${selectedDate}')">${t('addActionBtn')}</button>
         </div>
-        ${selectedTasks.length === 0
+        ${selectedRealTasks.length === 0
           ? '<div class="table-wrap"><div class="empty">' + t('noTasksOnDay') + '</div></div>'
-          : selectedTasks.sort((a,b) => {
+          : selectedRealTasks.sort((a,b) => {
               const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
               if (ao !== bo) return ao - bo;
               const _d = getDelayDays(b) - getDelayDays(a);
               return _d !== 0 ? _d : (a.dueDate || '').localeCompare(b.dueDate || '');
             }).map(a => renderTaskNode(a, false)).join('')}
+      </div>
+      <div class="section" style="margin-top:20px">
+        <div class="section-head">
+          <div class="section-title">${t('meetingsOnDay', fmtDate(selectedDate))} (${selectedMeetings.length})<span class="accent-line" style="background:var(--accent)"></span></div>
+          <button class="btn sm" style="background:var(--accent)" onclick="showActionForm(null, null, null, 'meeting', '${selectedDate}')">${t('addMeetingBtn')}</button>
+        </div>
+        ${selectedMeetings.length === 0
+          ? '<div class="table-wrap"><div class="empty">' + t('noMeetingsOnDay') + '</div></div>'
+          : selectedMeetings.sort((a,b) => (a.dueDate || '').localeCompare(b.dueDate || '')).map(a => renderTaskNode(a, false)).join('')}
       </div>
     ` : '<div class="empty" style="margin-top:20px"><div class="empty-icon">👆</div>' + t('selectDayHint') + '</div>'}
   `;
