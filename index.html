@@ -11019,12 +11019,62 @@ function completeAction(id) {
       return;
     }
   }
+  // Remember whether this task was already completed BEFORE we change it, so a
+  // repeat call (for example approving a request for a task the admin already
+  // completed) never sends the manager a second email for the same task.
+  const wasAlreadyCompleted = isCompleted(a);
   a.status = 'completed';
   a.completedDate = todayDate();
   markRowDirty('actions', a.id);
   saveState();
   toast(t('toastActionCompleted'));
   render(state.detailParam);
+  // Tell the team member's manager, if he has one. This is the single place in
+  // the app where a task becomes Completed, so it covers both an admin
+  // completing a task directly and a PMO approving a team member's request.
+  // It runs AFTER the completion is saved and can never block or undo it.
+  if (!wasAlreadyCompleted) notifyManagerTaskCompleted(a);
+}
+
+// Emails the manager of the team member who owns this task, telling him the
+// task is completed and linking to his manager page (all tasks + assign a new
+// one). Everything here is best-effort: no manager link, no email on the link,
+// a revoked link, or a failed send all end quietly — a missing manager must
+// never block a completion. Only top-level tasks send an email; subtasks are
+// skipped so a manager is not sent a stream of small emails.
+async function notifyManagerTaskCompleted(task) {
+  try {
+    if (!supabaseClient || !task) return;
+    if (task.parentId) return;                                   // skip subtasks
+    if (task.ownerKind !== 'internal' || !task.ownerId) return;  // team member tasks only
+    const member = (state.team || []).find(m => m.id === task.ownerId);
+    if (!member) return;
+    const proj = getProject(task.projectId);
+    const { data: linkRows } = await supabaseClient
+      .from('manager_links').select('token, manager_email')
+      .eq('member_id', task.ownerId).eq('revoked', false)
+      .order('created_at', { ascending: false }).limit(1);
+    if (!linkRows || linkRows.length === 0 || !linkRows[0].manager_email) return;
+    // Names and titles are picked in the language the email is sent in, not
+    // from the generic name field, which holds whichever language was saved last.
+    const pick = (o, base) => currentLang === 'ar'
+      ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
+      : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
+    await fetch(SEND_EMAIL_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipients: [linkRows[0].manager_email],
+        recipientType: 'manager_task_completed',
+        submitterName: pick(member, 'name'),
+        taskTitle: pick(task, 'title'),
+        projectName: proj ? pick(proj, 'name') : '',
+        completedDate: fmtDate(task.completedDate),
+        linkUrl: MANAGER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
+        lang: currentLang,
+      }),
+    });
+  } catch (e) { /* silent — best effort */ }
 }
 
 function showMeetingStatusPicker(id) {
