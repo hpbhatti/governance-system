@@ -10032,7 +10032,7 @@ function showProjectForm(projectId, defaultPartnerId) {
         <option value="">${t('pmoNotAssigned')}</option>
         ${(()=>{
           // Restrict to the two known admin emails as the primary list.
-          const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karim@soe.com.sa'];
+          const ADMIN_EMAILS = ['hp.bhatty@soe.com.sa','karhasmoh@gmail.com'];
           const admins = (state.team||[]).filter(m => m.email && ADMIN_EMAILS.includes((m.email||'').toLowerCase().trim()));
           let list = admins.length >= 2 ? admins : (state.team||[]);
           // Critical safety net: if this project already has a PMO assigned
