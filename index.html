@@ -6055,12 +6055,31 @@ function autoTranslateAction(a) {
 function setBilingualField(obj, baseKey, value) {
   // Slot strictly by the CURRENT UI language — what the user typed belongs to that language.
   const cap = currentLang === 'ar' ? 'Ar' : 'En';
+  const otherCap = cap === 'Ar' ? 'En' : 'Ar';
   const v = value || '';
   obj[baseKey + cap] = v;                  // store in the current language slot
   obj[baseKey + 'Manual' + cap] = true;    // current language is now user-authored
   obj[baseKey] = v;                        // canonical mirror = current-language text (for legacy display paths)
-  // The OTHER language slot and its manual flag are left completely untouched —
-  // editing one language must never overwrite or erase the other.
+  // sourceLang is set once, the first time a record is ever saved, and never
+  // changed after that — it records which language the record was ORIGINALLY
+  // entered in. Editing the source language later means the source itself
+  // changed, so the other (translated) side is now out of date and must be
+  // retranslated. Editing the TRANSLATED side does not touch the source, so
+  // that edit is kept exactly as typed until the source is edited again.
+  if (!obj.sourceLang) obj.sourceLang = currentLang;
+  if (obj.sourceLang === currentLang) {
+    // Editing the source: the existing translation no longer matches the new
+    // source text. Clear it (and its manual flag) so the next translation
+    // pass — which already runs automatically after every save — replaces it
+    // with a fresh one. This also fixes the older bug where an edit to the
+    // source silently left a stale, mismatched translation in place: that
+    // happened because the other slot still had text in it, and the
+    // translator skips any slot that is not empty.
+    obj[baseKey + otherCap] = '';
+    obj[baseKey + 'Manual' + otherCap] = false;
+  }
+  // If instead the TRANSLATED side is what's being edited, nothing else
+  // happens here — the source slot and its flag are left completely alone.
 }
 
 // Heuristic: an auto-translation is "broken" if it contains characters from the WRONG script —
@@ -6110,6 +6129,14 @@ function migrateBilingualContent() {
     if (v && !obj[key + 'En'] && !obj[key + 'Ar']) {
       const cap = detectContentLang(v) === 'ar' ? 'Ar' : 'En';
       obj[key + cap] = v; obj[key + 'Manual' + cap] = false;
+    }
+    // Backfill sourceLang for records saved before this concept existed, so
+    // the source/translation rule in setBilingualField applies to old data
+    // too, not only to records created from today onward. Detected once from
+    // whichever slot already has real text, then never touched again.
+    if (!obj.sourceLang) {
+      const guess = obj[key + 'En'] || obj[key] || obj[key + 'Ar'];
+      if (guess) obj.sourceLang = detectContentLang(guess);
     }
   };
   (state.actions || []).forEach(a => {
@@ -10894,8 +10921,12 @@ function saveAction(id) {
     }
   }
 
+  // Set when this save turns a task from not-completed into Completed, so the
+  // manager can be told once the save has finished (notifyManagerTaskCompleted).
+  let managerNoticeTask = null;
   if (id) {
     const a = state.actions.find(x => x.id === id);
+    const wasCompletedBefore = isCompleted(a);
     // Track extension if due date changed
     const oldDue = a.dueDate;
     Object.assign(a, data);
@@ -10917,6 +10948,11 @@ function saveAction(id) {
     }
     storeActionBilingual(a);
     autoTranslateAction(a);
+    // The Edit form can set Status to Completed directly, which never goes
+    // through completeAction — so a task completed this way must notify the
+    // manager here too. Meetings are excluded, and a task that was already
+    // completed before this save does not send a second email.
+    if (data.type !== 'meeting' && !wasCompletedBefore && data.status === 'completed') managerNoticeTask = a;
   } else {
     const newA = { id: uid(), ...data, parentId: window._pendingParentId || null, originalDueDate: data.dueDate || null, extensions: [], createdAt: todayDate() };
     storeActionBilingual(newA);
@@ -10937,6 +10973,7 @@ function saveAction(id) {
   toast(t('toastSaved'));
   closeModal();
   render(state.detailParam);
+  if (managerNoticeTask) notifyManagerTaskCompleted(managerNoticeTask);
 }
 
 async function deleteAction(id) {
@@ -11027,13 +11064,14 @@ function completeAction(id) {
   a.completedDate = todayDate();
   markRowDirty('actions', a.id);
   saveState();
+  // Tell the team member's manager, if he has one. This covers the Complete
+  // button and a PMO approving a team member's request (the Edit form has its
+  // own hook in saveAction). It is called right after the save and BEFORE the
+  // screen redraw on purpose: if the redraw ever failed, an email call placed
+  // after it would never run. It cannot block or undo the completion.
+  if (!wasAlreadyCompleted) notifyManagerTaskCompleted(a);
   toast(t('toastActionCompleted'));
   render(state.detailParam);
-  // Tell the team member's manager, if he has one. This is the single place in
-  // the app where a task becomes Completed, so it covers both an admin
-  // completing a task directly and a PMO approving a team member's request.
-  // It runs AFTER the completion is saved and can never block or undo it.
-  if (!wasAlreadyCompleted) notifyManagerTaskCompleted(a);
 }
 
 // Emails the manager of the team member who owns this task, telling him the
@@ -11044,23 +11082,29 @@ function completeAction(id) {
 // skipped so a manager is not sent a stream of small emails.
 async function notifyManagerTaskCompleted(task) {
   try {
+    // Each early exit below writes its reason to the browser console. Nothing is
+    // shown on screen and nothing is blocked — the reasons are only there so a
+    // "the manager got no email" report can be traced in seconds.
+    const skip = (why) => console.info('Manager notice skipped: ' + why);
     if (!supabaseClient || !task) return;
-    if (task.parentId) return;                                   // skip subtasks
-    if (task.ownerKind !== 'internal' || !task.ownerId) return;  // team member tasks only
+    if (task.parentId) return skip('subtasks do not send an email');
+    if (task.ownerKind !== 'internal' || !task.ownerId) return skip('task is not owned by an internal team member (owner: ' + (task.ownerKind || 'none') + ')');
     const member = (state.team || []).find(m => m.id === task.ownerId);
-    if (!member) return;
+    if (!member) return skip('owner not found in the team list');
     const proj = getProject(task.projectId);
-    const { data: linkRows } = await supabaseClient
+    const { data: linkRows, error: linkErr } = await supabaseClient
       .from('manager_links').select('token, manager_email')
       .eq('member_id', task.ownerId).eq('revoked', false)
       .order('created_at', { ascending: false }).limit(1);
-    if (!linkRows || linkRows.length === 0 || !linkRows[0].manager_email) return;
+    if (linkErr) return skip('could not read manager links — ' + linkErr.message);
+    if (!linkRows || linkRows.length === 0) return skip('no active manager link for ' + (member.name || task.ownerId));
+    if (!linkRows[0].manager_email) return skip('the manager link has no email address');
     // Names and titles are picked in the language the email is sent in, not
     // from the generic name field, which holds whichever language was saved last.
     const pick = (o, base) => currentLang === 'ar'
       ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
       : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
-    await fetch(SEND_EMAIL_FUNCTION_URL, {
+    const sendRes = await fetch(SEND_EMAIL_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -11074,7 +11118,11 @@ async function notifyManagerTaskCompleted(task) {
         lang: currentLang,
       }),
     });
-  } catch (e) { /* silent — best effort */ }
+    if (!sendRes.ok) {
+      const detail = await sendRes.text().catch(() => '');
+      console.warn('Manager notice: email service answered ' + sendRes.status + ' ' + detail);
+    }
+  } catch (e) { console.warn('Manager notice failed: ' + (e && e.message ? e.message : e)); }
 }
 
 function showMeetingStatusPicker(id) {
