@@ -1835,7 +1835,13 @@ function scheduleSync(){ if (_writeTimer) clearTimeout(_writeTimer); _writeTimer
    re-hang on every load and every tab focus. We now race each query against an
    AbortController so a stuck request fails fast, the function actually completes,
    and the cache/fallback logic runs correctly. */
-const SUPABASE_REQUEST_TIMEOUT_MS = 7000;
+// 7 seconds was too tight for a project genuinely far from the user (Seoul
+// hosting, users in Riyadh) — a slow but perfectly healthy request was being
+// cut off and wrongly treated as failed. Reads get a safer 15s baseline; the
+// actual data write below gets an even longer allowance of its own, since a
+// write failing is what visibly shows as the offline badge and queues a retry.
+const SUPABASE_REQUEST_TIMEOUT_MS = 15000;
+const SUPABASE_WRITE_TIMEOUT_MS = 25000;
 function withRequestTimeout(queryBuilder, ms) {
   ms = ms || SUPABASE_REQUEST_TIMEOUT_MS;
   // supabase-js query builders support .abortSignal(); pair it with a timer so
@@ -4155,12 +4161,12 @@ async function _flushWritesInner() {
       const allRows = state[tableKeyOf(table)] || [];
       const rowsToUpload = dirtyIds ? allRows.filter(o => o && dirtyIds.includes(o.id)) : allRows;
       if (!rowsToUpload.length) return;
-      jobs.push(withRequestTimeout(supabaseClient.from(table).upsert(rowsToUpload.map(o=>({id:o.id,data:o})),{onConflict:'id'})));
+      jobs.push(withRequestTimeout(supabaseClient.from(table).upsert(rowsToUpload.map(o=>({id:o.id,data:o})),{onConflict:'id'}), SUPABASE_WRITE_TIMEOUT_MS));
     });
     delTables.forEach(table => {
       const ids = (pendingDeletes[table]||[]).filter(Boolean);
-      if (ids.length === 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().eq('id', ids[0])));
-      else if (ids.length > 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().in('id', ids)));
+      if (ids.length === 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().eq('id', ids[0]), SUPABASE_WRITE_TIMEOUT_MS));
+      else if (ids.length > 1) jobs.push(withRequestTimeout(supabaseClient.from(table).delete().in('id', ids), SUPABASE_WRITE_TIMEOUT_MS));
     });
     if (jobs.length) {
       const results = await Promise.all(jobs);
