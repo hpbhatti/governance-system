@@ -4139,9 +4139,32 @@ function saveStateToLocalStorage() {
 
 // PRIMARY saver: write the local cache immediately (instant + offline-safe), then
 // flag only the changed table(s) dirty and schedule a debounced background upload.
-async function saveState() {
+async function saveState(changedRows) {
   saveStateToLocalStorage(); // synchronous local cache first (Quick Load source of truth)
   if (!supabaseClient) return;
+  // changedRows, when given, is an object like { projects: [...], actions: [...] } —
+  // the caller already knows exactly which rows changed. Four places in the
+  // app pass this, and until now it was silently discarded here, falling
+  // back to a whole-table hash comparison that uploads EVERY row in a table
+  // the instant any one row in it changes. For something like translating
+  // content across the whole dataset, that meant one request carrying every
+  // project you have, not just the handful that were actually translated —
+  // large enough, with file attachments included, to be rejected outright
+  // by Supabase. Using the row list directly, via the same per-row targeting
+  // every other save in the app already relies on, keeps every upload to
+  // only what genuinely changed.
+  if (changedRows && typeof changedRows === 'object') {
+    let markedAny = false;
+    Object.keys(changedRows).forEach(table => {
+      const rows = changedRows[table];
+      if (Array.isArray(rows)) {
+        rows.forEach(row => { if (row && row.id) { markRowDirty(table, row.id); markedAny = true; } });
+      }
+    });
+    if (markedAny) { scheduleSync(); return; }
+    // Nothing usable in the object (empty arrays, no ids) — fall through to
+    // the safe default below rather than silently doing nothing.
+  }
   recomputeDirty();          // mark ONLY the tables that actually changed
   scheduleSync();            // background, debounced — uploads just the dirty tables
 }
