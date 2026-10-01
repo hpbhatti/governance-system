@@ -5943,7 +5943,15 @@ function collectUntranslatedStrings() {
     if (ar && containsArabic(ar) && !en) items.push({ obj, key, table: obj.__table, source: ar });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
-  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); }); });
+  // See the matching comment in the Arabic-direction scanner below — a team
+  // member is stored nested inside their partner's own record, not as its
+  // own row, so the actual partner (not the member) is what must be saved.
+  state.partners.forEach(p => {
+    p.__table = 'partners'; maybeAdd(p, 'name');
+    const before = items.length;
+    (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); });
+    for (let i = before; i < items.length; i++) items[i].parentPartner = p;
+  });
   state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
@@ -5976,7 +5984,7 @@ async function translateAllUserContent(silent) {
       // real field was updated correctly.
       if (currentLang === 'en') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
-      else if (item.table === 'partners') changedPartners.push(item.obj);
+      else if (item.table === 'partners') changedPartners.push(item.parentPartner || item.obj);
       else if (item.table === 'internal_team') changedTeamMembers.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
@@ -6016,7 +6024,18 @@ function collectUntranslatedStringsToArabic() {
     if (en && isEnglishOnly(en) && !ar) items.push({ obj, key, table: obj.__table, source: en });
   }
   state.actions.forEach(a => { a.__table = 'actions'; maybeAdd(a, 'title'); maybeAdd(a, 'criticalNote'); });
-  state.partners.forEach(p => { p.__table = 'partners'; maybeAdd(p, 'name'); (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); }); });
+  // A team member is stored nested inside their partner's own record, not
+  // as its own row — pushing the member's own id into the save list would
+  // try to upload a row that doesn't exist, while the actual partner row
+  // that genuinely needs saving is never marked at all. parentPartner
+  // carries the real row to save; the member object stays what gets
+  // translated, parentPartner is only used when deciding what to upload.
+  state.partners.forEach(p => {
+    p.__table = 'partners'; maybeAdd(p, 'name');
+    const before = items.length;
+    (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); });
+    for (let i = before; i < items.length; i++) items[i].parentPartner = p;
+  });
   state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
@@ -6044,7 +6063,7 @@ async function translateAllUserContentToArabic(silent) {
       // partner-view), even though titleAr itself is correct in the database.
       if (currentLang === 'ar') item.obj[item.key] = translated;
       if (item.table === 'actions') changedActions.push(item.obj);
-      else if (item.table === 'partners') changedPartners.push(item.obj);
+      else if (item.table === 'partners') changedPartners.push(item.parentPartner || item.obj);
       else if (item.table === 'internal_team') changedTeamMembers.push(item.obj);
       else changedProjects.push(item.obj);
       count++;
@@ -11228,14 +11247,22 @@ function completeAction(id) {
 // Without one, nothing happens here — the date they typed already applied
 // normally, exactly as every task has always worked.
 async function requestDateConfirmation(task) {
+  // Every early exit below writes its exact reason to the console. Supabase
+  // queries that fail do not throw — they resolve with an error object — so
+  // without this, a failed lookup (a genuine connectivity timeout, the same
+  // kind already seen repeatedly in this environment) would exit silently,
+  // with nothing in the console explaining why no card or email appeared.
+  const skip = (why) => console.info('Date confirmation skipped: ' + why);
   try {
-    if (!supabaseClient || !task) return;
+    if (!supabaseClient || !task) return skip('no supabaseClient or no task');
     const partner = getPartnerForMemberId(task.ownerId);
-    if (!partner) return;
+    if (!partner) return skip('owner ' + task.ownerId + ' does not belong to any partner team');
     const { data: linkRows, error: linkErr } = await supabaseClient
       .from('partner_links').select('token').eq('partner_id', partner.id).eq('revoked', false)
       .order('created_at', { ascending: false }).limit(1);
-    if (linkErr || !linkRows || linkRows.length === 0) return; // no active link — date stands as entered
+    if (linkErr) return skip('partner_links lookup failed — ' + linkErr.message);
+    if (!linkRows || linkRows.length === 0) return skip('no active link for ' + (partner.name || partner.id));
+
     // Condition one, on its own: the partner has an active link. This alone
     // is enough to put the task into the pending-confirmation state — the
     // partner can see and confirm it directly on their link regardless of
@@ -11253,13 +11280,13 @@ async function requestDateConfirmation(task) {
     // the task still sits correctly in pending-confirmation, just silently,
     // with no email sent, rather than firing a request with no one to send it to.
     const recipients = Array.isArray(partner.lastEmailRecipients) ? partner.lastEmailRecipients : [];
-    if (recipients.length === 0) return;
+    if (recipients.length === 0) return skip('no recipients selected for ' + (partner.name || partner.id) + ' via Send Email');
 
     const proj = getProject(task.projectId);
     const pick = (o, base) => currentLang === 'ar'
       ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
       : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
-    await fetch(SEND_EMAIL_FUNCTION_URL, {
+    const sendRes = await fetch(SEND_EMAIL_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -11271,7 +11298,14 @@ async function requestDateConfirmation(task) {
         linkUrl: PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
         lang: currentLang,
       }),
-    }).catch(e => console.warn('Date confirmation email failed: ' + (e && e.message ? e.message : e)));
+    });
+    // fetch() does NOT throw on an error HTTP status (a 400 or 500 response
+    // resolves normally) — without checking .ok explicitly, the email
+    // service could fail outright and nothing would ever appear here.
+    if (!sendRes.ok) {
+      const detail = await sendRes.text().catch(() => '');
+      console.warn('Date confirmation email service responded ' + sendRes.status + ' ' + detail);
+    }
   } catch (e) { console.warn('requestDateConfirmation failed: ' + (e && e.message ? e.message : e)); }
 }
 
