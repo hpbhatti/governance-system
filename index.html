@@ -2606,6 +2606,7 @@ const T = {
     rejectionReasonLabel: 'سبب الرفض',
     proposedBy: 'مقترح من', proposalMarkComplete: 'تحديد المهمة كمكتملة', proposalAddNote: 'إضافة ملاحظة',
     proposalNewAssignment: 'تعيين مهمة جديدة', proposalTaskAssignment: 'تعيين المهام', proposalTaskCompletion: 'إكمال المهام',
+    proposalDateConfirmation: 'تأكيد التاريخ', confirmedByLabel: 'أكّده', needsDateConfirmationLabel: 'بحاجة لتأكيد التاريخ منك', yourPendingTasksLabel: 'مهامك المعلقة',
     proposedByManagerFor: 'مقترح من المدير',
     assignDueLabel: 'الاستحقاق', assignStartLabel: 'البدء', assignPriorityLabel: 'الأولوية', assignMilestoneLabel: 'يغذي',
     assigningToLabel: 'تعيين إلى', completedByLabel: 'أنجزها', completedByPartnerLabel: 'أنجزها',
@@ -3333,6 +3334,7 @@ const T = {
     rejectionReasonLabel: 'Rejection reason',
     proposedBy: 'Proposed by', proposalMarkComplete: 'Mark task complete', proposalAddNote: 'Add note',
     proposalNewAssignment: 'New task assignment', proposalTaskAssignment: 'Task assignment', proposalTaskCompletion: 'Task completion',
+    proposalDateConfirmation: 'Date confirmation', confirmedByLabel: 'Confirmed by', needsDateConfirmationLabel: 'Needs your date confirmation', yourPendingTasksLabel: 'Your pending tasks',
     proposedByManagerFor: 'Proposed by manager',
     assignDueLabel: 'Due', assignStartLabel: 'Start', assignPriorityLabel: 'Priority', assignMilestoneLabel: 'Feeds into',
     assigningToLabel: 'Assigning to', completedByLabel: 'Completed by', completedByPartnerLabel: 'Completed by',
@@ -7401,16 +7403,62 @@ views.pendingApprovals = () => {
   // Renders one status group (Pending / Approved / Rejected), itself split
   // into Task Assignment and Task Completion sub-groups — consistent at
   // every status level, not just Pending.
+  function renderDateConfirmCard(row) {
+    const task = state.actions.find(a => a.id === row.task_id);
+    const taskTitle = task ? escapeHtml(task.title) : `<em style="color:var(--ink-faint)">(${t('taskDeletedLabel')})</em>`;
+    const proj = task ? getProject(task.projectId) : null;
+    const partner = getPartner(row.proposed_by_id);
+    const statusPillClass = row.status === 'approved' ? 'green' : row.status === 'rejected' ? 'red' : 'amber';
+    const statusLabel = row.status === 'approved' ? t('statusApproved') : row.status === 'rejected' ? t('statusRejected') : t('statusPending');
+    const cardStateClass = row.status === 'approved' ? ' approved-card' : row.status === 'rejected' ? ' rejected-card' : '';
+    const initial = (partner ? partner.name : (row.proposed_by_name || '?')).trim().charAt(0).toUpperCase();
+    return `
+      <div class="pending-approval-card${cardStateClass}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <span class="badge ${statusPillClass}" style="font-size:10px">${statusLabel}</span>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${row.status === 'pending' ? `
+              <button class="btn sm" onclick="approveDateConfirmation('${row.id}')">✓ ${t('approveBtn')}</button>
+              <button class="btn ghost sm" onclick="rejectDateConfirmation('${row.id}')">✕ ${t('rejectBtn')}</button>
+            ` : `
+              <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
+            `}
+          </div>
+        </div>
+        <div style="font-size:15px;font-weight:700;margin:8px 0 4px">${taskTitle}</div>
+        ${proj ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">📁 ${escapeHtml(proj.name)}</div>` : ''}
+        <div class="pv-for-row">
+          <div class="pv-avatar">${escapeHtml(initial)}</div>
+          <div><span class="pv-for-label">${t('confirmedByLabel')}</span> <span class="pv-for-name">${escapeHtml(partner ? partner.name : (row.proposed_by_name || ''))}</span></div>
+        </div>
+        <div class="pv-meta-row">
+          <div class="pv-meta-item"><span class="pv-meta-lbl">${t('assignDueLabel')}</span><span>${escapeHtml(fmtDate(row.proposed_due_date))}</span></div>
+        </div>
+        ${row.status === 'rejected' && row.rejection_reason ? `
+          <div class="pv-reject-box">
+            <div class="pv-reject-lbl">${t('rejectionReasonLabel')}</div>
+            <div>${escapeHtml(row.rejection_reason)}</div>
+          </div>
+        ` : ''}
+        <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">${fmtDate(row.created_at ? row.created_at.slice(0,10) : '')}${row.created_at && row.created_at.length > 10 ? ' · ' + new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}</div>
+      </div>`;
+  }
+
   function renderStatusGroup(rows, statusLabel, isFirst) {
     if (rows.length === 0) return '';
     const assignRows = rows.filter(r => r.change_type === 'assign');
-    const completeRows = rows.filter(r => r.change_type !== 'assign');
+    const dateConfirmRows = rows.filter(r => r.change_type === 'date_confirm');
+    const completeRows = rows.filter(r => r.change_type !== 'assign' && r.change_type !== 'date_confirm');
     return `
       <div class="pv-status-group" style="${isFirst ? '' : 'margin-top:24px;padding-top:16px;border-top:1px solid var(--line)'}">
         <div class="pv-status-heading">${statusLabel} (${rows.length})</div>
         ${assignRows.length > 0 ? `
           <div class="pv-subgroup assign">🆕 ${t('proposalTaskAssignment')} <span class="pv-subgroup-count">(${assignRows.length})</span></div>
           ${assignRows.map(renderAssignCard).join('')}
+        ` : ''}
+        ${dateConfirmRows.length > 0 ? `
+          <div class="pv-subgroup assign">🗓 ${t('proposalDateConfirmation')} <span class="pv-subgroup-count">(${dateConfirmRows.length})</span></div>
+          ${dateConfirmRows.map(renderDateConfirmCard).join('')}
         ` : ''}
         ${completeRows.length > 0 ? `
           <div class="pv-subgroup complete">✓ ${t('proposalTaskCompletion')} <span class="pv-subgroup-count">(${completeRows.length})</span></div>
@@ -7578,6 +7626,56 @@ async function rejectAssignment(id) {
     } catch (e) { /* silent */ }
   })();
 
+  toast(t('toastProposalRejected'));
+  refreshPendingApprovals();
+}
+
+// Approve a confirmed date — applies it to the real task and clears the
+// pending flag. The task's date was already set to the proposed value when
+// it was created, so if the partner confirmed it as-is, nothing changes
+// visibly; if they picked a different date instead, that new date is what
+// gets applied now.
+async function approveDateConfirmation(id) {
+  if (!supabaseClient) return;
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (!row) return;
+  const task = state.actions.find(a => a.id === row.task_id);
+  if (task) {
+    task.dueDate = row.proposed_due_date;
+    task.dateConfirmationStatus = undefined;
+    markRowDirty('actions', task.id);
+    saveState();
+  }
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
+  toast(t('toastProposalApproved'));
+  refreshPendingApprovals();
+}
+
+async function rejectDateConfirmation(id) {
+  if (!supabaseClient) return;
+  const reason = prompt(t('rejectionReasonPrompt'));
+  if (reason === null) return;
+  if (!reason.trim()) { alert(t('rejectionReasonRequired')); return; }
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  const task = row ? state.actions.find(a => a.id === row.task_id) : null;
+  if (task) {
+    // The task goes back to awaiting confirmation, not back to a silent
+    // open state — the partner still needs to actually provide a date
+    // that works, same as before, just with the reason attached.
+    task.dateConfirmationStatus = 'pending';
+    markRowDirty('actions', task.id);
+    saveState();
+  }
+  try {
+    await supabaseClient.from('pending_changes').update({
+      status: 'rejected', rejection_reason: reason.trim(),
+      reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null,
+    }).eq('id', id);
+  } catch (e) {}
   toast(t('toastProposalRejected'));
   refreshPendingApprovals();
 }
@@ -10994,6 +11092,13 @@ function saveAction(id) {
         extendTaskDueDate(parent.id, newA.dueDate, t('parentAutoExtended'), newA.id);
       }
     }
+    // A new task assigned to a partner, with a date, only goes through date
+    // confirmation if that partner genuinely has an active link to confirm
+    // it on. With no link, there is nobody to confirm anything — the date
+    // applies directly, exactly as it always has.
+    if (newA.ownerKind === 'partner' && newA.ownerId && newA.dueDate && newA.type !== 'meeting') {
+      window._pendingDateConfirmTask = newA;
+    }
   }
   window._pendingParentId = null;
   if (typeof a !== 'undefined' && a && a.id) markRowDirty('actions', a.id);
@@ -11003,6 +11108,7 @@ function saveAction(id) {
   closeModal();
   render(state.detailParam);
   if (managerNoticeTask) notifyManagerTaskCompleted(managerNoticeTask);
+  if (window._pendingDateConfirmTask) { const _t = window._pendingDateConfirmTask; window._pendingDateConfirmTask = null; requestDateConfirmation(_t); }
 }
 
 async function deleteAction(id) {
@@ -11109,6 +11215,58 @@ function completeAction(id) {
 // a revoked link, or a failed send all end quietly — a missing manager must
 // never block a completion. Only top-level tasks send an email; subtasks are
 // skipped so a manager is not sent a stream of small emails.
+// Checks whether the partner who owns this new task has an active link.
+// With one, the task is marked awaiting confirmation and an email goes out.
+// Without one, nothing happens here — the date they typed already applied
+// normally, exactly as every task has always worked.
+async function requestDateConfirmation(task) {
+  try {
+    if (!supabaseClient || !task) return;
+    const partner = getPartner(task.ownerId);
+    if (!partner) return;
+    const { data: linkRows, error: linkErr } = await supabaseClient
+      .from('partner_links').select('token').eq('partner_id', task.ownerId).eq('revoked', false)
+      .order('created_at', { ascending: false }).limit(1);
+    if (linkErr || !linkRows || linkRows.length === 0) return; // no active link — date stands as entered
+    // Condition one, on its own: the partner has an active link. This alone
+    // is enough to put the task into the pending-confirmation state — the
+    // partner can see and confirm it directly on their link regardless of
+    // whether any email can actually be sent, and once confirmed, it still
+    // goes to Pending Approvals for the PMO exactly the same either way.
+    task.dateConfirmationStatus = 'pending';
+    task.proposedDueDate = task.dueDate;
+    markRowDirty('actions', task.id);
+    saveState();
+    renderPreserveScroll();
+
+    // Condition two, entirely separate: the email notification only goes
+    // out if this partner already has recipients selected through the
+    // existing Send Email picker. No selection made yet for this partner —
+    // the task still sits correctly in pending-confirmation, just silently,
+    // with no email sent, rather than firing a request with no one to send it to.
+    const recipients = Array.isArray(partner.lastEmailRecipients) ? partner.lastEmailRecipients : [];
+    if (recipients.length === 0) return;
+
+    const proj = getProject(task.projectId);
+    const pick = (o, base) => currentLang === 'ar'
+      ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
+      : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
+    await fetch(SEND_EMAIL_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipients,
+        recipientType: 'partner_date_confirmation_request',
+        taskTitle: pick(task, 'title'),
+        projectName: proj ? pick(proj, 'name') : '',
+        dueDate: fmtDate(task.dueDate),
+        linkUrl: PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
+        lang: currentLang,
+      }),
+    }).catch(e => console.warn('Date confirmation email failed: ' + (e && e.message ? e.message : e)));
+  } catch (e) { console.warn('requestDateConfirmation failed: ' + (e && e.message ? e.message : e)); }
+}
+
 async function notifyManagerTaskCompleted(task) {
   try {
     // Each early exit below writes its reason to the browser console. Nothing is
@@ -12523,10 +12681,14 @@ function computeProjectBreakdownForPartner(partnerId) {
     if (!belongsToThisPartner) return;
     const proj = getProject(a.projectId);
     if (!proj) return;
-    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, openCount: 0, overdueCount: 0, criticalTasks: [] };
+    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, openCount: 0, overdueCount: 0, criticalTasks: [], dateConfirmTasks: [] };
     byProject[proj.id].openCount++;
     if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
     if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
+    // Tasks still awaiting this partner's date confirmation get their own
+    // separate list, so the email can call them out ahead of the regular
+    // pending list rather than burying them in the normal count.
+    if (a.dateConfirmationStatus === 'pending') byProject[proj.id].dateConfirmTasks.push({ title: a.title, proposedDate: fmtDate(a.proposedDueDate || a.dueDate) });
   });
   return Object.values(byProject);
 }
