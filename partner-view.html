@@ -136,6 +136,10 @@
 
   .state-box { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
   .propose-row { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .date-confirm-box { background: #fdf5e8; border: 1px solid #e8c988; border-left: 3px solid #c9a84c; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .date-confirm-label { font-size: 13px; color: var(--ink); margin-bottom: 3px; }
+  .date-confirm-hint { font-size: 11px; color: var(--ink-muted); margin-bottom: 8px; }
+  .date-confirm-row { display: flex; gap: 8px; }
   .propose-btn { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
   .propose-btn.secondary { background: var(--bg-card); color: var(--accent); }
   .propose-btn:hover { opacity: 0.9; }
@@ -263,6 +267,12 @@ const STR = {
     rejectionReasonLabel: 'Reason', submissionChangeComplete: 'Marked Complete', submissionChangeNote: 'Added Note',
     closeBtn: 'Close',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
+    proposedDateLabel: 'Proposed date', dateConfirmHint: 'Confirm this date or choose a different one.',
+    confirmDateBtn: 'Confirm date', chooseOtherDateBtn: 'Choose different date',
+    confirmDateQuestion: 'Confirm', confirmDateSubtext: 'This will be sent for final approval.',
+    goBackBtn: 'Go back', yesConfirmBtn: 'Yes, confirm', nextBtn: 'Next',
+    submittingLabel: 'Submitting…', dateConfirmSubmitted: 'Submitted for approval. The admin will review it shortly.',
+    dateConfirmError: 'Could not submit — please try again.', pickADateError: 'Please pick a date first.',
     submittedPendingLabel: 'Completion submitted — awaiting confirmation',
     resubmitBtn: 'Resubmit',
     submittedRejectedLabel: 'Previously rejected — you may resubmit',
@@ -326,6 +336,12 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     rejectionReasonLabel: 'السبب', submissionChangeComplete: 'تم وضعها كمكتملة', submissionChangeNote: 'إضافة ملاحظة',
     closeBtn: 'إغلاق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
+    proposedDateLabel: 'التاريخ المقترح', dateConfirmHint: 'أكّد هذا التاريخ أو اختر تاريخاً آخر.',
+    confirmDateBtn: 'تأكيد التاريخ', chooseOtherDateBtn: 'اختيار تاريخ آخر',
+    confirmDateQuestion: 'تأكيد', confirmDateSubtext: 'سيتم إرسال هذا للموافقة النهائية.',
+    goBackBtn: 'رجوع', yesConfirmBtn: 'نعم، تأكيد', nextBtn: 'التالي',
+    submittingLabel: 'جارٍ الإرسال…', dateConfirmSubmitted: 'تم الإرسال للموافقة. سيراجعه المسؤول قريباً.',
+    dateConfirmError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.', pickADateError: 'يرجى اختيار تاريخ أولاً.',
     submittedPendingLabel: 'تم تقديم الإنجاز — في انتظار التأكيد',
     resubmitBtn: 'إعادة التقديم',
     submittedRejectedLabel: 'تم الرفض سابقاً — يمكنك إعادة التقديم',
@@ -786,7 +802,17 @@ function renderTaskCard(task, subtasks) {
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
     renderSubtasks(subtasks) +
-    (canPropose ?
+    (task.dateConfirmationStatus === 'pending' ?
+      '<div class="date-confirm-box">' +
+        '<div class="date-confirm-label">🗓 ' + t('proposedDateLabel') + ': <strong>' + fmtDate(task.proposedDueDate || task.dueDate) + '</strong></div>' +
+        '<div class="date-confirm-hint">' + t('dateConfirmHint') + '</div>' +
+        '<div class="date-confirm-row">' +
+          '<button class="propose-btn" onclick="openDateConfirm(\'' + task.id + '\', false)">✓ ' + t('confirmDateBtn') + '</button>' +
+          '<button class="propose-btn secondary" onclick="openDateConfirm(\'' + task.id + '\', true)">📅 ' + t('chooseOtherDateBtn') + '</button>' +
+        '</div>' +
+      '</div>'
+    : '') +
+    (canPropose && task.dateConfirmationStatus !== 'pending' ?
       '<div class="propose-row">' +
         (_pendingTaskIds[task.id] === 'pending'
           // Already submitted and awaiting PMO confirmation — block re-submission
@@ -1014,6 +1040,85 @@ function submitProposal(taskId, changeType, noteText, attachmentLink, attachment
     if (!res.ok) throw new Error('failed');
     return res.json();
   });
+}
+
+function submitDateConfirmation(taskId, confirmedDate) {
+  var token = getCurrentToken();
+  if (!token) return Promise.reject(new Error('no token'));
+  return fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, taskId: taskId, changeType: 'date_confirm', confirmedDueDate: confirmedDate }),
+  }).then(function(res) {
+    if (!res.ok) throw new Error('failed');
+    return res.json();
+  });
+}
+
+// openDateConfirm covers both paths in one function: confirming the date
+// exactly as proposed goes straight to the "are you sure" step; choosing a
+// different one shows a date picker first, then the same final step — so
+// the task name and the date being confirmed are always shown together,
+// never a bare yes/no with no context on what is actually being agreed to.
+function openDateConfirm(taskId, isChangingDate) {
+  if (!lastData) return;
+  var task = (lastData.tasks || []).find(function(tk) { return tk.id === taskId; });
+  if (!task) return;
+  var proposed = task.proposedDueDate || task.dueDate;
+
+  function showFinalStep(dateToConfirm) {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+      '<div class="modal-box" style="text-align:center">' +
+        '<div style="font-size:12px;color:var(--ink-muted);margin-bottom:6px">' + escapeHtml(taskTitle(task)) + '</div>' +
+        '<div style="font-weight:600;font-size:15px;margin-bottom:4px">' + t('confirmDateQuestion') + ' ' + fmtDate(dateToConfirm) + '?</div>' +
+        '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px">' + t('confirmDateSubtext') + '</div>' +
+        '<div class="modal-actions" style="justify-content:center">' +
+          '<button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('goBackBtn') + '</button>' +
+          '<button class="primary" id="date-confirm-final-submit">' + t('yesConfirmBtn') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('date-confirm-final-submit').onclick = function() {
+      this.disabled = true;
+      this.textContent = t('submittingLabel');
+      submitDateConfirmation(taskId, dateToConfirm).then(function() {
+        overlay.remove();
+        if (!lastData.tasks) return;
+        var tk = lastData.tasks.find(function(x) { return x.id === taskId; });
+        if (tk) tk.dateConfirmationStatus = 'confirmed_pending_approval';
+        render(lastData);
+        alert(t('dateConfirmSubmitted'));
+      }).catch(function() {
+        document.getElementById('date-confirm-final-submit').disabled = false;
+        document.getElementById('date-confirm-final-submit').textContent = t('yesConfirmBtn');
+        alert(t('dateConfirmError'));
+      });
+    };
+  }
+
+  if (!isChangingDate) { showFinalStep(proposed); return; }
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box">' +
+      '<div style="font-size:12px;color:var(--ink-muted);margin-bottom:6px">' + escapeHtml(taskTitle(task)) + '</div>' +
+      '<div style="font-weight:600;margin-bottom:10px">' + t('chooseOtherDateBtn') + '</div>' +
+      '<input type="date" id="date-confirm-picker" value="' + escapeHtml(proposed || '') + '" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:12px">' +
+      '<div class="modal-actions">' +
+        '<button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('proposalCancelBtn') + '</button>' +
+        '<button class="primary" id="date-confirm-picker-next">' + t('nextBtn') + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('date-confirm-picker-next').onclick = function() {
+    var val = document.getElementById('date-confirm-picker').value;
+    if (!val) { alert(t('pickADateError')); return; }
+    overlay.remove();
+    showFinalStep(val);
+  };
 }
 
 // Mark Complete now opens the same kind of modal as Add Note — optional
