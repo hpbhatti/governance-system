@@ -5000,6 +5000,14 @@ function getProjectImportance(project) {
 const getPartnerScore = getPartnerCommitment;
 
 function getPartner(id) { return state.partners.find(p => p.id === id); }
+// A partner-owned task's ownerId is a specific person inside that partner's
+// own team roster (e.g. "Hassan Iqbal"), not the partner's own top-level id
+// — getPartner(task.ownerId) will never match it. This finds the partner
+// whose team actually contains that member.
+function getPartnerForMemberId(memberId) {
+  if (!memberId) return null;
+  return state.partners.find(p => Array.isArray(p.team) && p.team.some(m => m.id === memberId)) || null;
+}
 function getProject(id) { return state.projects.find(p => p.id === id); }
 function getProjectPartnerNames(project) {
   if (!project) return '—';
@@ -11222,10 +11230,10 @@ function completeAction(id) {
 async function requestDateConfirmation(task) {
   try {
     if (!supabaseClient || !task) return;
-    const partner = getPartner(task.ownerId);
+    const partner = getPartnerForMemberId(task.ownerId);
     if (!partner) return;
     const { data: linkRows, error: linkErr } = await supabaseClient
-      .from('partner_links').select('token').eq('partner_id', task.ownerId).eq('revoked', false)
+      .from('partner_links').select('token').eq('partner_id', partner.id).eq('revoked', false)
       .order('created_at', { ascending: false }).limit(1);
     if (linkErr || !linkRows || linkRows.length === 0) return; // no active link — date stands as entered
     // Condition one, on its own: the partner has an active link. This alone
