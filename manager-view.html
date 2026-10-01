@@ -1023,7 +1023,7 @@ function render(data) {
         renderMilestonesZone(p, milestoneYourTasksMap) +
         renderForwardLookingLine(p, personStats) +
         delayBox +
-        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('memberTasksLabel', (data.member && data.member.name) || '') + '</span></div>' : '') +
+        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('memberTasksLabel', (data.member && (currentLang === 'ar' ? (data.member.nameAr || data.member.name) : (data.member.nameEn || data.member.name))) || '') + '</span></div>' : '') +
         cardsHtml +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
