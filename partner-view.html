@@ -142,6 +142,9 @@
   .date-confirm-row { display: flex; gap: 8px; }
   .date-confirm-box.waiting { background: #f5f3ee; border-color: var(--line); border-left-color: #8a92a3; }
   .date-confirm-waiting { font-size: 12.5px; color: var(--ink-muted); text-align: center; }
+  .date-reject-note { background: #fbe4e2; border-left: 3px solid var(--red); border-radius: 7px; padding: 9px 12px; margin-top: 10px; }
+  .date-reject-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--red); margin-bottom: 3px; }
+  .date-reject-txt { font-size: 12.5px; color: var(--ink); }
   .propose-btn { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
   .propose-btn.secondary { background: var(--bg-card); color: var(--accent); }
   .propose-btn:hover { opacity: 0.9; }
@@ -275,6 +278,7 @@ const STR = {
     goBackBtn: 'Go back', yesConfirmBtn: 'Yes, confirm', nextBtn: 'Next',
     submittingLabel: 'Submitting…', dateConfirmSubmitted: 'Submitted for approval. The admin will review it shortly.',
     dateAppliedImmediately: 'Date confirmed and applied.', awaitingDateApprovalMsg: 'Your suggested date has been sent to the admin for approval. You\'ll be notified once it\'s reviewed.',
+    dateNotApprovedLabel: 'Your suggested date wasn\'t approved',
     dateConfirmError: 'Could not submit — please try again.', pickADateError: 'Please pick a date first.',
     submittedPendingLabel: 'Completion submitted — awaiting confirmation',
     resubmitBtn: 'Resubmit',
@@ -345,6 +349,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     goBackBtn: 'رجوع', yesConfirmBtn: 'نعم، تأكيد', nextBtn: 'التالي',
     submittingLabel: 'جارٍ الإرسال…', dateConfirmSubmitted: 'تم الإرسال للموافقة. سيراجعه المسؤول قريباً.',
     dateAppliedImmediately: 'تم تأكيد التاريخ وتطبيقه.', awaitingDateApprovalMsg: 'تم إرسال التاريخ المقترح منك للمسؤول للموافقة عليه. سيتم إشعارك بمجرد مراجعته.',
+    dateNotApprovedLabel: 'التاريخ الذي اقترحته لم تتم الموافقة عليه',
     dateConfirmError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.', pickADateError: 'يرجى اختيار تاريخ أولاً.',
     submittedPendingLabel: 'تم تقديم الإنجاز — في انتظار التأكيد',
     resubmitBtn: 'إعادة التقديم',
@@ -807,6 +812,12 @@ function renderTaskCard(task, subtasks) {
     '</div>' +
     renderSubtasks(subtasks) +
     (task.dateConfirmationStatus === 'pending' ?
+      (task.lastDateRejectionReason ?
+        '<div class="date-reject-note">' +
+          '<div class="date-reject-lbl">' + t('dateNotApprovedLabel') + '</div>' +
+          '<div class="date-reject-txt">' + escapeHtml(task.lastDateRejectionReason) + '</div>' +
+        '</div>'
+      : '') +
       '<div class="date-confirm-box">' +
         '<div class="date-confirm-label">🗓 ' + t('proposedDateLabel') + ': <strong>' + fmtDate(task.proposedDueDate || task.dueDate) + '</strong></div>' +
         '<div class="date-confirm-hint">' + t('dateConfirmHint') + '</div>' +
@@ -1101,6 +1112,9 @@ function openDateConfirm(taskId, isChangingDate) {
           var tk = lastData.tasks.find(function(x) { return x.id === taskId; });
           if (tk) {
             appliedImmediately = dateToConfirm === (tk.proposedDueDate || tk.dueDate);
+            // A fresh submission either way — the old rejection reason, if
+            // any, no longer applies to this new attempt.
+            tk.lastDateRejectionReason = null;
             if (appliedImmediately) {
               // Matches the edge function's own logic exactly — applied
               // directly, task returns to completely normal immediately.
