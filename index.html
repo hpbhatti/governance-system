@@ -7672,6 +7672,7 @@ async function approveDateConfirmation(id) {
     task.dateConfirmationStatus = undefined;
     markRowDirty('actions', task.id);
     saveState();
+    notifyPartnerDateDecision(task, true);
   }
   try {
     await supabaseClient.from('pending_changes').update({
@@ -7694,8 +7695,14 @@ async function rejectDateConfirmation(id) {
     // open state — the partner still needs to actually provide a date
     // that works, same as before, just with the reason attached.
     task.dateConfirmationStatus = 'pending';
+    // Kept on the task itself, not only inside pending_changes, so the
+    // partner sees exactly why on their own page, not only if they happen
+    // to open the email. Cleared automatically the moment they submit
+    // again — see edge-partner-view.ts.
+    task.lastDateRejectionReason = reason.trim();
     markRowDirty('actions', task.id);
     saveState();
+    notifyPartnerDateDecision(task, false, reason.trim());
   }
   try {
     await supabaseClient.from('pending_changes').update({
@@ -11246,6 +11253,49 @@ function completeAction(id) {
 // With one, the task is marked awaiting confirmation and an email goes out.
 // Without one, nothing happens here — the date they typed already applied
 // normally, exactly as every task has always worked.
+// Tells the partner what happened to the date THEY suggested — approved or
+// rejected — once the PMO has actually made a decision. Without this, the
+// task just silently changes on their link with no way to know a decision
+// was ever made, unless they happen to check it again themselves.
+async function notifyPartnerDateDecision(task, approved, rejectionReason) {
+  const skip = (why) => console.info('Partner date decision notice skipped: ' + why);
+  try {
+    if (!supabaseClient || !task) return skip('no supabaseClient or no task');
+    const partner = getPartnerForMemberId(task.ownerId);
+    if (!partner) return skip('owner ' + task.ownerId + ' does not belong to any partner team');
+    const { data: linkRows, error: linkErr } = await supabaseClient
+      .from('partner_links').select('token').eq('partner_id', partner.id).eq('revoked', false)
+      .order('created_at', { ascending: false }).limit(1);
+    if (linkErr) return skip('partner_links lookup failed — ' + linkErr.message);
+    if (!linkRows || linkRows.length === 0) return skip('no active link for ' + (partner.name || partner.id));
+    const recipients = Array.isArray(partner.lastEmailRecipients) ? partner.lastEmailRecipients : [];
+    if (recipients.length === 0) return skip('no recipients selected for ' + (partner.name || partner.id) + ' via Send Email');
+
+    const proj = getProject(task.projectId);
+    const pick = (o, base) => currentLang === 'ar'
+      ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
+      : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
+    const sendRes = await fetch(SEND_EMAIL_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipients,
+        recipientType: approved ? 'partner_date_approved' : 'partner_date_rejected',
+        taskTitle: pick(task, 'title'),
+        projectName: proj ? pick(proj, 'name') : '',
+        dueDate: fmtDate(task.dueDate),
+        rejectionReason: rejectionReason || '',
+        linkUrl: PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
+        lang: currentLang,
+      }),
+    });
+    if (!sendRes.ok) {
+      const detail = await sendRes.text().catch(() => '');
+      console.warn('Partner date decision email service responded ' + sendRes.status + ' ' + detail);
+    }
+  } catch (e) { console.warn('notifyPartnerDateDecision failed: ' + (e && e.message ? e.message : e)); }
+}
+
 async function requestDateConfirmation(task) {
   // Every early exit below writes its exact reason to the console. Supabase
   // queries that fail do not throw — they resolve with an error object — so
