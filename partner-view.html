@@ -140,6 +140,8 @@
   .date-confirm-label { font-size: 13px; color: var(--ink); margin-bottom: 3px; }
   .date-confirm-hint { font-size: 11px; color: var(--ink-muted); margin-bottom: 8px; }
   .date-confirm-row { display: flex; gap: 8px; }
+  .date-confirm-box.waiting { background: #f5f3ee; border-color: var(--line); border-left-color: #8a92a3; }
+  .date-confirm-waiting { font-size: 12.5px; color: var(--ink-muted); text-align: center; }
   .propose-btn { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
   .propose-btn.secondary { background: var(--bg-card); color: var(--accent); }
   .propose-btn:hover { opacity: 0.9; }
@@ -272,6 +274,7 @@ const STR = {
     confirmDateQuestion: 'Confirm', confirmDateSubtext: 'This will be sent for final approval.',
     goBackBtn: 'Go back', yesConfirmBtn: 'Yes, confirm', nextBtn: 'Next',
     submittingLabel: 'Submitting…', dateConfirmSubmitted: 'Submitted for approval. The admin will review it shortly.',
+    dateAppliedImmediately: 'Date confirmed and applied.', awaitingDateApprovalMsg: 'Your suggested date has been sent to the admin for approval. You\'ll be notified once it\'s reviewed.',
     dateConfirmError: 'Could not submit — please try again.', pickADateError: 'Please pick a date first.',
     submittedPendingLabel: 'Completion submitted — awaiting confirmation',
     resubmitBtn: 'Resubmit',
@@ -341,6 +344,7 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     confirmDateQuestion: 'تأكيد', confirmDateSubtext: 'سيتم إرسال هذا للموافقة النهائية.',
     goBackBtn: 'رجوع', yesConfirmBtn: 'نعم، تأكيد', nextBtn: 'التالي',
     submittingLabel: 'جارٍ الإرسال…', dateConfirmSubmitted: 'تم الإرسال للموافقة. سيراجعه المسؤول قريباً.',
+    dateAppliedImmediately: 'تم تأكيد التاريخ وتطبيقه.', awaitingDateApprovalMsg: 'تم إرسال التاريخ المقترح منك للمسؤول للموافقة عليه. سيتم إشعارك بمجرد مراجعته.',
     dateConfirmError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.', pickADateError: 'يرجى اختيار تاريخ أولاً.',
     submittedPendingLabel: 'تم تقديم الإنجاز — في انتظار التأكيد',
     resubmitBtn: 'إعادة التقديم',
@@ -811,8 +815,15 @@ function renderTaskCard(task, subtasks) {
           '<button class="propose-btn secondary" onclick="openDateConfirm(\'' + task.id + '\', true)">📅 ' + t('chooseOtherDateBtn') + '</button>' +
         '</div>' +
       '</div>'
+    : task.dateConfirmationStatus === 'awaiting_approval' ?
+      // A different date was suggested — this now sits with the admin, no
+      // action left for the partner, so Mark Complete / Add Note stay hidden
+      // below and this plain waiting message takes their place instead.
+      '<div class="date-confirm-box waiting">' +
+        '<div class="date-confirm-waiting">⏳ ' + t('awaitingDateApprovalMsg') + '</div>' +
+      '</div>'
     : '') +
-    (canPropose && task.dateConfirmationStatus !== 'pending' ?
+    (canPropose && task.dateConfirmationStatus !== 'pending' && task.dateConfirmationStatus !== 'awaiting_approval' ?
       '<div class="propose-row">' +
         (_pendingTaskIds[task.id] === 'pending'
           // Already submitted and awaiting PMO confirmation — block re-submission
@@ -1085,11 +1096,26 @@ function openDateConfirm(taskId, isChangingDate) {
       this.textContent = t('submittingLabel');
       submitDateConfirmation(taskId, dateToConfirm).then(function() {
         overlay.remove();
-        if (!lastData.tasks) return;
-        var tk = lastData.tasks.find(function(x) { return x.id === taskId; });
-        if (tk) tk.dateConfirmationStatus = 'confirmed_pending_approval';
+        var appliedImmediately = false;
+        if (lastData.tasks) {
+          var tk = lastData.tasks.find(function(x) { return x.id === taskId; });
+          if (tk) {
+            appliedImmediately = dateToConfirm === (tk.proposedDueDate || tk.dueDate);
+            if (appliedImmediately) {
+              // Matches the edge function's own logic exactly — applied
+              // directly, task returns to completely normal immediately.
+              tk.dueDate = dateToConfirm;
+              tk.dateConfirmationStatus = null;
+              tk.proposedDueDate = null;
+            } else {
+              // A different date — sits with the admin now, Mark Complete
+              // and Add Note stay hidden until it's reviewed.
+              tk.dateConfirmationStatus = 'awaiting_approval';
+            }
+          }
+        }
         render(lastData);
-        alert(t('dateConfirmSubmitted'));
+        alert(appliedImmediately ? t('dateAppliedImmediately') : t('dateConfirmSubmitted'));
       }).catch(function() {
         document.getElementById('date-confirm-final-submit').disabled = false;
         document.getElementById('date-confirm-final-submit').textContent = t('yesConfirmBtn');
