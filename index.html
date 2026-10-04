@@ -2609,6 +2609,7 @@ const T = {
     proposalDateConfirmation: 'تأكيد التاريخ', confirmedByLabel: 'أكّده', needsDateConfirmationLabel: 'بحاجة لتأكيد التاريخ منك', yourPendingTasksLabel: 'مهامك المعلقة',
     proposedByManagerFor: 'مقترح من المدير',
     assignDueLabel: 'الاستحقاق', assignStartLabel: 'البدء', assignPriorityLabel: 'الأولوية', assignMilestoneLabel: 'يغذي',
+    approveWithChangesBtn: 'موافقة مع تعديل', approveWithChangesTitle: 'موافقة مع تعديل التواريخ', approveWithTheseDatesBtn: 'موافقة بهذه التواريخ', proposedLabel: 'المقترح', sameAsProposed: 'مطابق للمقترح', dueDateRequiredMsg: 'يرجى اختيار تاريخ الاستحقاق.', dueBeforeStartMsg: 'لا يمكن أن يكون تاريخ الاستحقاق قبل تاريخ البدء.',
     assigningToLabel: 'تعيين إلى', completedByLabel: 'أنجزها', completedByPartnerLabel: 'أنجزها',
     originallyDueLabel: 'الاستحقاق الأصلي', submittedLabel: 'تم التقديم',
     daysOverdueLabel: 'يوماً متأخراً', dayOverdueSingular: 'يوم متأخر', onTimeLabel: 'في الوقت المحدد',
@@ -3337,6 +3338,7 @@ const T = {
     proposalDateConfirmation: 'Date confirmation', confirmedByLabel: 'Confirmed by', needsDateConfirmationLabel: 'Needs your date confirmation', yourPendingTasksLabel: 'Your pending tasks',
     proposedByManagerFor: 'Proposed by manager',
     assignDueLabel: 'Due', assignStartLabel: 'Start', assignPriorityLabel: 'Priority', assignMilestoneLabel: 'Feeds into',
+    approveWithChangesBtn: 'Approve with changes', approveWithChangesTitle: 'Approve with changes', approveWithTheseDatesBtn: 'Approve with these dates', proposedLabel: 'Proposed', sameAsProposed: 'Same as proposed', dueDateRequiredMsg: 'Please choose a due date.', dueBeforeStartMsg: 'The due date cannot be before the start date.',
     assigningToLabel: 'Assigning to', completedByLabel: 'Completed by', completedByPartnerLabel: 'Completed by',
     originallyDueLabel: 'Originally due', submittedLabel: 'Submitted',
     daysOverdueLabel: 'days overdue', dayOverdueSingular: 'day overdue', onTimeLabel: 'On time',
@@ -7324,6 +7326,7 @@ views.pendingApprovals = () => {
           <div style="display:flex;gap:6px;flex-shrink:0">
             ${row.status === 'pending' ? `
               <button class="btn sm" onclick="approveAssignment('${row.id}')">✓ ${t('approveBtn')}</button>
+              <button class="btn ghost sm" style="color:var(--gold-deep,#8a5a10);border-color:var(--gold,#c9a84c)" onclick="openApproveWithChanges('${row.id}')">📅 ${t('approveWithChangesBtn')}</button>
               <button class="btn ghost sm" onclick="rejectAssignment('${row.id}')">✕ ${t('rejectBtn')}</button>
             ` : `
               <button class="btn ghost sm" style="color:var(--red);border-color:rgba(176,69,64,0.3)" onclick="deletePendingChange('${row.id}')">🗑 ${t('deleteBtn')}</button>
@@ -7515,10 +7518,18 @@ views.pendingApprovals = () => {
 // ── Approve a task ASSIGNMENT proposal — creates the real task, assigns it
 // to the team member, and sends them a confirmation email. Distinct from
 // approveProposal (which handles existing-task completions/notes). ──
-async function approveAssignment(id) {
+// overrides is optional: { startDate, dueDate } — used by "Approve with
+// changes". With no overrides this behaves exactly as it always has. The
+// task is created ONCE, with the dates the admin chose, so no extension is
+// ever recorded against a date nobody had committed to yet.
+async function approveAssignment(id, overrides) {
   if (!supabaseClient) return;
   const row = (_pendingApprovalsCache || []).find(r => r.id === id);
   if (!row) return;
+
+  const finalStart = (overrides && 'startDate' in overrides) ? (overrides.startDate || null) : (row.proposed_start_date || null);
+  const finalDue = (overrides && overrides.dueDate) ? overrides.dueDate : row.proposed_due_date;
+  const datesChanged = finalDue !== row.proposed_due_date || finalStart !== (row.proposed_start_date || null);
 
   const newTask = {
     id: uid(),
@@ -7529,8 +7540,8 @@ async function approveAssignment(id) {
     ownerId: row.proposed_by_id, // the team member this was assigned FOR
     status: 'open',
     priority: row.proposed_priority || 'medium',
-    startDate: row.proposed_start_date || null,
-    dueDate: row.proposed_due_date,
+    startDate: finalStart,
+    dueDate: finalDue,
     completedDate: null,
     reason: '', tracking: [],
     dependsOnIds: [],
@@ -7576,7 +7587,7 @@ async function approveAssignment(id) {
         headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipients: [member.email], recipientName: member.name || '', recipientType: 'task_assigned',
-          taskTitle: row.proposed_title, projectName: proj.name, dueDate: fmtDate(row.proposed_due_date),
+          taskTitle: row.proposed_title, projectName: proj.name, dueDate: fmtDate(finalDue),
           priority: row.proposed_priority || 'medium', linkUrl, lang: currentLang,
         }),
       });
@@ -7603,7 +7614,14 @@ async function approveAssignment(id) {
           recipients: [linkRows[0].manager_email], recipientType: 'assignment_approved',
           submitterName: member ? member.name : (row.proposed_by_name || ''),
           taskTitle: row.proposed_title, projectName: proj ? proj.name : '',
-          dueDate: fmtDate(row.proposed_due_date), linkUrl, lang: currentLang,
+          dueDate: fmtDate(finalDue), linkUrl, lang: currentLang,
+          // Only meaningful when the admin adjusted the dates: lets the
+          // manager see proposed beside approved instead of assuming it was
+          // approved exactly as proposed.
+          datesChanged,
+          startDate: finalStart ? fmtDate(finalStart) : '',
+          proposedStartDate: row.proposed_start_date ? fmtDate(row.proposed_start_date) : '',
+          proposedDueDate: fmtDate(row.proposed_due_date),
         }),
       });
     } catch (e) { /* silent — best effort */ }
@@ -7611,6 +7629,51 @@ async function approveAssignment(id) {
 
   toast(t('toastProposalApproved'));
   refreshPendingApprovals();
+}
+
+function openApproveWithChanges(id) {
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (!row) return;
+  const startVal = row.proposed_start_date || '';
+  const dueVal = row.proposed_due_date || '';
+  const html =
+    '<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:14px">' + escapeHtml(row.proposed_title || '') + '</div>' +
+    '<div class="form-row"><label>' + t('assignStartLabel') + '</label>' +
+      '<input type="date" id="f-awc-start" value="' + escapeHtml(startVal) + '" oninput="awcRefreshHints(\'' + id + '\')">' +
+      '<div id="f-awc-start-hint" style="font-size:11px;color:var(--ink-faint);margin-top:3px"></div></div>' +
+    '<div class="form-row"><label>' + t('assignDueLabel') + ' *</label>' +
+      '<input type="date" id="f-awc-due" value="' + escapeHtml(dueVal) + '" oninput="awcRefreshHints(\'' + id + '\')">' +
+      '<div id="f-awc-due-hint" style="font-size:11px;color:var(--ink-faint);margin-top:3px"></div></div>';
+  const foot =
+    '<button class="btn" onclick="confirmApproveWithChanges(\'' + id + '\')">' + t('approveWithTheseDatesBtn') + '</button> ' +
+    '<button class="btn ghost" onclick="closeModal()">' + t('cancel') + '</button>';
+  openModal(t('approveWithChangesTitle'), html, foot);
+  awcRefreshHints(id);
+}
+
+// Shows what each date was proposed as, and tints a changed field, so the
+// admin always sees exactly what they are overriding.
+function awcRefreshHints(id) {
+  const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+  if (!row) return;
+  const pairs = [['f-awc-start', 'f-awc-start-hint', row.proposed_start_date || ''], ['f-awc-due', 'f-awc-due-hint', row.proposed_due_date || '']];
+  pairs.forEach(([inputId, hintId, proposed]) => {
+    const inp = document.getElementById(inputId), hint = document.getElementById(hintId);
+    if (!inp || !hint) return;
+    const changed = inp.value !== proposed;
+    hint.textContent = changed ? (t('proposedLabel') + ': ' + (proposed ? fmtDate(proposed) : '—')) : t('sameAsProposed');
+    inp.style.borderColor = changed ? 'var(--gold,#c9a84c)' : '';
+    inp.style.background = changed ? '#fdf5e8' : '';
+  });
+}
+
+function confirmApproveWithChanges(id) {
+  const start = (document.getElementById('f-awc-start').value || '').trim();
+  const due = (document.getElementById('f-awc-due').value || '').trim();
+  if (!due) { alert(t('dueDateRequiredMsg')); return; }
+  if (start && start > due) { alert(t('dueBeforeStartMsg')); return; }
+  closeModal();
+  approveAssignment(id, { startDate: start || null, dueDate: due });
 }
 
 async function rejectAssignment(id) {
