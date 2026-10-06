@@ -209,6 +209,28 @@
   .pv-files-rule { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
   .pv-files-rule::after { content: ''; flex: 1; height: 1.5px; background: var(--line-strong); }
   .pv-files-rule-label { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+
+  /* ── Step 1: grouped tasks + team filter (pvg-*) ── */
+  .pvg-action-box { background: var(--amber-bg); border: 1px solid rgba(196,126,42,0.3); border-radius: 12px; padding: 2px 12px 6px; margin: 10px 0 6px; }
+  .pvg-action-box .pvg-group-head { color: #854F0B; margin-top: 10px; }
+  .pvg-group-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: 13.5px; font-weight: 700; margin: 16px 0 8px; }
+  .pvg-group-head.overdue { color: var(--red); }
+  .pvg-group-head.done { color: var(--green); }
+  .pvg-count, .pvg-range { font-size: 12px; font-weight: 400; color: var(--ink-muted); }
+  .pvg-team { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .pvg-team-label { font-size: 12px; color: var(--ink-muted); }
+  .pvg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; padding-inline-start: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-card); font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+  .pvg-chip.on { border-color: var(--accent); background: #eef3f8; box-shadow: 0 0 0 1px var(--accent); }
+  .pvg-chip em { font-style: normal; font-size: 11.5px; background: var(--bg); border-radius: 999px; padding: 0 7px; color: var(--ink-muted); }
+  .pvg-av { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .pvg-av.all { background: var(--ink-faint); }
+  .pvg-summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-muted); margin-bottom: 4px; }
+  .pvg-link { background: none; border: none; padding: 0; color: #0C447C; text-decoration: underline; cursor: pointer; font-family: inherit; font-size: inherit; }
+  .pvg-toggle { margin-inline-start: 4px; border: 1px solid var(--line-strong); background: var(--bg-card); border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; color: var(--accent); cursor: pointer; }
+  .pvg-note { margin-top: 8px; font-size: 12.5px; border-radius: 8px; padding: 6px 10px; }
+  .pvg-note.ok { background: var(--green-bg); color: var(--green); }
+  .pvg-note.late { background: var(--amber-bg); color: #633806; border: 1px solid rgba(196,126,42,0.3); }
+  .pvg-empty { text-align: center; color: var(--ink-muted); font-size: 13px; padding: 20px 10px; background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: 10px; }
   .pv-impact-card { background: #e6f1fb; border: 1px solid rgba(24,95,165,0.15); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
   .pv-impact-row { display: flex; align-items: center; gap: 12px; }
   .pv-impact-block { flex: 1; min-width: 0; }
@@ -312,6 +334,20 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     stCompleted: '\u2713 Completed', stOpen: 'Open', stOverdue: 'Overdue', stMissed: 'Missed',
     pHigh: 'High', pMedium: 'Medium', pLow: 'Low',
     yourTasks: 'Your Tasks', projectFilesZone: 'Project Files',
+    pvgNeedsAction: 'Needs your action',
+    pvgNeedsActionHint: function(n){ return n === 1 ? 'Confirm the proposed date' : 'Confirm the proposed dates'; },
+    pvgNeedsActionAll: 'Shown for everyone, whatever the Team filter',
+    pvgGroupOverdue: 'Overdue', pvgGroupThisWeek: 'Due this week', pvgGroupNextWeek: 'Due next week', pvgGroupLater: 'Due later', pvgGroupCompleted: 'Completed',
+    pvgRangeThisWeek: function(d){ return 'today to Thu ' + d; },
+    pvgRangeNextWeek: function(a, b){ return a + ' to ' + b + ', includes Fri and Sat'; },
+    pvgTaskCount: function(n){ return n + (n === 1 ? ' task' : ' tasks'); },
+    pvgTeam: 'Team', pvgEveryone: 'Everyone', pvgShow: 'Show', pvgHide: 'Hide', pvgShowEveryone: 'Show everyone',
+    pvgShowingOpen: function(n, name){ return 'Showing ' + n + ' open task' + (n === 1 ? '' : 's') + (name ? ' for ' + name : ''); },
+    pvgShowingOther: function(n, name){ return 'Showing ' + n + ' other open task' + (n === 1 ? '' : 's') + (name ? ' for ' + name : ''); },
+    pvgNoOpen: 'No other open tasks here.',
+    pvgOnTime: 'Completed on time',
+    pvgCompletedLate: function(n){ return 'Completed ' + n + ' working day' + (n === 1 ? '' : 's') + ' after the due date. Friday and Saturday are not counted.'; },
+    pvgOverdueWorkDays: function(n){ return '\u23F0 ' + n + ' working day' + (n === 1 ? '' : 's') + ' overdue'; },
     milestonesTitle: 'Milestones',
     msBadgeDone: 'Done', msBadgeOverdue: 'Overdue', msBadgeNext: 'Next', msBadgeUpcoming: 'Upcoming',
     msOverdueCount: function(n){ return n + ' overdue'; },
@@ -383,6 +419,20 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     stCompleted: '\u2713 مكتملة', stOpen: 'مفتوحة', stOverdue: 'متأخرة', stMissed: 'فائتة',
     pHigh: 'عالية', pMedium: 'متوسطة', pLow: 'منخفضة',
     yourTasks: 'مهامك', projectFilesZone: 'ملفات المشروع',
+    pvgNeedsAction: 'مطلوب إجراء منك',
+    pvgNeedsActionHint: function(n){ return n === 1 ? 'يرجى تأكيد التاريخ المقترح' : 'يرجى تأكيد التواريخ المقترحة'; },
+    pvgNeedsActionAll: 'تظهر للجميع بغض النظر عن فلتر الفريق',
+    pvgGroupOverdue: 'متأخرة', pvgGroupThisWeek: 'مستحقة هذا الأسبوع', pvgGroupNextWeek: 'مستحقة الأسبوع القادم', pvgGroupLater: 'مستحقة لاحقًا', pvgGroupCompleted: 'المهام المنجزة',
+    pvgRangeThisWeek: function(d){ return 'من اليوم حتى الخميس ' + d; },
+    pvgRangeNextWeek: function(a, b){ return 'من ' + a + ' إلى ' + b + ' (تشمل الجمعة والسبت)'; },
+    pvgTaskCount: function(n){ return n === 1 ? 'مهمة واحدة' : n === 2 ? 'مهمتان' : (n >= 3 && n <= 10) ? n + ' مهام' : n + ' مهمة'; },
+    pvgTeam: 'الفريق', pvgEveryone: 'الجميع', pvgShow: 'عرض', pvgHide: 'إخفاء', pvgShowEveryone: 'عرض الجميع',
+    pvgShowingOpen: function(n, name){ return 'المهام المفتوحة المعروضة: ' + n + (name ? ' (' + name + ')' : ''); },
+    pvgShowingOther: function(n, name){ return 'المهام المفتوحة الأخرى المعروضة: ' + n + (name ? ' (' + name + ')' : ''); },
+    pvgNoOpen: 'لا توجد مهام مفتوحة أخرى.',
+    pvgOnTime: 'أُنجزت في الموعد المحدد',
+    pvgCompletedLate: function(n){ var w = n === 1 ? 'يوم عمل واحد' : n === 2 ? 'يومَي عمل' : (n >= 3 && n <= 10) ? n + ' أيام عمل' : n + ' يوم عمل'; return 'أُنجزت بعد تاريخ الاستحقاق بمقدار ' + w + ' (لا تُحتسب الجمعة والسبت).'; },
+    pvgOverdueWorkDays: function(n){ var w = n === 1 ? 'يوم عمل واحد' : n === 2 ? 'يومين عمل' : (n >= 3 && n <= 10) ? n + ' أيام عمل' : n + ' يوم عمل'; return '\u23F0 متأخرة ' + w; },
     milestonesTitle: 'المعالم',
     msBadgeDone: 'مكتمل', msBadgeOverdue: 'متأخر', msBadgeNext: 'التالي', msBadgeUpcoming: 'قادم',
     msOverdueCount: function(n){ return n + ' متأخرة'; },
@@ -807,7 +857,7 @@ function renderTaskCard(task, subtasks) {
       priorityBadge(task.priority) +
       (task.startDate ? '<span>🚀 ' + t('startDate') + ': ' + fmtDate(task.startDate) + '</span>' : '') +
       '<span>📅 ' + t('due') + ': ' + fmtDate(task.dueDate) + '</span>' +
-      (cls === 'overdue' && delay > 0 ? '<span style="color:var(--red);font-weight:600">' + t('overdueDays', delay) + '</span>' : '') +
+      (cls === 'overdue' && pvgWorkDays(task.dueDate, todayStr()) > 0 ? '<span style="color:var(--red);font-weight:600">' + t('pvgOverdueWorkDays', pvgWorkDays(task.dueDate, todayStr())) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
     renderSubtasks(subtasks) +
@@ -930,6 +980,157 @@ function loadPartnerView() {
   });
 }
 
+// ── Step 1: grouped task list + Team filter + "Needs your action" box ──────
+// All names start with pvg so nothing here can clash with existing code.
+var pvgState = { team: {}, done: {}, people: {} };
+var PVG_COLORS = ['#1a3a52', '#2f7d6d', '#8a5ca8', '#b8884a', '#4a6fa5', '#a0526b'];
+
+function pvgDow(iso) { return new Date(iso + 'T00:00:00').getDay(); } // 0 Sun ... 6 Sat
+function pvgAddDays(iso, n) {
+  var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// Saudi work week is Sunday to Thursday: Friday (5) and Saturday (6) never count.
+function pvgWorkDays(fromIso, toIso) {
+  if (!fromIso || !toIso || toIso <= fromIso) return 0;
+  var n = 0, cur = fromIso, guard = 0;
+  while (cur < toIso && guard++ < 4000) {
+    cur = pvgAddDays(cur, 1);
+    var w = pvgDow(cur);
+    if (w !== 5 && w !== 6) n++;
+  }
+  return n;
+}
+// "This week" runs from today to Thursday. On Friday or Saturday it means the coming Sunday to Thursday.
+function pvgWeekEnd(todayIso) {
+  var w = pvgDow(todayIso);
+  if (w <= 4) return pvgAddDays(todayIso, 4 - w);
+  return pvgAddDays(todayIso, w === 5 ? 6 : 5);
+}
+function pvgOwnerKey(tk) {
+  var s = tk.stakeholder;
+  return s ? (s.nameEn || s.nameRaw || s.nameAr || '') : '';
+}
+function pvgInitials(name) {
+  var parts = String(name || '').trim().split(/\s+/);
+  var a = parts[0] ? Array.from(parts[0])[0] : '';
+  var b = parts[1] ? Array.from(parts[1])[0] : '';
+  return (a + b).toUpperCase();
+}
+function pvgIsOpen(tk) { return tk.status !== 'completed'; }
+function pvgBucket(tk, today, wkEnd, nxtEnd) {
+  if (tk.status === 'completed') return 'done';
+  if (tk.dateConfirmationStatus === 'pending' && tk.status !== 'missed') return 'act';
+  if (tk.status === 'missed') return 'ovd';
+  if (tk.dueDate && tk.dueDate < today) return 'ovd';
+  if (!tk.dueDate) return 'later';
+  if (tk.dueDate <= wkEnd) return 'wk';
+  if (tk.dueDate <= nxtEnd) return 'nxt';
+  return 'later';
+}
+function pvgCompletionNote(tk) {
+  if (!tk.completedDate || !tk.dueDate) return '';
+  var wd = tk.completedDate > tk.dueDate ? pvgWorkDays(tk.dueDate, tk.completedDate) : 0;
+  return wd > 0
+    ? '<div class="pvg-note late">' + escapeHtml(t('pvgCompletedLate', wd)) + '</div>'
+    : '<div class="pvg-note ok">' + escapeHtml(t('pvgOnTime')) + '</div>';
+}
+function pvgCard(tk, tasks) {
+  var subtasks = tasks.filter(function(st){ return st.parentId === tk.id; });
+  var html = renderTaskCard(tk, subtasks);
+  if (tk.status === 'completed') {
+    var note = pvgCompletionNote(tk);
+    if (note && html.slice(-6) === '</div>') html = html.slice(0, -6) + note + '</div>';
+  }
+  return html;
+}
+function pvgGroupHead(label, count, range, cls) {
+  return '<div class="pvg-group-head ' + (cls || '') + '">' + escapeHtml(label) +
+    ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', count)) + '</span>' +
+    (range ? '<span class="pvg-range">' + escapeHtml(range) + '</span>' : '') + '</div>';
+}
+function pvgRenderGroups(items, tasks, pid) {
+  var today = todayStr(), wkEnd = pvgWeekEnd(today), nxtEnd = pvgAddDays(wkEnd, 7);
+  // Team chips only when 2 or more named people have tasks in this project
+  var keys = [], seen = {};
+  items.forEach(function(tk){ var k = pvgOwnerKey(tk); if (k && !seen[k]) { seen[k] = tk.stakeholder; keys.push(k); } });
+  keys.sort();
+  pvgState.people[pid] = keys;
+  var sel = pvgState.team[pid] || 'ALL';
+  if (sel !== 'ALL' && keys.indexOf(sel) === -1) sel = 'ALL';
+  var showTeam = keys.length >= 2;
+  if (!showTeam) sel = 'ALL';
+  var selLabel = sel !== 'ALL' ? stakeholderDisplayName(seen[sel]) : '';
+
+  var actionTasks = items.filter(function(tk){ return pvgBucket(tk, today, wkEnd, nxtEnd) === 'act'; })
+    .sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); });
+  var visible = items.filter(function(tk){ return sel === 'ALL' || pvgOwnerKey(tk) === sel; });
+  var by = { ovd: [], wk: [], nxt: [], later: [], done: [] };
+  visible.forEach(function(tk){
+    var b = pvgBucket(tk, today, wkEnd, nxtEnd);
+    if (b !== 'act') by[b].push(tk);
+  });
+  ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k].sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); }); });
+  by.done.sort(function(a, b){ return (b.completedDate || '').localeCompare(a.completedDate || ''); });
+  var openCount = by.ovd.length + by.wk.length + by.nxt.length + by.later.length;
+
+  var h = '';
+  if (showTeam) {
+    h += '<div class="pvg-team"><span class="pvg-team-label">' + escapeHtml(t('pvgTeam')) + '</span>' +
+      '<button class="pvg-chip' + (sel === 'ALL' ? ' on' : '') + '" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="-1"><span class="pvg-av all">' + escapeHtml(t('pvgEveryone').slice(0, 1)) + '</span>' + escapeHtml(t('pvgEveryone')) + '</button>';
+    keys.forEach(function(k, i){
+      var n = items.filter(function(tk){ return pvgOwnerKey(tk) === k && pvgIsOpen(tk); }).length;
+      h += '<button class="pvg-chip' + (sel === k ? ' on' : '') + '" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="' + i + '">' +
+        '<span class="pvg-av" style="background:' + PVG_COLORS[i % PVG_COLORS.length] + '">' + escapeHtml(pvgInitials(stakeholderDisplayName(seen[k]))) + '</span>' +
+        escapeHtml(stakeholderDisplayName(seen[k])) + '<em>' + n + '</em></button>';
+    });
+    h += '</div>';
+  }
+  if (actionTasks.length) {
+    h += '<div class="pvg-action-box"><div class="pvg-group-head">' + escapeHtml(t('pvgNeedsAction')) +
+      ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', actionTasks.length)) + '</span>' +
+      '<span class="pvg-range">' + escapeHtml(t('pvgNeedsActionHint', actionTasks.length)) + (sel !== 'ALL' ? '. ' + escapeHtml(t('pvgNeedsActionAll')) : '') + '</span></div>' +
+      actionTasks.map(function(tk){ return pvgCard(tk, tasks); }).join('') + '</div>';
+  }
+  h += '<div class="pvg-summary"><span>' + escapeHtml(actionTasks.length ? t('pvgShowingOther', openCount, selLabel) : t('pvgShowingOpen', openCount, selLabel)) + '</span>' +
+    (sel !== 'ALL' ? '<button class="pvg-link" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="-1">' + escapeHtml(t('pvgShowEveryone')) + '</button>' : '') + '</div>';
+
+  var groups = [
+    ['ovd',   t('pvgGroupOverdue'),  '', 'overdue'],
+    ['wk',    t('pvgGroupThisWeek'), t('pvgRangeThisWeek', fmtDate(wkEnd)), ''],
+    ['nxt',   t('pvgGroupNextWeek'), t('pvgRangeNextWeek', fmtDate(pvgAddDays(wkEnd, 1)), fmtDate(nxtEnd)), ''],
+    ['later', t('pvgGroupLater'),    '', '']
+  ];
+  var any = false;
+  groups.forEach(function(g){
+    var list = by[g[0]];
+    if (!list.length) return;
+    any = true;
+    h += pvgGroupHead(g[1], list.length, g[2], g[3]) + list.map(function(tk){ return pvgCard(tk, tasks); }).join('');
+  });
+  if (!any) h += '<div class="pvg-empty">' + escapeHtml(t('pvgNoOpen')) + '</div>';
+
+  var showDone = !!pvgState.done[pid];
+  h += '<div class="pvg-group-head done">' + escapeHtml(t('pvgGroupCompleted')) +
+    ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', by.done.length)) + '</span>' +
+    (by.done.length ? '<button class="pvg-toggle" data-pvg="done" data-pid="' + escapeHtml(pid) + '">' + escapeHtml(showDone ? t('pvgHide') : t('pvgShow')) + '</button>' : '') + '</div>';
+  if (showDone) h += by.done.map(function(tk){ return pvgCard(tk, tasks); }).join('');
+  return h;
+}
+document.addEventListener('click', function(e) {
+  var el = e.target.closest ? e.target.closest('[data-pvg]') : null;
+  if (!el) return;
+  var pid = el.getAttribute('data-pid');
+  if (el.getAttribute('data-pvg') === 'team') {
+    var idx = parseInt(el.getAttribute('data-idx'), 10);
+    var keys = pvgState.people[pid] || [];
+    pvgState.team[pid] = idx >= 0 && keys[idx] ? keys[idx] : 'ALL';
+  } else if (el.getAttribute('data-pvg') === 'done') {
+    pvgState.done[pid] = !pvgState.done[pid];
+  } else { return; }
+  if (lastData) render(lastData);
+});
+
 function render(data) {
   var app = document.getElementById('app');
   var tasks = data.tasks || [];
@@ -1016,7 +1217,7 @@ function render(data) {
         renderForwardLookingLine(p, personStats) +
         delayBox +
         (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span></div>' : '') +
-        cardsHtml +
+        (cardsHtml ? pvgRenderGroups(items, tasks, p.id) : '') +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
           : '') +
