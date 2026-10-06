@@ -1441,6 +1441,26 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .cal-zone-meetings { opacity: 0.95; }
   @media (max-width: 720px) { .calendar-cell { min-height: 56px; padding: 4px; } .calendar-day-num { font-size: 12px; } .cal-badge { font-size: 9px; padding: 0 4px; } }
 
+  /* === Combined Calendar & Agenda (cag) — new classes only === */
+  .cag-layout { display: grid; grid-template-columns: minmax(320px, 430px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .cag-layout .calendar-cell { min-height: 64px; }
+  .calendar-cell.cag-wk { background: #faf6ea; }
+  .cag-day-head { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin: 14px 0 6px; font-family: 'Reem Kufi', serif; letter-spacing: 0.03em; }
+  .cag-day-head:first-child { margin-top: 0; }
+  .cag-scope-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: var(--ink-muted); margin-bottom: 10px; }
+  .cag-add-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .cag-month-sum { margin-top: 10px; font-size: 12.5px; color: var(--ink-muted); background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  .cag-more { margin-top: 10px; width: 100%; }
+  .cag-mode-seg { display: none; margin-bottom: 12px; }
+  .cag-back { display: none; background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0; margin: 0 0 10px; font-family: inherit; }
+  @media (max-width: 760px) {
+    .cag-layout { display: block; }
+    .cag-mode-seg { display: flex; }
+    .cag-back { display: inline-block; }
+    .cag-layout[data-mode="list"] .cag-grid-pane { display: none; }
+    .cag-layout[data-mode="month"] .cag-list-pane { display: none; }
+  }
+
     /* === Task node cards (collapsible, project detail) === */
   .task-node {
     background: var(--bg-card);
@@ -2239,6 +2259,10 @@ const T = {
     filterDelayed: 'متأخرة',
     agendaNoTasks: 'لا توجد مهام في هذه الفترة',
     agendaNoMeetings: 'لا توجد اجتماعات في هذه الفترة',
+    calAgendaNav: 'التقويم والأجندة', calAgendaTitle: 'التقويم والأجندة', calAgendaSub: 'المهام والاجتماعات حسب اليوم',
+    cagBoth: 'الكل', cagTasks: 'المهام', cagMeetings: 'الاجتماعات', cagList: 'قائمة', cagMonth: 'الشهر', cagOverdue: 'متأخرة',
+    cagShowingOnly: 'عرض يوم {0} فقط', cagClear: 'مسح', cagBackToMonth: 'العودة إلى الشهر', cagMoreItems: '+ {0} أخرى — عرض المزيد',
+    cagNothing: 'لا يوجد شيء في هذا العرض.', cagMonthSummary: 'هذا الشهر: {0} مهام · {1} اجتماعات · {2} متأخرة',
     backToDashboard: '← العودة للوحة التحكم',
     taskStartDate: 'تاريخ البدء',
     colStakeholder: 'الجهة',
@@ -2968,6 +2992,10 @@ const T = {
     filterDelayed: 'Delayed',
     agendaNoTasks: 'No tasks in this period',
     agendaNoMeetings: 'No meetings in this period',
+    calAgendaNav: 'Calendar & Agenda', calAgendaTitle: 'Calendar & Agenda', calAgendaSub: 'Tasks and meetings by day',
+    cagBoth: 'Both', cagTasks: 'Tasks', cagMeetings: 'Meetings', cagList: 'List', cagMonth: 'Month', cagOverdue: 'Overdue',
+    cagShowingOnly: 'Showing only {0}', cagClear: 'Clear', cagBackToMonth: 'Back to month', cagMoreItems: '+ {0} more — show more',
+    cagNothing: 'Nothing in this view.', cagMonthSummary: 'This month: {0} tasks · {1} meetings · {2} late',
     backToDashboard: '← Back to Dashboard',
     taskStartDate: 'Start Date',
     colStakeholder: 'Stakeholder',
@@ -3584,9 +3612,9 @@ function renderSidebar() {
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         ${t('dashboard')}
       </button>
-      <button class="nav-item ${state.currentView==='agenda'?'active':''}" data-view="agenda">
+      <button class="nav-item ${(state.currentView==='calAgenda'||state.currentView==='agenda'||state.currentView==='calendar')?'active':''}" data-view="calAgenda">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
-        ${t('dailyAgenda')}
+        ${t('calAgendaNav')}
       </button>
       <button class="nav-item ${state.currentView==='report'?'active':''}" data-view="report">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -3603,10 +3631,6 @@ function renderSidebar() {
         ${(_pendingApprovalCount || 0) > 0 ? `<span style="background:var(--amber);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-inline-start:auto;font-family:'Reem Kufi',serif">${_pendingApprovalCount}</span>` : ''}
       </button>
 
-      <button class="nav-item ${state.currentView==='calendar'?'active':''}" data-view="calendar">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        ${t('calendar')}
-      </button>
 
       <div class="nav-section-title">${t('management')}</div>
 
@@ -9083,7 +9107,7 @@ function navigate(view, param) {
   state.currentView = view;
   // Reset the drill-down origin when the user lands on a top-level page (dashboard/agenda).
   // This stops the "Back to Dashboard" pill from appearing on unrelated pages later.
-  if (view === 'dashboard' || view === 'agenda' || view === 'team' || view === 'actions') { state.navOrigin = null; state.navOriginParam = null; }
+  if (view === 'dashboard' || view === 'agenda' || view === 'calAgenda' || view === 'team' || view === 'actions') { state.navOrigin = null; state.navOriginParam = null; }
   // Keep the browser address bar in sync with whatever page is actually showing —
   // previously navigate() never touched the URL at all, so it stayed frozen at
   // whatever hash the page happened to load with (e.g. #pendingApprovals from an
@@ -9207,7 +9231,8 @@ window.goToTasksFiltered = function(filter) {
 window.goToAgendaToday = function() {
   state.filters.agendaTaskFilter = 'today';
   state.filters.agendaMeetFilter = 'today';
-  navigate('agenda');
+  _cag.range = 'today'; _cag.scope = 'both'; _cag.day = null; _cag.limit = 25;
+  navigate('calAgenda');
 };
 
 /* ========== SCORING SETTINGS (configurable weights UI) ========== */
@@ -9620,6 +9645,236 @@ function calendarToday() {
   state.calendarSelectedDate = todayDate(); render();
 }
 
+
+// ── Combined Calendar & Agenda (cag*) ──
+// One page that merges the Daily Agenda (filtered lists) and the Calendar
+// (month grid). Additive: views.agenda and views.calendar are untouched and
+// still reachable by URL hash. All state lives in _cag (not in `state`), so
+// nothing here is saved or synced.
+var _cag = { range: 'today', scope: 'both', day: null, mode: 'list', year: null, month: null, limit: 25 };
+
+function cagIso(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function cagWeekRange() {
+  const n = new Date();
+  const sun = new Date(n.getFullYear(), n.getMonth(), n.getDate() - n.getDay());
+  const thu = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 4);
+  return { start: cagIso(sun), end: cagIso(thu) };
+}
+function cagMonthRange() {
+  const n = new Date();
+  return { start: cagIso(new Date(n.getFullYear(), n.getMonth(), 1)), end: cagIso(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
+}
+function cagIsPhone() { return window.innerWidth <= 760; }
+function cagScopeFilter(list) {
+  if (_cag.scope === 'tasks') return list.filter(a => !isMeeting(a));
+  if (_cag.scope === 'meetings') return list.filter(a => isMeeting(a));
+  return list;
+}
+function cagIsOverdue(a) { return isOpen(a) && getDelayDays(a) > 0; }
+function cagCurrentItems() {
+  const all = cagScopeFilter(state.actions || []);
+  if (_cag.day) {
+    return all.filter(a => a.dueDate === _cag.day).sort((a, b) => {
+      const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      const d = getDelayDays(b) - getDelayDays(a);
+      return d !== 0 ? d : (a.title || '').localeCompare(b.title || '');
+    });
+  }
+  const byDue = (a, b) => (a.dueDate || '').localeCompare(b.dueDate || '');
+  if (_cag.range === 'overdue') {
+    return all.filter(cagIsOverdue).sort((a, b) => {
+      const d = getDelayDays(b) - getDelayDays(a);
+      return d !== 0 ? d : byDue(a, b);
+    });
+  }
+  if (_cag.range === 'week') {
+    const r = cagWeekRange();
+    return all.filter(a => a.dueDate && a.dueDate >= r.start && a.dueDate <= r.end).sort(byDue);
+  }
+  if (_cag.range === 'month') {
+    const r = cagMonthRange();
+    return all.filter(a => a.dueDate && a.dueDate >= r.start && a.dueDate <= r.end).sort(byDue);
+  }
+  const today = todayDate();
+  return all.filter(a => a.dueDate === today).sort(byDue);
+}
+function cagDayHeading(dateStr) {
+  const d = parseDateLocal(dateStr);
+  let label = d ? d.toLocaleDateString(t('locale'), { weekday: 'short', month: 'short', day: 'numeric' }) : dateStr;
+  if (dateStr === todayDate()) label = t('filterToday') + ' · ' + label;
+  return label;
+}
+function cagSetRange(r) {
+  _cag.range = r; _cag.day = null; _cag.limit = 25;
+  if (cagIsPhone()) _cag.mode = 'list';
+  render();
+}
+function cagSetScope(s) { _cag.scope = s; _cag.limit = 25; render(); }
+function cagSetMode(m) { _cag.mode = m; render(); }
+function cagSelectDay(dateStr) {
+  _cag.day = dateStr; _cag.limit = 25;
+  const phone = cagIsPhone();
+  if (phone) _cag.mode = 'list';
+  const scrollY = window.scrollY;
+  render();
+  if (phone) window.scrollTo(0, 0); else requestAnimationFrame(() => window.scrollTo(0, scrollY));
+}
+function cagClearDay() { _cag.day = null; _cag.limit = 25; render(); }
+function cagBackToMonth() { _cag.mode = 'month'; render(); window.scrollTo(0, 0); }
+function cagShowMore() { _cag.limit += 25; render(); }
+function cagToday() {
+  const n = new Date();
+  _cag.range = 'today'; _cag.day = null; _cag.limit = 25;
+  _cag.year = n.getFullYear(); _cag.month = n.getMonth();
+  if (cagIsPhone()) _cag.mode = 'list';
+  render();
+}
+function cagPrevMonth() {
+  const n = new Date();
+  let y = _cag.year != null ? _cag.year : n.getFullYear(), m = _cag.month != null ? _cag.month : n.getMonth();
+  m--; if (m < 0) { m = 11; y--; }
+  _cag.year = y; _cag.month = m; render();
+}
+function cagNextMonth() {
+  const n = new Date();
+  let y = _cag.year != null ? _cag.year : n.getFullYear(), m = _cag.month != null ? _cag.month : n.getMonth();
+  m++; if (m > 11) { m = 0; y++; }
+  _cag.year = y; _cag.month = m; render();
+}
+
+views.calAgenda = () => {
+  const now = new Date();
+  const year = _cag.year != null ? _cag.year : now.getFullYear();
+  const month = _cag.month != null ? _cag.month : now.getMonth();
+  const today = todayDate();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = firstDay.getDay();
+  const monthName = firstDay.toLocaleDateString(t('locale'), { year: 'numeric', month: 'long' });
+  const weekdayNames = [];
+  const wdRef = new Date(2024, 0, 7);
+  for (let i = 0; i < 7; i++) { const d = new Date(wdRef); d.setDate(wdRef.getDate() + i); weekdayNames.push(d.toLocaleDateString(t('locale'), { weekday: 'short' })); }
+
+  const actionsByDate = {};
+  (state.actions || []).forEach(a => { if (!a.dueDate) return; (actionsByDate[a.dueDate] = actionsByDate[a.dueDate] || []).push(a); });
+  const wkRange = (_cag.range === 'week' && !_cag.day) ? cagWeekRange() : null;
+
+  let cells = '';
+  for (let i = 0; i < startWeekday; i++) cells += '<div class="calendar-cell empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const dayActions = actionsByDate[dateStr] || [];
+    const openTasks = dayActions.filter(a => isOpen(a) && !isMeeting(a));
+    const delayed = openTasks.filter(a => getDelayDays(a) > 0);
+    const onTime = openTasks.filter(a => getDelayDays(a) === 0);
+    const completed = dayActions.filter(a => isCompleted(a) && !isMeeting(a));
+    const mDone = dayActions.filter(a => isMeeting(a) && a.status === 'completed');
+    const mMissed = dayActions.filter(a => isMeeting(a) && a.status === 'missed');
+    const mSched = dayActions.filter(a => isMeeting(a) && a.status !== 'completed' && a.status !== 'missed');
+    const cls = ['calendar-cell'];
+    if (dateStr === today) cls.push('today');
+    if (wkRange && dateStr >= wkRange.start && dateStr <= wkRange.end) cls.push('cag-wk');
+    if (dateStr === _cag.day) cls.push('selected');
+    cells += '<div class="' + cls.join(' ') + '" onclick="cagSelectDay(\'' + dateStr + '\')">' +
+      '<div class="calendar-day-num">' + d + '</div>' +
+      (delayed.length + onTime.length + completed.length > 0 ? '<div class="calendar-badges cal-zone-tasks">' +
+        (delayed.length > 0 ? '<span class="cal-badge red">' + delayed.length + '</span>' : '') +
+        (onTime.length > 0 ? '<span class="cal-badge amber">' + onTime.length + '</span>' : '') +
+        (completed.length > 0 ? '<span class="cal-badge green">' + completed.length + '</span>' : '') +
+        '</div>' : '') +
+      (mDone.length + mMissed.length + mSched.length > 0 ? '<div class="calendar-badges cal-zone-meetings">' +
+        (mDone.length > 0 ? '<span class="cal-badge meeting-green">🗓 ' + mDone.length + '</span>' : '') +
+        (mMissed.length > 0 ? '<span class="cal-badge meeting-red">🗓 ' + mMissed.length + '</span>' : '') +
+        (mSched.length > 0 ? '<span class="cal-badge meeting-blue">🗓 ' + mSched.length + '</span>' : '') +
+        '</div>' : '') + '</div>';
+  }
+
+  // Month summary (shown on the phone Month screen)
+  const monthPrefix = year + '-' + String(month + 1).padStart(2, '0') + '-';
+  const monthItems = (state.actions || []).filter(a => a.dueDate && a.dueDate.indexOf(monthPrefix) === 0);
+  const sumTasks = monthItems.filter(a => !isMeeting(a)).length;
+  const sumMeet = monthItems.filter(a => isMeeting(a)).length;
+  const sumLate = monthItems.filter(a => !isMeeting(a) && cagIsOverdue(a)).length;
+
+  // List pane
+  const items = cagCurrentItems();
+  const shown = items.slice(0, _cag.limit);
+  const groupByDay = !_cag.day && (_cag.range === 'week' || _cag.range === 'month');
+  let listHtml = '';
+  if (shown.length === 0) {
+    listHtml = '<div class="empty" style="padding:24px"><div class="empty-icon">✅</div>' + t('cagNothing') + '</div>';
+  } else if (groupByDay) {
+    let lastDate = null;
+    shown.forEach(a => {
+      if (a.dueDate !== lastDate) { listHtml += '<div class="cag-day-head">' + escapeHtml(cagDayHeading(a.dueDate)) + '</div>'; lastDate = a.dueDate; }
+      listHtml += renderTaskNode(a, false);
+    });
+  } else {
+    if (!_cag.day && _cag.range === 'today') listHtml += '<div class="cag-day-head">' + escapeHtml(cagDayHeading(today)) + '</div>';
+    listHtml += shown.map(a => renderTaskNode(a, false)).join('');
+  }
+  const moreHtml = items.length > shown.length
+    ? '<button class="btn ghost sm cag-more" onclick="cagShowMore()">' + t('cagMoreItems', items.length - shown.length) + '</button>' : '';
+
+  const overdueCount = cagScopeFilter(state.actions || []).filter(cagIsOverdue).length;
+  const chipDefs = [['today', t('filterToday')], ['week', t('filterThisWeek')], ['month', t('filterThisMonth')], ['overdue', t('cagOverdue') + ' ' + overdueCount]];
+  const chips = chipDefs.map(c => '<button class="filter-chip ' + ((!_cag.day && _cag.range === c[0]) ? 'active' : '') + '" onclick="cagSetRange(\'' + c[0] + '\')">' + c[1] + '</button>').join('');
+  const scopeDefs = [['both', t('cagBoth')], ['tasks', t('cagTasks')], ['meetings', t('cagMeetings')]];
+  const scopeBtns = scopeDefs.map(c => '<button class="filter-chip ' + (_cag.scope === c[0] ? 'active' : '') + '" onclick="cagSetScope(\'' + c[0] + '\')">' + c[1] + '</button>').join('');
+  const arrow = currentLang === 'ar' ? '›' : '‹';
+
+  const dayBar = _cag.day ? `
+      <div class="cag-scope-bar">
+        <span>${t('cagShowingOnly', escapeHtml(fmtDate(_cag.day)))}</span>
+        <button class="btn ghost sm" onclick="cagClearDay()">✕ ${t('cagClear')}</button>
+      </div>
+      <button class="cag-back" onclick="cagBackToMonth()">${arrow} ${t('cagBackToMonth')}</button>
+      <div class="cag-add-row">
+        <button class="btn sm" onclick="showActionForm(null, null, null, 'task', '${_cag.day}')">${t('addActionBtn')}</button>
+        <button class="btn sm" style="background:var(--accent)" onclick="showActionForm(null, null, null, 'meeting', '${_cag.day}')">${t('addMeetingBtn')}</button>
+      </div>` : '';
+
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">📅 ${t('calAgendaTitle')}</h1>
+        <div class="page-sub">${t('calAgendaSub')}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost" onclick="printOpenTasksReport()">${t('exportOpenTasksReport')}</button>
+        <button class="btn ghost" onclick="cagToday()">${t('calendarGoToday')}</button>
+      </div>
+    </div>
+    <div class="cag-mode-seg filters">
+      <button class="filter-chip ${_cag.mode === 'list' ? 'active' : ''}" onclick="cagSetMode('list')">${t('cagList')}</button>
+      <button class="filter-chip ${_cag.mode === 'month' ? 'active' : ''}" onclick="cagSetMode('month')">${t('cagMonth')}</button>
+    </div>
+    <div class="cag-layout" data-mode="${_cag.mode}">
+      <div class="cag-grid-pane">
+        <div class="calendar-nav" style="margin-bottom:10px;gap:12px">
+          <button class="calendar-nav-btn" onclick="cagPrevMonth()">${currentLang === 'ar' ? '›' : '‹'}</button>
+          <div class="calendar-month-label" style="min-width:140px">${monthName}</div>
+          <button class="calendar-nav-btn" onclick="cagNextMonth()">${currentLang === 'ar' ? '‹' : '›'}</button>
+        </div>
+        <div class="calendar-grid">
+          ${weekdayNames.map(w => '<div class="calendar-weekday">' + w + '</div>').join('')}
+          ${cells}
+        </div>
+        <div class="cag-month-sum">${t('cagMonthSummary', sumTasks, sumMeet, sumLate)}</div>
+      </div>
+      <div class="cag-list-pane">
+        <div class="filters cag-scope-row" style="margin-bottom:10px">${scopeBtns}</div>
+        <div class="filters" style="margin-bottom:12px">${chips}</div>
+        ${dayBar}
+        <div class="card-list">${listHtml}</div>
+        ${moreHtml}
+      </div>
+    </div>
+  `;
+};
 
 
 // ── Open Tasks Report (all projects, grouped by priority) ──
@@ -15311,7 +15566,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
       // links like the PMO notification email's "#pendingApprovals" CTA
       // never actually landed anywhere but the dashboard. This is the read
       // side of the same hash that navigate() now writes on every click.
-      const _KNOWN_HASH_VIEWS = ['dashboard','agenda','reports','reportsArchive','pendingApprovals','calendar','team','partners','projects','actions','meetings','scoringSettings'];
+      const _KNOWN_HASH_VIEWS = ['dashboard','agenda','reports','reportsArchive','pendingApprovals','calendar','calAgenda','team','partners','projects','actions','meetings','scoringSettings'];
       const _rawHash = (window.location.hash || '').replace(/^#/, '');
       const [_hashView, _hashParam] = _rawHash.split('/');
       if (_hashView && _KNOWN_HASH_VIEWS.includes(_hashView)) {
