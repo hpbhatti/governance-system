@@ -1445,6 +1445,13 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .cag-layout { display: grid; grid-template-columns: minmax(320px, 430px) minmax(0, 1fr); gap: 20px; align-items: start; }
   .cag-layout .calendar-cell { min-height: 64px; }
   .calendar-cell.cag-wk { background: #faf6ea; }
+  /* Weekend (Fri/Sat) grey-out in Calendar & Agenda — new classes only */
+  .calendar-cell.cag-we:not(.today):not(.selected):not(.empty) { background: #ebe9e1; border-color: #e0ddd2; }
+  .calendar-cell.cag-we:not(.today):not(.selected):not(.empty):hover { background: #e4e1d7; }
+  .calendar-cell.cag-we:not(.today):not(.selected) .calendar-day-num { color: #a8a29e; }
+  .calendar-weekday.cag-we-h { color: #b6b1a4; }
+  .we-soft-warn { margin-top: 6px; font-size: 12.5px; line-height: 1.55; background: #fdf6e3; border: 1px solid #ecd9a2; color: #633806; border-radius: 8px; padding: 7px 10px; }
+  .we-soft-warn button { margin-inline-start: 6px; font-size: 12px; padding: 3px 10px; border-radius: 8px; border: 1px solid #cfc9b8; background: #fff; color: #1a3a52; font-weight: 600; cursor: pointer; font-family: inherit; }
   .cag-day-head { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin: 14px 0 6px; font-family: 'Reem Kufi', serif; letter-spacing: 0.03em; }
   .cag-day-head:first-child { margin-top: 0; }
   .cag-scope-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: var(--ink-muted); margin-bottom: 10px; }
@@ -2259,6 +2266,7 @@ const T = {
     filterDelayed: 'متأخرة',
     agendaNoTasks: 'لا توجد مهام في هذه الفترة',
     agendaNoMeetings: 'لا توجد اجتماعات في هذه الفترة',
+    weSoftTask: '{0} يوم عطلة (الجمعة والسبت ليسا من أيام العمل). يمكنك الإبقاء عليه.', weSoftMeeting: '{0} يوم عطلة. الاجتماعات في عطلة نهاية الأسبوع نادرة. يرجى التحقق من التاريخ.', weSoftMove: 'انقل إلى {0}',
     calAgendaNav: 'التقويم والأجندة', calAgendaTitle: 'التقويم والأجندة', calAgendaSub: 'المهام والاجتماعات حسب اليوم',
     cagBoth: 'الكل', cagTasks: 'المهام', cagMeetings: 'الاجتماعات', cagList: 'قائمة', cagMonth: 'الشهر', cagOverdue: 'متأخرة',
     cagShowingOnly: 'عرض يوم {0} فقط', cagClear: 'مسح', cagBackToMonth: 'العودة إلى الشهر', cagMoreItems: '+ {0} أخرى — عرض المزيد',
@@ -2992,6 +3000,7 @@ const T = {
     filterDelayed: 'Delayed',
     agendaNoTasks: 'No tasks in this period',
     agendaNoMeetings: 'No meetings in this period',
+    weSoftTask: '{0} is a weekend day (Friday and Saturday are not working days). You can still keep it.', weSoftMeeting: '{0} is a weekend day. Meetings on a weekend are rare. Please check the date.', weSoftMove: 'Move to {0}',
     calAgendaNav: 'Calendar & Agenda', calAgendaTitle: 'Calendar & Agenda', calAgendaSub: 'Tasks and meetings by day',
     cagBoth: 'Both', cagTasks: 'Tasks', cagMeetings: 'Meetings', cagList: 'List', cagMonth: 'Month', cagOverdue: 'Overdue',
     cagShowingOnly: 'Showing only {0}', cagClear: 'Clear', cagBackToMonth: 'Back to month', cagMoreItems: '+ {0} more — show more',
@@ -9776,6 +9785,7 @@ views.calAgenda = () => {
     const mSched = dayActions.filter(a => isMeeting(a) && a.status !== 'completed' && a.status !== 'missed');
     const cls = ['calendar-cell'];
     if (dateStr === today) cls.push('today');
+    if (new Date(year, month, d).getDay() >= 5) cls.push('cag-we');
     if (wkRange && dateStr >= wkRange.start && dateStr <= wkRange.end) cls.push('cag-wk');
     if (dateStr === _cag.day) cls.push('selected');
     cells += '<div class="' + cls.join(' ') + '" onclick="cagSelectDay(\'' + dateStr + '\')">' +
@@ -9860,7 +9870,7 @@ views.calAgenda = () => {
           <button class="calendar-nav-btn" onclick="cagNextMonth()">${currentLang === 'ar' ? '‹' : '›'}</button>
         </div>
         <div class="calendar-grid">
-          ${weekdayNames.map(w => '<div class="calendar-weekday">' + w + '</div>').join('')}
+          ${weekdayNames.map((w, wi) => '<div class="calendar-weekday' + (wi >= 5 ? ' cag-we-h' : '') + '">' + w + '</div>').join('')}
           ${cells}
         </div>
         <div class="cag-month-sum">${t('cagMonthSummary', sumTasks, sumMeet, sumLate)}</div>
@@ -15734,6 +15744,62 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
   }
+})();
+
+// ===== Soft weekend warning on date fields (new, self-contained; never blocks saving) =====
+(function () {
+  var WE_IDS = ['f-start-date', 'f-due', 'f-newdate'];
+  function weParse(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function weIsWeekend(d) { return !!d && (d.getDay() === 5 || d.getDay() === 6); }
+  function weIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function weLabel(d) { return d.toLocaleDateString(t('locale'), { weekday: 'long', day: 'numeric', month: 'short' }); }
+  function weIsMeeting(inp) { var s = document.getElementById('f-type'); return s ? s.value === 'meeting' : inp.id === 'f-newdate'; }
+  function weCheck(inp) {
+    if (!inp || !inp.parentNode) return;
+    var box = inp.parentNode.querySelector('.we-soft-warn[data-for="' + inp.id + '"]');
+    var d = weParse(inp.value);
+    if (!weIsWeekend(d)) { if (box) box.remove(); return; }
+    var sun = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (7 - d.getDay()));
+    if (!box) { box = document.createElement('div'); box.className = 'we-soft-warn'; box.setAttribute('data-for', inp.id); inp.insertAdjacentElement('afterend', box); }
+    var msg = t(weIsMeeting(inp) ? 'weSoftMeeting' : 'weSoftTask', weLabel(d));
+    box.innerHTML = '';
+    box.appendChild(document.createTextNode(msg + ' '));
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'we-soft-move';
+    b.setAttribute('data-for', inp.id); b.setAttribute('data-iso', weIso(sun));
+    b.textContent = t('weSoftMove', weLabel(sun));
+    box.appendChild(b);
+  }
+  function weScan() {
+    WE_IDS.forEach(function (id) {
+      var inp = document.getElementById(id);
+      if (inp && !inp._weSeen) { inp._weSeen = true; weCheck(inp); }
+    });
+  }
+  function weStart() {
+    var queued = false;
+    new MutationObserver(function () {
+      if (queued) return; queued = true;
+      requestAnimationFrame(function () { queued = false; weScan(); });
+    }).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('change', function (e) {
+      var el = e.target;
+      if (!el || !el.id) return;
+      if (WE_IDS.indexOf(el.id) >= 0) weCheck(el);
+      else if (el.id === 'f-type') WE_IDS.forEach(function (id) { weCheck(document.getElementById(id)); });
+    });
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.we-soft-move') : null;
+      if (!b) return;
+      var inp = document.getElementById(b.getAttribute('data-for'));
+      if (!inp) return;
+      inp.value = b.getAttribute('data-iso');
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    weScan();
+  }
+  if (document.body) weStart(); else document.addEventListener('DOMContentLoaded', weStart);
 })();
 </script>
 </body>
