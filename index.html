@@ -1450,6 +1450,11 @@ tr.actions-tab-row { user-select: none; } /* avoid text selection on quick doubl
   .calendar-cell.cag-we:not(.today):not(.selected):not(.empty):hover { background: #e4e1d7; }
   .calendar-cell.cag-we:not(.today):not(.selected) .calendar-day-num { color: #a8a29e; }
   .calendar-weekday.cag-we-h { color: #b6b1a4; }
+  .cag-viewbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .cag-viewbar-lb { font-size: 12px; color: var(--ink-muted); }
+  .cag-viewbar-gap { margin-inline-start: 10px; }
+  .cag-owner-sel { min-width: 200px; max-width: 100%; width: auto; padding: 6px 10px; font-size: 13px; }
+  .cag-viewbar-hint { font-size: 12px; color: var(--ink-muted); background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: -4px 0 12px; line-height: 1.5; }
   .we-soft-warn { margin-top: 6px; font-size: 12.5px; line-height: 1.55; background: #fdf6e3; border: 1px solid #ecd9a2; color: #633806; border-radius: 8px; padding: 7px 10px; }
   .we-soft-warn button { margin-inline-start: 6px; font-size: 12px; padding: 3px 10px; border-radius: 8px; border: 1px solid #cfc9b8; background: #fff; color: #1a3a52; font-weight: 600; cursor: pointer; font-family: inherit; }
   .cag-day-head { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin: 14px 0 6px; font-family: 'Reem Kufi', serif; letter-spacing: 0.03em; }
@@ -2266,7 +2271,7 @@ const T = {
     filterDelayed: 'متأخرة',
     agendaNoTasks: 'لا توجد مهام في هذه الفترة',
     agendaNoMeetings: 'لا توجد اجتماعات في هذه الفترة',
-    weSoftTask: '{0} يوم عطلة (الجمعة والسبت ليسا من أيام العمل). يمكنك الإبقاء عليه.', weSoftMeeting: '{0} يوم عطلة. الاجتماعات في عطلة نهاية الأسبوع نادرة. يرجى التحقق من التاريخ.', weSoftMove: 'انقل إلى {0}',
+    weSoftTask: '{0} يوم عطلة (الجمعة والسبت ليسا من أيام العمل). يمكنك الإبقاء عليه.', weSoftMeeting: '{0} يوم عطلة. الاجتماعات في عطلة نهاية الأسبوع نادرة. يرجى التحقق من التاريخ.', weSoftMove: 'انقل إلى {0}', cagViewLabel: 'العرض', cagViewDue: 'حسب الاستحقاق', cagViewActive: 'النشطة', cagActiveHint: 'النشطة: تظهر كل مهمة مفتوحة في كل يوم من تاريخ بدايتها حتى تاريخ استحقاقها، وتبقى باللون الأحمر بعد الاستحقاق حتى تكتمل. الاجتماعات تبقى في يومها.', cagOwnerLabel: 'المسؤول', cagOwnerAll: 'الجميع', cagOwnerInternal: 'الفريق الداخلي', cagOwnerPartnerGroup: 'شريك', cagOwnerAllMembers: 'كل الأعضاء', cagOwnerNone: 'بدون مسؤول', cagOwnerOther: 'أخرى', cagGrpDueToday: 'مستحقة اليوم', cagGrpInProgress: 'قيد التنفيذ', cagGrpMeetingsToday: 'اجتماعات اليوم', cagOwnerMeetNote: 'تُصفّى الاجتماعات حسب الشريك فقط. اختيار شخص لا يخفي أي اجتماع.',
     calAgendaNav: 'التقويم والأجندة', calAgendaTitle: 'التقويم والأجندة', calAgendaSub: 'المهام والاجتماعات حسب اليوم',
     cagBoth: 'الكل', cagTasks: 'المهام', cagMeetings: 'الاجتماعات', cagList: 'قائمة', cagMonth: 'الشهر', cagOverdue: 'متأخرة',
     cagShowingOnly: 'عرض يوم {0} فقط', cagClear: 'مسح', cagBackToMonth: 'العودة إلى الشهر', cagMoreItems: '+ {0} أخرى — عرض المزيد',
@@ -3000,7 +3005,7 @@ const T = {
     filterDelayed: 'Delayed',
     agendaNoTasks: 'No tasks in this period',
     agendaNoMeetings: 'No meetings in this period',
-    weSoftTask: '{0} is a weekend day (Friday and Saturday are not working days). You can still keep it.', weSoftMeeting: '{0} is a weekend day. Meetings on a weekend are rare. Please check the date.', weSoftMove: 'Move to {0}',
+    weSoftTask: '{0} is a weekend day (Friday and Saturday are not working days). You can still keep it.', weSoftMeeting: '{0} is a weekend day. Meetings on a weekend are rare. Please check the date.', weSoftMove: 'Move to {0}', cagViewLabel: 'View', cagViewDue: 'Due', cagViewActive: 'Active', cagActiveHint: 'Active: each open task shows on every day from its start date to its due date. After the due date it stays red until it is finished. Meetings stay on their own day.', cagOwnerLabel: 'Owner', cagOwnerAll: 'Everyone', cagOwnerInternal: 'Internal team', cagOwnerPartnerGroup: 'Partner', cagOwnerAllMembers: 'all members', cagOwnerNone: 'No owner', cagOwnerOther: 'Other', cagGrpDueToday: 'Due today', cagGrpInProgress: 'In progress', cagGrpMeetingsToday: 'Meetings today', cagOwnerMeetNote: 'Meetings are filtered by partner only. Choosing a person never hides a meeting.',
     calAgendaNav: 'Calendar & Agenda', calAgendaTitle: 'Calendar & Agenda', calAgendaSub: 'Tasks and meetings by day',
     cagBoth: 'Both', cagTasks: 'Tasks', cagMeetings: 'Meetings', cagList: 'List', cagMonth: 'Month', cagOverdue: 'Overdue',
     cagShowingOnly: 'Showing only {0}', cagClear: 'Clear', cagBackToMonth: 'Back to month', cagMoreItems: '+ {0} more — show more',
@@ -9661,6 +9666,8 @@ function calendarToday() {
 // still reachable by URL hash. All state lives in _cag (not in `state`), so
 // nothing here is saved or synced.
 var _cag = { range: 'today', scope: 'both', day: null, mode: 'list', year: null, month: null, limit: 25 };
+_cag.view = 'due';   // 'due' (default, as before) | 'active'
+_cag.owner = 'ALL';  // 'ALL' | 'none' | 'i:<teamId>' | 'p:<partnerMemberId>' | 'pa:<partnerId>'
 
 function cagIso(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -9677,6 +9684,7 @@ function cagMonthRange() {
 }
 function cagIsPhone() { return window.innerWidth <= 760; }
 function cagScopeFilter(list) {
+  list = cagOwnerFilter(list);
   if (_cag.scope === 'tasks') return list.filter(a => !isMeeting(a));
   if (_cag.scope === 'meetings') return list.filter(a => isMeeting(a));
   return list;
@@ -9684,6 +9692,15 @@ function cagScopeFilter(list) {
 function cagIsOverdue(a) { return isOpen(a) && getDelayDays(a) > 0; }
 function cagCurrentItems() {
   const all = cagScopeFilter(state.actions || []);
+  if (_cag.day && _cag.view === 'active') {
+    const _t = todayDate();
+    return all.filter(a => isMeeting(a) ? a.dueDate === _cag.day : (cagActiveOn(a, _cag.day, _t) || (isCompleted(a) && a.completedDate === _cag.day))).sort((a, b) => {
+      const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      const d = getDelayDays(b) - getDelayDays(a);
+      return d !== 0 ? d : (a.title || '').localeCompare(b.title || '');
+    });
+  }
   if (_cag.day) {
     return all.filter(a => a.dueDate === _cag.day).sort((a, b) => {
       const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
@@ -9754,6 +9771,105 @@ function cagNextMonth() {
   _cag.year = y; _cag.month = m; render();
 }
 
+
+/* ========== Calendar & Agenda: Due | Active switch + Owner filter (new, additive) ========== */
+function cagTaskOwnerPartnerId(a) {
+  if (!a || a.ownerKind !== 'partner' || !a.ownerId) return null;
+  const p = getPartnerForMemberId(a.ownerId);
+  return p ? p.id : null;
+}
+function cagOwnerMatchTask(a) {
+  const v = _cag.owner;
+  if (v === 'ALL') return true;
+  if (v === 'none') return !a.ownerId;
+  if (v.indexOf('i:') === 0) return a.ownerKind === 'internal' && a.ownerId === v.slice(2);
+  if (v.indexOf('pa:') === 0) return cagTaskOwnerPartnerId(a) === v.slice(3);
+  if (v.indexOf('p:') === 0) return a.ownerKind === 'partner' && a.ownerId === v.slice(2);
+  return true;
+}
+// Partner whose meetings should be shown for the current owner choice (null = do not filter meetings)
+function cagOwnerMeetingPartnerId() {
+  const v = _cag.owner;
+  if (v.indexOf('pa:') === 0) return v.slice(3);
+  if (v.indexOf('p:') === 0) { const p = getPartnerForMemberId(v.slice(2)); return p ? p.id : null; }
+  return null;
+}
+function cagOwnerFilter(list) {
+  if (_cag.owner === 'ALL') return list;
+  const mp = cagOwnerMeetingPartnerId();
+  return list.filter(a => {
+    if (isMeeting(a)) {
+      if (!mp) return true; // a person or "no owner" never hides meetings
+      if (Array.isArray(a.participantPartnerIds)) return a.participantPartnerIds.includes(mp);
+      return a.partnerId === mp;
+    }
+    return cagOwnerMatchTask(a);
+  });
+}
+function cagActiveOn(a, dateStr, today) {
+  if (isMeeting(a) || !isOpen(a) || !a.dueDate) return false;
+  let start = a.startDate || a.dueDate;
+  if (start > a.dueDate) start = a.dueDate;
+  const end = a.dueDate < today ? today : a.dueDate;
+  return dateStr >= start && dateStr <= end;
+}
+function cagActiveCounts(dateStr, tasks, today) {
+  let r = 0, am = 0, g = 0;
+  tasks.forEach(a => {
+    if (cagActiveOn(a, dateStr, today)) { if (dateStr > a.dueDate) r++; else am++; }
+    if (isCompleted(a) && a.completedDate === dateStr) g++;
+  });
+  return { r: r, a: am, g: g };
+}
+function cagSetView(v) { _cag.view = v; _cag.day = null; _cag.limit = 25; render(); }
+function cagSetOwner(v) { _cag.owner = v; _cag.day = null; _cag.limit = 25; render(); }
+function cagOwnerSelectHtml() {
+  const open = (state.actions || []).filter(a => isTask(a) && isOpen(a));
+  const sel = _cag.owner;
+  const opt = (val, label, n) => '<option value="' + escapeHtml(val) + '"' + (sel === val ? ' selected' : '') + '>' + escapeHtml(label) + (n != null ? ' (' + n + ')' : '') + '</option>';
+  let h = '<select class="cag-owner-sel" aria-label="' + escapeHtml(t('cagOwnerLabel')) + '" onchange="cagSetOwner(this.value)">';
+  h += opt('ALL', t('cagOwnerAll'), open.length);
+  let internal = '';
+  (state.team || []).forEach(m => {
+    const n = open.filter(a => a.ownerKind === 'internal' && a.ownerId === m.id).length;
+    if (n > 0 || sel === 'i:' + m.id) internal += opt('i:' + m.id, m.name, n);
+  });
+  if (internal) h += '<optgroup label="' + escapeHtml(t('cagOwnerInternal')) + '">' + internal + '</optgroup>';
+  (state.partners || []).forEach(p => {
+    const pTotal = open.filter(a => cagTaskOwnerPartnerId(a) === p.id).length;
+    if (!(pTotal > 0 || sel === 'pa:' + p.id || (sel.indexOf('p:') === 0 && (p.team || []).some(m => 'p:' + m.id === sel)))) return;
+    let g = opt('pa:' + p.id, p.name + ', ' + t('cagOwnerAllMembers'), pTotal);
+    (Array.isArray(p.team) ? p.team : []).forEach(m => {
+      const n = open.filter(a => a.ownerKind === 'partner' && a.ownerId === m.id).length;
+      if (n > 0 || sel === 'p:' + m.id) g += opt('p:' + m.id, '  ' + m.name, n);
+    });
+    h += '<optgroup label="' + escapeHtml(t('cagOwnerPartnerGroup') + ': ' + p.name) + '">' + g + '</optgroup>';
+  });
+  h += '<optgroup label="' + escapeHtml(t('cagOwnerOther')) + '">' + opt('none', t('cagOwnerNone'), open.filter(a => !a.ownerId).length) + '</optgroup>';
+  return h + '</select>';
+}
+function cagViewBarHtml() {
+  const chip = (v, label) => '<button class="filter-chip ' + (_cag.view === v ? 'active' : '') + '" onclick="cagSetView(\'' + v + '\')">' + label + '</button>';
+  return '<div class="cag-viewbar"><span class="cag-viewbar-lb">' + escapeHtml(t('cagViewLabel')) + '</span>' +
+    chip('due', t('cagViewDue')) + chip('active', t('cagViewActive')) +
+    '<span class="cag-viewbar-lb cag-viewbar-gap">' + escapeHtml(t('cagOwnerLabel')) + '</span>' + cagOwnerSelectHtml() + '</div>' +
+    (_cag.view === 'active' ? '<div class="cag-viewbar-hint">' + escapeHtml(t('cagActiveHint')) + '</div>' : '') +
+    (_cag.owner !== 'ALL' ? '<div class="cag-viewbar-hint">' + escapeHtml(t('cagOwnerMeetNote')) + '</div>' : '');
+}
+// Active-mode "Today" list: Overdue / Due today / In progress / Meetings today
+function cagActiveTodayHtml() {
+  const today = todayDate();
+  const all = cagScopeFilter(state.actions || []);
+  const tasks = all.filter(a => !isMeeting(a) && isOpen(a) && a.dueDate);
+  const overdue = tasks.filter(a => a.dueDate < today).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const dueToday = tasks.filter(a => a.dueDate === today);
+  const inProg = tasks.filter(a => a.dueDate > today && (a.startDate || a.dueDate) <= today).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const meets = all.filter(a => isMeeting(a) && a.dueDate === today);
+  const grp = (title, arr) => arr.length ? '<div class="cag-day-head">' + escapeHtml(title) + ' · ' + arr.length + '</div>' + arr.map(a => renderTaskNode(a, false)).join('') : '';
+  const out = grp(t('cagOverdue'), overdue) + grp(t('cagGrpDueToday'), dueToday) + grp(t('cagGrpInProgress'), inProg) + grp(t('cagGrpMeetingsToday'), meets);
+  return out || '<div class="empty" style="padding:24px"><div class="empty-icon">✅</div>' + t('cagNothing') + '</div>';
+}
+
 views.calAgenda = () => {
   const now = new Date();
   const year = _cag.year != null ? _cag.year : now.getFullYear();
@@ -9768,8 +9884,9 @@ views.calAgenda = () => {
   for (let i = 0; i < 7; i++) { const d = new Date(wdRef); d.setDate(wdRef.getDate() + i); weekdayNames.push(d.toLocaleDateString(t('locale'), { weekday: 'short' })); }
 
   const actionsByDate = {};
-  (state.actions || []).forEach(a => { if (!a.dueDate) return; (actionsByDate[a.dueDate] = actionsByDate[a.dueDate] || []).push(a); });
+  cagOwnerFilter(state.actions || []).forEach(a => { if (!a.dueDate) return; (actionsByDate[a.dueDate] = actionsByDate[a.dueDate] || []).push(a); });
   const wkRange = (_cag.range === 'week' && !_cag.day) ? cagWeekRange() : null;
+  const _cagActTasks = _cag.view === 'active' ? cagOwnerFilter(state.actions || []).filter(a => !isMeeting(a)) : null;
 
   let cells = '';
   for (let i = 0; i < startWeekday; i++) cells += '<div class="calendar-cell empty"></div>';
@@ -9777,12 +9894,16 @@ views.calAgenda = () => {
     const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const dayActions = actionsByDate[dateStr] || [];
     const openTasks = dayActions.filter(a => isOpen(a) && !isMeeting(a));
-    const delayed = openTasks.filter(a => getDelayDays(a) > 0);
-    const onTime = openTasks.filter(a => getDelayDays(a) === 0);
-    const completed = dayActions.filter(a => isCompleted(a) && !isMeeting(a));
+    let delayed = openTasks.filter(a => getDelayDays(a) > 0);
+    let onTime = openTasks.filter(a => getDelayDays(a) === 0);
+    let completed = dayActions.filter(a => isCompleted(a) && !isMeeting(a));
     const mDone = dayActions.filter(a => isMeeting(a) && a.status === 'completed');
     const mMissed = dayActions.filter(a => isMeeting(a) && a.status === 'missed');
     const mSched = dayActions.filter(a => isMeeting(a) && a.status !== 'completed' && a.status !== 'missed');
+    if (_cagActTasks) {
+      const _ac = cagActiveCounts(dateStr, _cagActTasks, today);
+      delayed = new Array(_ac.r).fill(0); onTime = new Array(_ac.a).fill(0); completed = new Array(_ac.g).fill(0);
+    }
     const cls = ['calendar-cell'];
     if (dateStr === today) cls.push('today');
     if (new Date(year, month, d).getDay() >= 5) cls.push('cag-we');
@@ -9804,7 +9925,7 @@ views.calAgenda = () => {
 
   // Month summary (shown on the phone Month screen)
   const monthPrefix = year + '-' + String(month + 1).padStart(2, '0') + '-';
-  const monthItems = (state.actions || []).filter(a => a.dueDate && a.dueDate.indexOf(monthPrefix) === 0);
+  const monthItems = cagOwnerFilter(state.actions || []).filter(a => a.dueDate && a.dueDate.indexOf(monthPrefix) === 0);
   const sumTasks = monthItems.filter(a => !isMeeting(a)).length;
   const sumMeet = monthItems.filter(a => isMeeting(a)).length;
   const sumLate = monthItems.filter(a => !isMeeting(a) && cagIsOverdue(a)).length;
@@ -9826,8 +9947,10 @@ views.calAgenda = () => {
     if (!_cag.day && _cag.range === 'today') listHtml += '<div class="cag-day-head">' + escapeHtml(cagDayHeading(today)) + '</div>';
     listHtml += shown.map(a => renderTaskNode(a, false)).join('');
   }
-  const moreHtml = items.length > shown.length
+  let moreHtml = items.length > shown.length
     ? '<button class="btn ghost sm cag-more" onclick="cagShowMore()">' + t('cagMoreItems', items.length - shown.length) + '</button>' : '';
+
+  if (_cag.view === 'active' && !_cag.day && _cag.range === 'today') { listHtml = cagActiveTodayHtml(); moreHtml = ''; }
 
   const overdueCount = cagScopeFilter(state.actions || []).filter(cagIsOverdue).length;
   const chipDefs = [['today', t('filterToday')], ['week', t('filterThisWeek')], ['month', t('filterThisMonth')], ['overdue', t('cagOverdue') + ' ' + overdueCount]];
@@ -9858,6 +9981,7 @@ views.calAgenda = () => {
         <button class="btn ghost" onclick="cagToday()">${t('calendarGoToday')}</button>
       </div>
     </div>
+    ${cagViewBarHtml()}
     <div class="cag-mode-seg filters">
       <button class="filter-chip ${_cag.mode === 'list' ? 'active' : ''}" onclick="cagSetMode('list')">${t('cagList')}</button>
       <button class="filter-chip ${_cag.mode === 'month' ? 'active' : ''}" onclick="cagSetMode('month')">${t('cagMonth')}</button>
@@ -11006,12 +11130,12 @@ function showActionForm(actionId, defaultProjectId, defaultPartnerId, defaultTyp
     </div>
     <div class="form-row" id="start-date-row">
       <label>${t('taskStartDate')}</label>
-      <input type="date" id="f-start-date" value="${editing?.startDate || todayDate()}">
+      <input type="date" id="f-start-date" value="${editing?.startDate || defaultDate || todayDate()}">
     </div>
     <div class="form-row row-2">
       <div>
         <label id="due-label">${t('fieldDueDate')}</label>
-        <input type="date" id="f-due" value="${editing?.dueDate || ''}">
+        <input type="date" id="f-due" value="${editing?.dueDate || (defaultType === 'meeting' ? defaultDate : '') || ''}">
       </div>
       <div id="time-row" class="hidden">
         <label>${t('fieldMeetingTime')}</label>
@@ -15782,12 +15906,14 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       if (queued) return; queued = true;
       requestAnimationFrame(function () { queued = false; weScan(); });
     }).observe(document.body, { childList: true, subtree: true });
-    document.addEventListener('change', function (e) {
+    function weOnEdit(e) {
       var el = e.target;
       if (!el || !el.id) return;
       if (WE_IDS.indexOf(el.id) >= 0) weCheck(el);
       else if (el.id === 'f-type') WE_IDS.forEach(function (id) { weCheck(document.getElementById(id)); });
-    });
+    }
+    document.addEventListener('change', weOnEdit);
+    document.addEventListener('input', weOnEdit);
     document.addEventListener('click', function (e) {
       var b = e.target && e.target.closest ? e.target.closest('.we-soft-move') : null;
       if (!b) return;
