@@ -270,13 +270,13 @@ const STR = {
     rejectionReasonLabel: 'Reason', submissionChangeComplete: 'Marked Complete', submissionChangeNote: 'Added Note',
     closeBtn: 'Close',
     markCompleteBtn: 'Mark Complete', addNoteBtn: 'Add Note',
-    submittedPendingLabel: 'Completion submitted — awaiting confirmation',
+    submittedPendingLabel: 'Marked as complete — awaiting Admin confirmation',
     resubmitBtn: 'Resubmit',
     submittedRejectedLabel: 'Previously rejected — you may resubmit',
     proposalNotePlaceholder: 'Add a note or delay reason…',
     proposalCompleteNotePlaceholder: 'Optional: anything the reviewer should know (e.g. what was done, any links)…',
     proposalSubmitBtn: 'Submit', proposalCancelBtn: 'Cancel',
-    proposalSubmitted: 'Submitted for cross-checking', proposalError: 'Could not submit — please try again.',
+    proposalSubmitted: 'Sent to the Admin for confirmation', proposalError: 'Could not submit — please try again.',
     proposalSubmittingLabel: 'Submitting…',
 proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     proposalFilePlaceholder: 'Attach a file (PDF, Word, Excel, PowerPoint, image — max 10 MB)',
@@ -336,13 +336,13 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     rejectionReasonLabel: 'السبب', submissionChangeComplete: 'تم وضعها كمكتملة', submissionChangeNote: 'إضافة ملاحظة',
     closeBtn: 'إغلاق',
     markCompleteBtn: 'إنجاز', addNoteBtn: 'إضافة ملاحظة',
-    submittedPendingLabel: 'تم تقديم الإنجاز — في انتظار التأكيد',
+    submittedPendingLabel: 'تم تحديد المهمة كمكتملة — في انتظار تأكيد المسؤول',
     resubmitBtn: 'إعادة التقديم',
     submittedRejectedLabel: 'تم الرفض سابقاً — يمكنك إعادة التقديم',
     proposalNotePlaceholder: 'أضف ملاحظة أو سبب التأخير…',
     proposalCompleteNotePlaceholder: 'اختياري: أي شيء يجب أن يعرفه المراجع (مثل ما تم إنجازه، أو أي روابط)…',
     proposalSubmitBtn: 'إرسال', proposalCancelBtn: 'إلغاء',
-    proposalSubmitted: 'تم الإرسال للتحقق', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
+    proposalSubmitted: 'تم الإرسال إلى المسؤول للتأكيد', proposalError: 'تعذر الإرسال — يرجى المحاولة مرة أخرى.',
     proposalSubmittingLabel: 'جارٍ الإرسال…',
 proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     proposalFilePlaceholder: 'إرفاق ملف (PDF، Word، Excel، PowerPoint، صورة — حد أقصى 10 ميغابايت)',
@@ -639,7 +639,7 @@ function renderProgressZone(p, stats) {
 
   return '<div class="pv-status-card">' +
     '<div class="pv-sc-fraction">' +
-      '<span class="pv-sc-frac-n">' + completedTotal + '</span>' + (currentLang === 'ar' ? ' من أصل ' + bp.totalTasks + ' مهمة مكتملة' : ' of ' + bp.totalTasks + ' tasks complete') +
+      (currentLang === 'ar' ? 'تقدّم المشروع: ' : 'Project progress: ') + '<span class="pv-sc-frac-n">' + completedTotal + '</span>' + (currentLang === 'ar' ? ' من أصل ' + bp.totalTasks + ' مهمة مكتملة (جميع المسؤولين)' : ' of ' + bp.totalTasks + ' tasks complete (all owners)') +
     '</div>' +
     '<div class="pv-sc-fraction-label">' +
       '<span class="pv-sc-status-pill ' + cls + '">' + (statusLabels[bp.statusLight] || statusLabels.onTrack) + '</span>' +
@@ -891,16 +891,26 @@ function loadPartnerView() {
     fetch(FUNCTION_URL + '?token=' + encodeURIComponent(proposalToken) + '&myProposals=1', {
       headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
     }).then(function(r){ return r.ok ? r.json() : null; }).then(function(pd){
-      _pendingTaskIds = {};
+      // Only completion submissions decide whether Mark Complete is hidden.
+      // The server returns the task id as taskId (task_id kept for safety).
+      // A submission made a moment ago on this page is kept even if the
+      // server list was fetched before it was saved.
+      var _freshPending = {};
       if (pd && pd.proposals) {
         pd.proposals.forEach(function(p) {
-          if (!_pendingTaskIds[p.task_id] || p.status === 'pending') {
+          var pid = p.taskId || p.task_id;
+          if (!pid || p.changeType !== 'complete') return;
+          if (!_freshPending[pid] || p.status === 'pending') {
             if (p.status === 'pending' || p.status === 'rejected') {
-              _pendingTaskIds[p.task_id] = p.status;
+              _freshPending[pid] = p.status;
             }
           }
         });
       }
+      Object.keys(_pendingTaskIds).forEach(function(k) {
+        if (_pendingTaskIds[k] === 'pending' && !_freshPending[k]) _freshPending[k] = 'pending';
+      });
+      _pendingTaskIds = _freshPending;
       render(data); // re-render with submission state now known
     }).catch(function(){}); // silent — page already rendered, no update needed on failure
     ensureTitlesForLang(data, currentLang).then(function() { render(data); });
