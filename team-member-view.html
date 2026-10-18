@@ -232,6 +232,20 @@
   .pv-sc-bottom-row { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 10px; }
   .pv-sc-your-share { font-size: 12px; color: rgba(232,220,200,0.65); }
   .pv-sc-your-share strong { color: #c9a84c; font-weight: 600; }
+  /* Cleaner progress banner: one column — label and status, key figure, full-width bar, share sentence */
+  .pv-status-card.pv-sc2 { flex-direction: column; align-items: stretch; gap: 10px; padding: 16px 18px; }
+  .pv-sc2-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pv-sc2-eyebrow { font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(201,168,76,0.75); }
+  .pv-sc2 .pv-sc-status-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; }
+  .pv-sc2-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .pv-sc2-big .pv-sc-frac-n { font-size: 34px; line-height: 1; }
+  .pv-sc2-of { font-size: 18px; font-weight: 600; color: rgba(232,220,200,0.92); }
+  .pv-sc2-tc { font-size: 14px; color: rgba(232,220,200,0.65); }
+  .pv-sc2 .pv-sc-bar-wrap { margin-bottom: 0; }
+  .pv-sc2 .pv-sc-leg-item { font-size: 11.5px; }
+  .pv-sc2 .pv-sc-legend { gap: 4px 14px; }
+  .pv-sc2 .pv-sc-bottom-row { margin-top: 0; }
+  .pv-sc2 .pv-sc-your-share { font-size: 13px; color: rgba(232,220,200,0.8); }
   .pv-ms-your-tag { font-size: 9px; font-weight: 600; color: #185fa5; background: #e6f1fb; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
 </style>
 </head>
@@ -315,6 +329,10 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     scLegDoneYou: 'Completed by you',
     scLegOpenYou: 'Your open tasks',
     scLegOpenOther: "Others' open tasks",
+    scEyebrow: 'Project progress · all owners',
+    scOfTotal: function(total){ return 'of ' + total; },
+    scTasksComplete: 'tasks complete',
+    scAllYours: function(total, done, open){ return 'All ' + total + ' tasks in this project are yours — <strong>' + done + ' done, ' + open + ' remaining</strong>'; },
     msYourTasksNeeded: 'your tasks needed',
     delaySpecific: function(n, ms){ return n + ' of your task' + (n===1?'':'s') + ' ' + (n===1?'is':'are') + ' overdue, directly delaying: ' + ms; },
     forwardLookingFraction: function(count, newDone, total, pct){ return 'Finishing your ' + count + ' remaining task' + (count===1?'':'s') + ' moves this to ' + newDone + ' of ' + total + ' (' + pct + '%)'; },
@@ -381,6 +399,10 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     scLegDoneYou: 'أنجزتها أنت',
     scLegOpenYou: 'مهامك المفتوحة',
     scLegOpenOther: 'مهام الآخرين المفتوحة',
+    scEyebrow: 'تقدّم المشروع · جميع المسؤولين',
+    scOfTotal: function(total){ return 'من أصل ' + total; },
+    scTasksComplete: 'مهمة مكتملة',
+    scAllYours: function(total, done, open){ return 'جميع المهام (' + total + ') في هذا المشروع مهامك — <strong>' + done + ' منجزة، ' + open + ' متبقية</strong>'; },
     msYourTasksNeeded: 'مهامك مطلوبة',
     delaySpecific: function(n, ms){ return n + ' من مهامك متأخرة، تؤخر مباشرة: ' + ms; },
     forwardLookingFraction: function(count, newDone, total, pct){ return 'إكمال مهامك المتبقية (' + count + ') يرفع هذا إلى ' + newDone + ' من أصل ' + total + ' (' + pct + '%)'; },
@@ -631,18 +653,24 @@ function renderProgressZone(p, stats) {
   }
 
   // Bottom row — only when per-person data is available
+  var allYours = stats.yourTaskCount > 0 && stats.yourTaskCount === bp.totalTasks;
   var bottomRow = (stats.yourTaskCount > 0)
     ? '<div class="pv-sc-bottom-row"><div class="pv-sc-your-share">' +
-        t('scYourShare', stats.yourTaskCount, bp.totalTasks, stats.yourCompletedCount, stats.yourOpenCount) +
+        (allYours
+          ? t('scAllYours', bp.totalTasks, stats.yourCompletedCount, stats.yourOpenCount)
+          : t('scYourShare', stats.yourTaskCount, bp.totalTasks, stats.yourCompletedCount, stats.yourOpenCount)) +
       '</div></div>'
     : '';
 
-  return '<div class="pv-status-card">' +
-    '<div class="pv-sc-fraction">' +
-      (currentLang === 'ar' ? 'تقدّم المشروع: ' : 'Project progress: ') + '<span class="pv-sc-frac-n">' + completedTotal + '</span>' + (currentLang === 'ar' ? ' من أصل ' + bp.totalTasks + ' مهمة مكتملة (جميع المسؤولين)' : ' of ' + bp.totalTasks + ' tasks complete (all owners)') +
-    '</div>' +
-    '<div class="pv-sc-fraction-label">' +
+  return '<div class="pv-status-card pv-sc2">' +
+    '<div class="pv-sc2-top">' +
+      '<span class="pv-sc2-eyebrow">' + t('scEyebrow') + '</span>' +
       '<span class="pv-sc-status-pill ' + cls + '">' + (statusLabels[bp.statusLight] || statusLabels.onTrack) + '</span>' +
+    '</div>' +
+    '<div class="pv-sc2-big">' +
+      '<span class="pv-sc-frac-n">' + completedTotal + '</span>' +
+      '<span class="pv-sc2-of">' + t('scOfTotal', bp.totalTasks) + '</span>' +
+      '<span class="pv-sc2-tc">' + t('scTasksComplete') + '</span>' +
     '</div>' +
     '<div class="pv-sc-bar-wrap">' + barHtml + '</div>' +
     bottomRow +
