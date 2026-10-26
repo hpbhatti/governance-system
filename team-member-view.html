@@ -247,6 +247,101 @@
   .pv-sc2 .pv-sc-bottom-row { margin-top: 0; }
   .pv-sc2 .pv-sc-your-share { font-size: 13px; color: rgba(232,220,200,0.8); }
   .pv-ms-your-tag { font-size: 9px; font-weight: 600; color: #185fa5; background: #e6f1fb; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  /* ── Step 1: grouped tasks + team filter (pvg-*) ── */
+  .pvg-action-box { background: var(--amber-bg); border: 1px solid rgba(196,126,42,0.3); border-radius: 12px; padding: 2px 12px 6px; margin: 10px 0 6px; }
+  .pvg-action-box .pvg-group-head { color: #854F0B; margin-top: 10px; }
+  .pvg-group-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: 13.5px; font-weight: 700; margin: 16px 0 8px; }
+  .pvg-group-head.overdue { color: var(--red); }
+  .pvg-group-head.done { color: var(--green); }
+  .pvg-count, .pvg-range { font-size: 12px; font-weight: 400; color: var(--ink-muted); }
+  .pvg-team { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .pvg-team-label { font-size: 12px; color: var(--ink-muted); }
+  .pvg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; padding-inline-start: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-card); font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+  .pvg-chip.on { border-color: var(--accent); background: #eef3f8; box-shadow: 0 0 0 1px var(--accent); }
+  .pvg-chip em { font-style: normal; font-size: 11.5px; background: var(--bg); border-radius: 999px; padding: 0 7px; color: var(--ink-muted); }
+  .pvg-av { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .pvg-av.all { background: var(--ink-faint); }
+  .pvg-summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-muted); margin-bottom: 4px; }
+  .pvg-link { background: none; border: none; padding: 0; color: #0C447C; text-decoration: underline; cursor: pointer; font-family: inherit; font-size: inherit; }
+  .pvg-toggle { margin-inline-start: 4px; border: 1px solid var(--line-strong); background: var(--bg-card); border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; color: var(--accent); cursor: pointer; }
+  .pvg-note { margin-top: 8px; font-size: 12.5px; border-radius: 8px; padding: 6px 10px; }
+  .pvg-note.ok { background: var(--green-bg); color: var(--green); }
+  .pvg-note.late { background: var(--amber-bg); color: #633806; border: 1px solid rgba(196,126,42,0.3); }
+  .pvg-empty { text-align: center; color: var(--ink-muted); font-size: 13px; padding: 20px 10px; background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: 10px; }
+
+  /* ── Step 2: List | Month switch and month calendar (pvg-*) ── */
+  .pv-task-rule .pvg-switch { order: 3; }
+  .pvg-switch { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; }
+  .pvg-switch button { border: 0; font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 14px; background: var(--bg-card); color: var(--ink-muted); cursor: pointer; }
+  .pvg-switch button.on { background: var(--accent); color: #fff; }
+  .pvg-cal { background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .pvg-cal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .pvg-cal-title { font-size: 14px; font-weight: 700; }
+  .pvg-cal-done { font-size: 12px; font-weight: 600; background: var(--green-bg); color: var(--green); border-radius: 999px; padding: 2px 10px; }
+  .pvg-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .pvg-cal-dow { font-size: 11px; color: var(--ink-muted); text-align: center; }
+  .pvg-day { min-height: 68px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-card); padding: 3px 6px; text-align: start; font-family: inherit; font-size: 11px; color: var(--ink); cursor: pointer; }
+  .pvg-day.we { background: #faf8f3; color: #a8a29e; }
+  .pvg-day.rd { background: var(--red-bg); border-color: #e8bcb9; }
+  .pvg-day.td { box-shadow: inset 0 3px 0 var(--gold); }
+  .pvg-day.sel { outline: 2px solid var(--accent); }
+  .pvg-day-n { display: block; font-weight: 600; font-size: 12px; }
+  .pvg-day-c, .pvg-day-d { display: block; margin-top: 4px; font-size: 11px; border-radius: 999px; padding: 0 6px; width: fit-content; font-weight: 600; }
+  .pvg-day-d { margin-top: 3px; background: var(--green-bg); color: var(--green); }
+  .pvg-h0 { background: transparent; color: #c4bfb0; }
+  .pvg-h1 { background: #e6ecf2; color: #0C447C; }
+  .pvg-h2 { background: #b5cde0; color: #0C447C; }
+  .pvg-h3 { background: #4d7391; color: #fff; }
+  .pvg-h4 { background: #1a3a52; color: #fff; }
+  .pvg-short { display: none; }
+  .pvg-cal-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-muted); margin-top: 8px; align-items: center; }
+  .pvg-cal-legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-inline-end: 5px; }
+  @media (max-width: 520px) {
+    .pvg-cal-grid { gap: 3px; }
+    .pvg-day { min-height: 36px; padding: 2px 3px; text-align: center; }
+    .pvg-day-c, .pvg-day-d { margin-inline: auto; padding: 0 4px; margin-top: 1px; }
+    .pvg-long { display: none; }
+    .pvg-short { display: inline; }
+  }
+  .pv-impact-card { background: #e6f1fb; border: 1px solid rgba(24,95,165,0.15); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .pv-impact-row { display: flex; align-items: center; gap: 12px; }
+  .pv-impact-block { flex: 1; min-width: 0; }
+  .pv-impact-block-label { font-size: 9px; font-weight: 700; color: #185fa5; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .pv-impact-bar { height: 6px; background: rgba(24,95,165,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+  .pv-impact-fill-now { height: 100%; background: #4a7c59; border-radius: 3px; }
+  .pv-impact-fill-after { height: 100%; background: #185fa5; border-radius: 3px; }
+  .pv-impact-count { display: flex; align-items: baseline; gap: 3px; }
+  .pv-impact-n { font-size: 18px; font-weight: 700; color: #185fa5; line-height: 1; }
+  .pv-impact-of { font-size: 10px; color: rgba(24,95,165,0.6); }
+  .pv-impact-arrow { font-size: 18px; color: rgba(24,95,165,0.4); flex-shrink: 0; }
+  .pv-sc-fraction { font-size: 22px; font-weight: 700; color: rgba(232,220,200,0.9); line-height: 1.2; margin-bottom: 6px; font-family: 'IBM Plex Sans Arabic', sans-serif; }
+  .pv-sc-frac-n { font-size: 30px; color: #c9a84c; font-family: 'Reem Kufi', serif; }
+  [dir="rtl"] .pv-sc-frac-n { font-family: 'Cairo', sans-serif; }
+  .pv-sc-fraction-label { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 10px; color: rgba(232,220,200,0.45); flex-wrap: wrap; }
+  .pv-sc-bar-wrap { margin-bottom: 10px; }
+  .pv-sc-bar-track { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex; }
+  .pv-sc-seg { height: 100%; transition: width 0.4s ease; }
+  .pv-sc-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .pv-sc-leg-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: rgba(232,220,200,0.5); }
+  .pv-sc-leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .pv-sc-bottom-row { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 10px; }
+  .pv-sc-your-share { font-size: 12px; color: rgba(232,220,200,0.65); }
+  .pv-sc-your-share strong { color: #c9a84c; font-weight: 600; }
+  /* Cleaner progress banner: one column — label and status, key figure, full-width bar, share sentence */
+  .pv-status-card.pv-sc2 { flex-direction: column; align-items: stretch; gap: 10px; padding: 16px 18px; }
+  .pv-sc2-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pv-sc2-eyebrow { font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(201,168,76,0.75); }
+  .pv-sc2 .pv-sc-status-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; }
+  .pv-sc2-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .pv-sc2-big .pv-sc-frac-n { font-size: 34px; line-height: 1; }
+  .pv-sc2-of { font-size: 18px; font-weight: 600; color: rgba(232,220,200,0.92); }
+  .pv-sc2-tc { font-size: 14px; color: rgba(232,220,200,0.65); }
+  .pv-sc2 .pv-sc-bar-wrap { margin-bottom: 0; }
+  .pv-sc2 .pv-sc-leg-item { font-size: 11.5px; }
+  .pv-sc2 .pv-sc-legend { gap: 4px 14px; }
+  .pv-sc2 .pv-sc-bottom-row { margin-top: 0; }
+  .pv-sc2 .pv-sc-your-share { font-size: 13px; color: rgba(232,220,200,0.8); }
+  .pv-ms-your-tag { font-size: 9px; font-weight: 600; color: #185fa5; background: #e6f1fb; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -1036,8 +1131,8 @@ function render(data) {
         renderMilestonesZone(p, milestoneYourTasksMap) +
         renderForwardLookingLine(p, personStats) +
         delayBox +
-        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span></div>' : '') +
-        cardsHtml +
+        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' : '') +
+        (cardsHtml ? pvgRenderGroups(items, tasks, p.id) : '') +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
           : '') +
@@ -1259,5 +1354,282 @@ function openMySubmissions() {
 
 loadPartnerView();
 </script>
-</body>
+<script>Object.assign(STR.en,{    pvgNeedsAction: 'Needs your action',
+    pvgNeedsActionHint: function(n){ return n === 1 ? 'Confirm the proposed date' : 'Confirm the proposed dates'; },
+    pvgNeedsActionAll: 'Shown for everyone, whatever the Team filter',
+    pvgGroupOverdue: 'Overdue', pvgGroupThisWeek: 'Due this week', pvgGroupNextWeek: 'Due next week', pvgGroupLater: 'Due later', pvgGroupCompleted: 'Completed',
+    pvgRangeThisWeek: function(d){ return 'today to Thu ' + d; },
+    pvgRangeNextWeek: function(a, b){ return a + ' to ' + b + ', includes Fri and Sat'; },
+    pvgTaskCount: function(n){ return n + (n === 1 ? ' task' : ' tasks'); },
+    pvgTeam: 'Team', pvgEveryone: 'Everyone', pvgShow: 'Show', pvgHide: 'Hide', pvgShowEveryone: 'Show everyone',
+    pvgShowingOpen: function(n, name){ return 'Showing ' + n + ' open task' + (n === 1 ? '' : 's') + (name ? ' for ' + name : ''); },
+    pvgShowingOther: function(n, name){ return 'Showing ' + n + ' other open task' + (n === 1 ? '' : 's') + (name ? ' for ' + name : ''); },
+    pvgNoOpen: 'No other open tasks here.',
+    pvgOnTime: 'Completed on time',
+    pvgCompletedLate: function(n){ return 'Completed ' + n + ' working day' + (n === 1 ? '' : 's') + ' after the due date. Friday and Saturday are not counted.'; },
+    pvgOverdueWorkDays: function(n){ return '\u23F0 ' + n + ' working day' + (n === 1 ? '' : 's') + ' overdue'; },
+    pvgList: 'List', pvgMonth: 'Month', pvgPrev: 'Previous', pvgNext: 'Next',
+    pvgActiveLong: function(n){ return n + ' active'; }, pvgNoneLong: 'none',
+    pvgDoneLong: function(n){ return '\u2713 ' + n + ' done'; },
+    pvgDoneMonth: function(n){ return n + ' completed this month'; },
+    pvgLegendRed: 'Red: days after the due date of a task that is still open',
+    pvgLegendNum: 'Number: open tasks active that day',
+    pvgLegendGreen: 'Green: tasks completed that day',
+    pvgLegendToday: 'Today',
+    pvgShowAll: 'Show all',
+    pvgCompletedOn: function(d){ return 'Completed on ' + d; },
+    pvgShowingDay: function(n, done, day, name, other){ return 'Showing ' + n + (other ? ' other' : '') + ' open task' + (n === 1 ? '' : 's') + (done ? ' and ' + done + ' completed' : '') + ' on ' + day + (name ? ' for ' + name : ''); },
+    pvgNoOpenDay: 'No open tasks on this day.',});Object.assign(STR.ar,{    pvgNeedsAction: 'مطلوب إجراء منك',
+    pvgNeedsActionHint: function(n){ return n === 1 ? 'يرجى تأكيد التاريخ المقترح' : 'يرجى تأكيد التواريخ المقترحة'; },
+    pvgNeedsActionAll: 'تظهر للجميع بغض النظر عن فلتر الفريق',
+    pvgGroupOverdue: 'متأخرة', pvgGroupThisWeek: 'مستحقة هذا الأسبوع', pvgGroupNextWeek: 'مستحقة الأسبوع القادم', pvgGroupLater: 'مستحقة لاحقًا', pvgGroupCompleted: 'المهام المنجزة',
+    pvgRangeThisWeek: function(d){ return 'من اليوم حتى الخميس ' + d; },
+    pvgRangeNextWeek: function(a, b){ return 'من ' + a + ' إلى ' + b + ' (تشمل الجمعة والسبت)'; },
+    pvgTaskCount: function(n){ return n === 1 ? 'مهمة واحدة' : n === 2 ? 'مهمتان' : (n >= 3 && n <= 10) ? n + ' مهام' : n + ' مهمة'; },
+    pvgTeam: 'الفريق', pvgEveryone: 'الجميع', pvgShow: 'عرض', pvgHide: 'إخفاء', pvgShowEveryone: 'عرض الجميع',
+    pvgShowingOpen: function(n, name){ return 'المهام المفتوحة المعروضة: ' + n + (name ? ' (' + name + ')' : ''); },
+    pvgShowingOther: function(n, name){ return 'المهام المفتوحة الأخرى المعروضة: ' + n + (name ? ' (' + name + ')' : ''); },
+    pvgNoOpen: 'لا توجد مهام مفتوحة أخرى.',
+    pvgOnTime: 'أُنجزت في الموعد المحدد',
+    pvgCompletedLate: function(n){ var w = n === 1 ? 'يوم عمل واحد' : n === 2 ? 'يومَي عمل' : (n >= 3 && n <= 10) ? n + ' أيام عمل' : n + ' يوم عمل'; return 'أُنجزت بعد تاريخ الاستحقاق بمقدار ' + w + ' (لا تُحتسب الجمعة والسبت).'; },
+    pvgOverdueWorkDays: function(n){ var w = n === 1 ? 'يوم عمل واحد' : n === 2 ? 'يومين عمل' : (n >= 3 && n <= 10) ? n + ' أيام عمل' : n + ' يوم عمل'; return '\u23F0 متأخرة ' + w; },
+    pvgList: 'قائمة', pvgMonth: 'شهر', pvgPrev: 'السابق', pvgNext: 'التالي',
+    pvgActiveLong: function(n){ return n + ' نشطة'; }, pvgNoneLong: 'لا توجد',
+    pvgDoneLong: function(n){ return '\u2713 ' + n + ' منجزة'; },
+    pvgDoneMonth: function(n){ return 'أُنجز هذا الشهر: ' + n; },
+    pvgLegendRed: 'أحمر: الأيام التي تلي تاريخ استحقاق مهمة ما زالت مفتوحة',
+    pvgLegendNum: 'الرقم: المهام المفتوحة النشطة في ذلك اليوم',
+    pvgLegendGreen: 'أخضر: المهام المنجزة في ذلك اليوم',
+    pvgLegendToday: 'اليوم',
+    pvgShowAll: 'عرض الكل',
+    pvgCompletedOn: function(d){ return 'أُنجزت في ' + d; },
+    pvgShowingDay: function(n, done, day, name, other){ return (other ? 'المهام المفتوحة الأخرى المعروضة: ' : 'المهام المفتوحة المعروضة: ') + n + (done ? '، والمنجزة: ' + done : '') + ' بتاريخ ' + day + (name ? ' (' + name + ')' : ''); },
+    pvgNoOpenDay: 'لا توجد مهام مفتوحة في هذا اليوم.',});window.stakeholderDisplayName=window.stakeholderDisplayName||function(s){return s?(s.name||s.nameEn||String(s)):"";};</script><script>// ── Step 1: grouped task list + Team filter + "Needs your action" box ──────
+// All names start with pvg so nothing here can clash with existing code.
+var pvgState = { team: {}, done: {}, people: {}, mode: {}, day: {}, month: {} };
+var PVG_COLORS = ['#1a3a52', '#2f7d6d', '#8a5ca8', '#b8884a', '#4a6fa5', '#a0526b'];
+
+function pvgDow(iso) { return new Date(iso + 'T00:00:00').getDay(); } // 0 Sun ... 6 Sat
+function pvgAddDays(iso, n) {
+  var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// Saudi work week is Sunday to Thursday: Friday (5) and Saturday (6) never count.
+function pvgWorkDays(fromIso, toIso) {
+  if (!fromIso || !toIso || toIso <= fromIso) return 0;
+  var n = 0, cur = fromIso, guard = 0;
+  while (cur < toIso && guard++ < 4000) {
+    cur = pvgAddDays(cur, 1);
+    var w = pvgDow(cur);
+    if (w !== 5 && w !== 6) n++;
+  }
+  return n;
+}
+// "This week" runs from today to Thursday. On Friday or Saturday it means the coming Sunday to Thursday.
+function pvgWeekEnd(todayIso) {
+  var w = pvgDow(todayIso);
+  if (w <= 4) return pvgAddDays(todayIso, 4 - w);
+  return pvgAddDays(todayIso, w === 5 ? 6 : 5);
+}
+function pvgOwnerKey(tk) {
+  var s = tk.stakeholder;
+  return s ? (s.nameEn || s.nameRaw || s.nameAr || '') : '';
+}
+function pvgInitials(name) {
+  var parts = String(name || '').trim().split(/\s+/);
+  var a = parts[0] ? Array.from(parts[0])[0] : '';
+  var b = parts[1] ? Array.from(parts[1])[0] : '';
+  return (a + b).toUpperCase();
+}
+function pvgIsOpen(tk) { return tk.status !== 'completed'; }
+function pvgBucket(tk, today, wkEnd, nxtEnd) {
+  if (tk.status === 'completed') return 'done';
+  if (tk.dateConfirmationStatus === 'pending' && tk.status !== 'missed') return 'act';
+  if (tk.status === 'missed') return 'ovd';
+  if (tk.dueDate && tk.dueDate < today) return 'ovd';
+  if (!tk.dueDate) return 'later';
+  if (tk.dueDate <= wkEnd) return 'wk';
+  if (tk.dueDate <= nxtEnd) return 'nxt';
+  return 'later';
+}
+function pvgCompletionNote(tk) {
+  if (!tk.completedDate || !tk.dueDate) return '';
+  var wd = tk.completedDate > tk.dueDate ? pvgWorkDays(tk.dueDate, tk.completedDate) : 0;
+  return wd > 0
+    ? '<div class="pvg-note late">' + escapeHtml(t('pvgCompletedLate', wd)) + '</div>'
+    : '<div class="pvg-note ok">' + escapeHtml(t('pvgOnTime')) + '</div>';
+}
+function pvgCard(tk, tasks) {
+  var subtasks = tasks.filter(function(st){ return st.parentId === tk.id; });
+  var html = renderTaskCard(tk, subtasks);
+  if (tk.status === 'completed') {
+    var note = pvgCompletionNote(tk);
+    if (note && html.slice(-6) === '</div>') html = html.slice(0, -6) + note + '</div>';
+  }
+  return html;
+}
+function pvgGroupHead(label, count, range, cls) {
+  return '<div class="pvg-group-head ' + (cls || '') + '">' + escapeHtml(label) +
+    ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', count)) + '</span>' +
+    (range ? '<span class="pvg-range">' + escapeHtml(range) + '</span>' : '') + '</div>';
+}
+// ── Step 2: List | Month switch and month calendar ─────────────────────────
+function pvgLocale() { return currentLang === 'ar' ? 'ar' : 'en-US'; }
+function pvgDateOnly(v) { return v ? String(v).slice(0, 10) : ''; }
+function pvgDayText(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(pvgLocale(), { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function pvgMonthKey(pid, today) { return pvgState.month[pid] || today.slice(0, 7); }
+function pvgShiftMonth(key, n) {
+  var d = new Date(+key.slice(0, 4), +key.slice(5, 7) - 1 + n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function pvgIsLate(tk, today) { return tk.status !== 'completed' && !!tk.dueDate && pvgDateOnly(tk.dueDate) < today; }
+// A task is active from its start date to its due date (to today if it is late). Without a start date it counts on its due date only.
+function pvgIsActiveOn(tk, iso, today) {
+  if (tk.status === 'completed' || !tk.dueDate) return false;
+  var due = pvgDateOnly(tk.dueDate), start = pvgDateOnly(tk.startDate) || due;
+  if (start > due) start = due;
+  var end = pvgIsLate(tk, today) ? today : due;
+  return iso >= start && iso <= end;
+}
+function pvgSwitchHtml(pid) {
+  var mm = pvgState.mode[pid] === 'month', p = escapeHtml(pid);
+  return '<span class="pvg-switch">' +
+    '<button data-pvg="mode" data-pid="' + p + '" data-mode="list" class="' + (mm ? '' : 'on') + '" aria-pressed="' + (mm ? 'false' : 'true') + '">' + escapeHtml(t('pvgList')) + '</button>' +
+    '<button data-pvg="mode" data-pid="' + p + '" data-mode="month" class="' + (mm ? 'on' : '') + '" aria-pressed="' + (mm ? 'true' : 'false') + '">' + escapeHtml(t('pvgMonth')) + '</button></span>';
+}
+function pvgHeat(n) { return 'pvg-h' + (n >= 4 ? 4 : n); }
+function pvgGridHtml(items, pid, today, selDay) {
+  var key = pvgMonthKey(pid, today), y = +key.slice(0, 4), m = +key.slice(5, 7) - 1, loc = pvgLocale(), p = escapeHtml(pid);
+  var first = new Date(y, m, 1).getDay(), nd = new Date(y, m + 1, 0).getDate();
+  var doneMonth = items.filter(function(tk){ return tk.status === 'completed' && pvgDateOnly(tk.completedDate).slice(0, 7) === key; }).length;
+  var h = '<div class="pvg-cal"><div class="pvg-cal-head"><span class="pvg-cal-title">' + escapeHtml(new Date(y, m, 1).toLocaleDateString(loc, { month: 'long', year: 'numeric' })) + '</span>' +
+    (doneMonth ? '<span class="pvg-cal-done">' + escapeHtml(t('pvgDoneMonth', doneMonth)) + '</span>' : '') +
+    '<span class="pvg-switch"><button data-pvg="month" data-pid="' + p + '" data-dir="-1">' + escapeHtml(t('pvgPrev')) + '</button>' +
+    '<button data-pvg="month" data-pid="' + p + '" data-dir="1">' + escapeHtml(t('pvgNext')) + '</button></span></div><div class="pvg-cal-grid">';
+  for (var i = 0; i < 7; i++) h += '<div class="pvg-cal-dow">' + escapeHtml(new Date(2023, 0, 1 + i).toLocaleDateString(loc, { weekday: 'short' })) + '</div>';
+  for (var e = 0; e < first; e++) h += '<div></div>';
+  for (var d = 1; d <= nd; d++) {
+    var iso = key + '-' + String(d).padStart(2, '0'), wd = (first + d - 1) % 7;
+    var act = items.filter(function(tk){ return pvgIsActiveOn(tk, iso, today); });
+    var red = act.some(function(tk){ return pvgIsLate(tk, today) && iso > pvgDateOnly(tk.dueDate); });
+    var done = items.filter(function(tk){ return tk.status === 'completed' && pvgDateOnly(tk.completedDate) === iso; }).length;
+    h += '<button class="pvg-day' + (wd === 5 || wd === 6 ? ' we' : '') + (red ? ' rd' : '') + (iso === today ? ' td' : '') + (iso === selDay ? ' sel' : '') + '" data-pvg="day" data-pid="' + p + '" data-date="' + iso + '" aria-pressed="' + (iso === selDay ? 'true' : 'false') + '">' +
+      '<span class="pvg-day-n">' + d + '</span>' +
+      '<span class="pvg-day-c ' + pvgHeat(act.length) + '"><span class="pvg-long">' + escapeHtml(act.length ? t('pvgActiveLong', act.length) : t('pvgNoneLong')) + '</span><span class="pvg-short">' + (act.length || '–') + '</span></span>' +
+      (done ? '<span class="pvg-day-d"><span class="pvg-long">' + escapeHtml(t('pvgDoneLong', done)) + '</span><span class="pvg-short">✓' + done + '</span></span>' : '') + '</button>';
+  }
+  return h + '</div><div class="pvg-cal-legend"><span><i style="background:var(--red-bg);border:1px solid #e8bcb9"></i>' + escapeHtml(t('pvgLegendRed')) + '</span>' +
+    '<span>' + escapeHtml(t('pvgLegendNum')) + '</span>' +
+    '<span><i style="background:var(--green-bg)"></i>' + escapeHtml(t('pvgLegendGreen')) + '</span>' +
+    '<span><i style="background:var(--gold);height:4px"></i>' + escapeHtml(t('pvgLegendToday')) + '</span></div></div>';
+}
+
+function pvgRenderGroups(items, tasks, pid) {
+  var today = todayStr(), wkEnd = pvgWeekEnd(today), nxtEnd = pvgAddDays(wkEnd, 7);
+  // Team chips only when 2 or more named people have tasks in this project
+  var keys = [], seen = {};
+  items.forEach(function(tk){ var k = pvgOwnerKey(tk); if (k && !seen[k]) { seen[k] = tk.stakeholder; keys.push(k); } });
+  keys.sort();
+  pvgState.people[pid] = keys;
+  var sel = pvgState.team[pid] || 'ALL';
+  if (sel !== 'ALL' && keys.indexOf(sel) === -1) sel = 'ALL';
+  var showTeam = keys.length >= 2;
+  if (!showTeam) sel = 'ALL';
+  var isMonth = pvgState.mode[pid] === 'month';
+  var selDay = isMonth ? (pvgState.day[pid] || '') : '';
+  var selLabel = sel !== 'ALL' ? stakeholderDisplayName(seen[sel]) : '';
+
+  var actionTasks = items.filter(function(tk){ return pvgBucket(tk, today, wkEnd, nxtEnd) === 'act'; })
+    .sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); });
+  var visible = items.filter(function(tk){ return sel === 'ALL' || pvgOwnerKey(tk) === sel; });
+  var by = { ovd: [], wk: [], nxt: [], later: [], done: [] };
+  visible.forEach(function(tk){
+    var b = pvgBucket(tk, today, wkEnd, nxtEnd);
+    if (b !== 'act') by[b].push(tk);
+  });
+  ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k].sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); }); });
+  by.done.sort(function(a, b){ return (b.completedDate || '').localeCompare(a.completedDate || ''); });
+  if (selDay) {
+    ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k] = by[k].filter(function(tk){ return pvgIsActiveOn(tk, selDay, today); }); });
+    by.done = by.done.filter(function(tk){ return pvgDateOnly(tk.completedDate) === selDay; });
+  }
+  var openCount = by.ovd.length + by.wk.length + by.nxt.length + by.later.length;
+
+  var h = '';
+  if (showTeam) {
+    h += '<div class="pvg-team"><span class="pvg-team-label">' + escapeHtml(t('pvgTeam')) + '</span>' +
+      '<button class="pvg-chip' + (sel === 'ALL' ? ' on' : '') + '" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="-1"><span class="pvg-av all">' + escapeHtml(t('pvgEveryone').slice(0, 1)) + '</span>' + escapeHtml(t('pvgEveryone')) + '</button>';
+    keys.forEach(function(k, i){
+      var n = items.filter(function(tk){ return pvgOwnerKey(tk) === k && pvgIsOpen(tk); }).length;
+      h += '<button class="pvg-chip' + (sel === k ? ' on' : '') + '" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="' + i + '">' +
+        '<span class="pvg-av" style="background:' + PVG_COLORS[i % PVG_COLORS.length] + '">' + escapeHtml(pvgInitials(stakeholderDisplayName(seen[k]))) + '</span>' +
+        escapeHtml(stakeholderDisplayName(seen[k])) + '<em>' + n + '</em></button>';
+    });
+    h += '</div>';
+  }
+  if (isMonth) h += pvgGridHtml(visible, pid, today, selDay);
+  if (actionTasks.length) {
+    h += '<div class="pvg-action-box"><div class="pvg-group-head">' + escapeHtml(t('pvgNeedsAction')) +
+      ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', actionTasks.length)) + '</span>' +
+      '<span class="pvg-range">' + escapeHtml(t('pvgNeedsActionHint', actionTasks.length)) + (sel !== 'ALL' ? '. ' + escapeHtml(t('pvgNeedsActionAll')) : '') + '</span></div>' +
+      actionTasks.map(function(tk){ return pvgCard(tk, tasks); }).join('') + '</div>';
+  }
+  h += '<div class="pvg-summary"><span>' + escapeHtml(selDay ? t('pvgShowingDay', openCount, by.done.length, pvgDayText(selDay), selLabel, actionTasks.length > 0) : (actionTasks.length ? t('pvgShowingOther', openCount, selLabel) : t('pvgShowingOpen', openCount, selLabel))) + '</span><span>' +
+    (selDay ? '<button class="pvg-link" data-pvg="day-clear" data-pid="' + escapeHtml(pid) + '">' + escapeHtml(t('pvgShowAll')) + '</button> ' : '') +
+    (sel !== 'ALL' ? '<button class="pvg-link" data-pvg="team" data-pid="' + escapeHtml(pid) + '" data-idx="-1">' + escapeHtml(t('pvgShowEveryone')) + '</button>' : '') + '</span></div>';
+
+  var groups = [
+    ['ovd',   t('pvgGroupOverdue'),  '', 'overdue'],
+    ['wk',    t('pvgGroupThisWeek'), t('pvgRangeThisWeek', fmtDate(wkEnd)), ''],
+    ['nxt',   t('pvgGroupNextWeek'), t('pvgRangeNextWeek', fmtDate(pvgAddDays(wkEnd, 1)), fmtDate(nxtEnd)), ''],
+    ['later', t('pvgGroupLater'),    '', '']
+  ];
+  var any = false;
+  groups.forEach(function(g){
+    var list = by[g[0]];
+    if (!list.length) return;
+    any = true;
+    h += pvgGroupHead(g[1], list.length, g[2], g[3]) + list.map(function(tk){ return pvgCard(tk, tasks); }).join('');
+  });
+  if (!any && !(selDay && by.done.length)) h += '<div class="pvg-empty">' + escapeHtml(selDay ? t('pvgNoOpenDay') : t('pvgNoOpen')) + '</div>';
+
+  if (selDay) {
+    if (by.done.length) h += pvgGroupHead(t('pvgCompletedOn', pvgDayText(selDay)), by.done.length, '', 'done') + by.done.map(function(tk){ return pvgCard(tk, tasks); }).join('');
+    return h;
+  }
+  var showDone = !!pvgState.done[pid];
+  h += '<div class="pvg-group-head done">' + escapeHtml(t('pvgGroupCompleted')) +
+    ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', by.done.length)) + '</span>' +
+    (by.done.length ? '<button class="pvg-toggle" data-pvg="done" data-pid="' + escapeHtml(pid) + '">' + escapeHtml(showDone ? t('pvgHide') : t('pvgShow')) + '</button>' : '') + '</div>';
+  if (showDone) h += by.done.map(function(tk){ return pvgCard(tk, tasks); }).join('');
+  return h;
+}
+document.addEventListener('click', function(e) {
+  var el = e.target.closest ? e.target.closest('[data-pvg]') : null;
+  if (!el) return;
+  var pid = el.getAttribute('data-pid');
+  if (el.getAttribute('data-pvg') === 'team') {
+    var idx = parseInt(el.getAttribute('data-idx'), 10);
+    var keys = pvgState.people[pid] || [];
+    pvgState.team[pid] = idx >= 0 && keys[idx] ? keys[idx] : 'ALL';
+  } else if (el.getAttribute('data-pvg') === 'done') {
+    pvgState.done[pid] = !pvgState.done[pid];
+  } else if (el.getAttribute('data-pvg') === 'mode') {
+    pvgState.mode[pid] = el.getAttribute('data-mode') === 'month' ? 'month' : 'list';
+    pvgState.day[pid] = '';
+    pvgState.month[pid] = '';
+  } else if (el.getAttribute('data-pvg') === 'month') {
+    pvgState.month[pid] = pvgShiftMonth(pvgMonthKey(pid, todayStr()), parseInt(el.getAttribute('data-dir'), 10) || 0);
+    pvgState.day[pid] = '';
+  } else if (el.getAttribute('data-pvg') === 'day') {
+    var pvgPicked = el.getAttribute('data-date');
+    pvgState.day[pid] = pvgState.day[pid] === pvgPicked ? '' : pvgPicked;
+  } else if (el.getAttribute('data-pvg') === 'day-clear') {
+    pvgState.day[pid] = '';
+  } else { return; }
+  if (lastData) render(lastData);
+});
+</script></body>
 </html>
