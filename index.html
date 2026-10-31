@@ -16103,8 +16103,16 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
     var sess = await supabaseClient.auth.getSession();
     var jwt = sess && sess.data && sess.data.session && sess.data.session.access_token;
     if (!jwt) throw { code: 'no_session' };
-    var r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + jwt },
-      body: JSON.stringify(Object.assign({ action: action }, body || {})) });
+    // x-region makes the function run next to the database. If the server refuses it, the first call is repeated once without it.
+    var payload = JSON.stringify(Object.assign({ action: action }, body || {})), t0 = Date.now();
+    function send(withRegion) {
+      var h = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + jwt };
+      if (withRegion) h['x-region'] = 'ap-northeast-2';
+      return fetch(FN_URL, { method: 'POST', headers: h, body: payload });
+    }
+    var r;
+    try { r = await send(window._attxRegionOn !== false); }
+    catch (netErr) { if (window._attxRegionOn !== false && Date.now() - t0 < 4000) { window._attxRegionOn = false; r = await send(false); } else throw netErr; }
     var j = {}; try { j = await r.json(); } catch (e) {}
     if (!r.ok) throw { code: j.error || 'server_error', status: r.status, data: j };
     return j;
