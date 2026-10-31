@@ -1565,7 +1565,7 @@ loadPartnerView();
   }
   function wRender(flash) {
     var d = S.data; if (!d) return setHTML('');
-    var h = idCard(d.name, d.nameAr, d.designation, d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
+    var h = idCard(d.name, d.nameAr, (lang() === 'ar' ? (d.designationAr || d.designation) : d.designation), d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
     if (!d.consent) {
       h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p><button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
       setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this; b.disabled = true; call('w_consent').then(function (r) { if (r.ok) wLoad().then(function () { wRender(); }); else { b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
@@ -1625,7 +1625,7 @@ loadPartnerView();
   function mRender(flash) {
     var d = S.data; if (!d) return setHTML('');
     var ar = lang() === 'ar', who = ar ? (d.workerAr || d.worker) : d.worker;
-    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_m')) + '</div><div class="attx-muted">' + esc(L('mgrIntro')) + ': <b>' + esc(who) + '</b>' + (d.workerId ? ' · <span class="attx-chip">' + esc(d.workerId) + '</span>' : '') + (d.workerDesignation ? ' · ' + esc(d.workerDesignation) : '') + '</div>';
+    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_m')) + '</div><div class="attx-muted">' + esc(L('mgrIntro')) + ': <b>' + esc(who) + '</b>' + (d.workerId ? ' · <span class="attx-chip">' + esc(d.workerId) + '</span>' : '') + (d.workerDesignation ? ' · ' + esc(ar ? (d.workerDesignationAr || d.workerDesignation) : d.workerDesignation) : '') + '</div>';
     if (flash) h += '<div class="attx-msg ok">' + esc(flash) + '</div>';
     if (!d.sheets.length) h += '<p class="attx-muted" style="margin-top:10px">' + esc(L('mgrNone')) + '</p>';
     else h += '<div class="attx-tw" style="margin-top:10px"><table class="attx-t"><thead><tr><th>' + esc(L('month')) + '</th><th>' + esc(L('docNo')) + '</th><th>' + esc(L('status')) + '</th><th></th></tr></thead><tbody>' +
@@ -1637,7 +1637,7 @@ loadPartnerView();
   function mOpen(id) {
     var s = (S.data.sheets || []).filter(function (x) { return x.id === id; })[0]; if (!s || !s.content) return;
     var ar = lang() === 'ar';
-    signForm({ title: L('mgrTitle'), sub: (ar ? (S.data.workerAr || S.data.worker) : S.data.worker) + (S.data.workerId ? ' · ' + S.data.workerId : '') + (S.data.workerDesignation ? ' · ' + S.data.workerDesignation : ''), content: s.content, sheetId: id, needName: true, goLabel: L('approveBtn'), codeAction: 'm_request_code', codeBody: { sheetId: id }, signAction: 'm_sign',
+    signForm({ title: L('mgrTitle'), sub: (ar ? (S.data.workerAr || S.data.worker) : S.data.worker) + (S.data.workerId ? ' · ' + S.data.workerId : '') + (S.data.workerDesignation ? ' · ' + (ar ? (S.data.workerDesignationAr || S.data.workerDesignation) : S.data.workerDesignation) : ''), content: s.content, sheetId: id, needName: true, goLabel: L('approveBtn'), codeAction: 'm_request_code', codeBody: { sheetId: id }, signAction: 'm_sign',
       onDone: function () { mLoad().then(function () { mRender(L('approvedOk')); }); } });
   }
 
