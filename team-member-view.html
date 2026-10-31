@@ -1648,6 +1648,7 @@ document.addEventListener('click', function(e) {
       checkin: 'Check in', checkout: 'Check out', done: 'Done for today.',
       consentTitle: 'Before you start', consentText: 'To record your remote attendance, the system saves the time of each check-in and check-out, the date, your device type and your network address. This is used only for your monthly timesheet and for company records, and it is kept for 5 years. Each month you will confirm and sign your timesheet.',
       consentBtn: 'I understand and agree',
+      ckin: 'Checking in…', ckout: 'Checking out…', saving: 'Saving…', pleaseWait: 'Please wait. Do not close this page.', slowWait: 'Still working. This can take a few more seconds.',
       sendCode: 'Send code to my email', codeSent: 'A code was sent to your email. It is valid for a few minutes.', enterCode: 'Enter the 6-digit code', confirm: 'Confirm', cancel: 'Cancel', close: 'Close', back: 'Back',
       signNeeded: 'Timesheet ready for your signature', review: 'Review and sign', signTitle: 'Confirm and sign your timesheet',
       iConfirm: 'I confirm that these records are correct.', drawSign: 'Draw your signature below', clear: 'Clear', signBtn: 'Sign timesheet',
@@ -1674,6 +1675,7 @@ document.addEventListener('click', function(e) {
       checkin: 'تسجيل الحضور', checkout: 'تسجيل الانصراف', done: 'اكتمل يومك.',
       consentTitle: 'قبل أن تبدأ', consentText: 'لتسجيل حضورك عن بُعد، يحفظ النظام وقت كل حضور وانصراف، والتاريخ، ونوع جهازك وعنوان شبكتك. تُستخدم هذه البيانات لكشف الحضور الشهري وسجلات الشركة فقط، وتُحفظ لمدة 5 سنوات. وفي نهاية كل شهر ستؤكد كشفك وتوقّع عليه.',
       consentBtn: 'أفهم وأوافق',
+      ckin: 'جارٍ تسجيل الحضور…', ckout: 'جارٍ تسجيل الانصراف…', saving: 'جارٍ الحفظ…', pleaseWait: 'يرجى الانتظار وعدم إغلاق الصفحة.', slowWait: 'ما زال العمل جارياً. قد يستغرق ذلك بضع ثوانٍ إضافية.',
       sendCode: 'أرسل الرمز إلى بريدي', codeSent: 'تم إرسال رمز إلى بريدك الإلكتروني. صالح لدقائق قليلة.', enterCode: 'أدخل الرمز المكوّن من 6 أرقام', confirm: 'تأكيد', cancel: 'إلغاء', close: 'إغلاق', back: 'رجوع',
       signNeeded: 'كشف الحضور جاهز لتوقيعك', review: 'مراجعة وتوقيع', signTitle: 'أكّد كشف الحضور ووقّع عليه',
       iConfirm: 'أؤكد أن هذه السجلات صحيحة.', drawSign: 'ارسم توقيعك في الأسفل', clear: 'مسح', signBtn: 'توقيع الكشف',
@@ -1705,12 +1707,36 @@ document.addEventListener('click', function(e) {
   function fmtDay(d) { try { var p = d.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).toLocaleDateString(lang() === 'ar' ? 'ar' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (e) { return d; } }
   function shiftMonth(m, n) { var p = m.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1 + n, 1)); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
 
+  // The function runs next to the database (Seoul) when this header is sent. If the server does not accept it yet,
+  // the first call fails fast and is repeated once without it.
+  var REGION = 'ap-northeast-2', useRegion = true;
   function call(action, body) {
     var b = { action: action, token: TOKEN }; for (var k in (body || {})) b[k] = body[k];
-    var ctl = new AbortController(); var to = setTimeout(function () { ctl.abort(); }, 25000);
-    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify(b), signal: ctl.signal, cache: 'no-store' })
-      .then(function (r) { clearTimeout(to); return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, data: j || {} }; }); })
-      .catch(function () { clearTimeout(to); return { ok: false, status: 0, data: { error: 'net' } }; });
+    function once(withRegion) {
+      var ctl = new AbortController(); var to = setTimeout(function () { ctl.abort(); }, 25000);
+      var h = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }; if (withRegion) h['x-region'] = REGION;
+      return fetch(API, { method: 'POST', headers: h, body: JSON.stringify(b), signal: ctl.signal, cache: 'no-store' })
+        .then(function (r) { clearTimeout(to); return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, data: j || {} }; }); })
+        .catch(function () { clearTimeout(to); return { ok: false, status: 0, data: { error: 'net' } }; });
+    }
+    var t0 = Date.now();
+    return once(useRegion).then(function (res) {
+      if (res.status === 0 && useRegion && Date.now() - t0 < 4000) { useRegion = false; return once(false); }
+      return res;
+    });
+  }
+  // Shows that a tap was received: spinner in the button, moving bar, and a hint when it takes longer.
+  function busyOn(btn, key, noBar) {
+    if (!btn) return function () {};
+    var old = btn.innerHTML, wrap = null, t = null;
+    btn.classList.add('attx-busy'); btn.disabled = true; btn.innerHTML = '<span class="attx-spin"></span>' + esc(L(key));
+    if (!noBar && btn.parentNode) {
+      wrap = document.createElement('div'); wrap.className = 'attx-wait';
+      wrap.innerHTML = '<div class="attx-wbar"><i></i></div><div class="attx-wtxt">' + esc(L('pleaseWait')) + '</div>';
+      btn.parentNode.insertBefore(wrap, btn.nextSibling);
+      t = setTimeout(function () { var x = wrap.querySelector('.attx-wtxt'); if (x) x.textContent = L('slowWait'); }, 6000);
+    }
+    return function () { if (t) clearTimeout(t); btn.classList.remove('attx-busy'); btn.innerHTML = old; if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap); };
   }
 
   // ---------- host + styles ----------
@@ -1725,6 +1751,10 @@ document.addEventListener('click', function(e) {
     '.attx-btn.sec{background:#fff;color:var(--accent,#1a3a52);border:1px solid var(--line-strong,#c8c2b0)}',
     '.attx-btn.go{background:var(--green,#4a7c59)}.attx-btn.out{background:var(--amber,#c47e2a)}',
     '.attx-btn[disabled]{opacity:.5;cursor:not-allowed}',
+    '.attx-btn.attx-busy[disabled]{opacity:.9;cursor:progress}',
+    '.attx-spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;vertical-align:-2px;margin-inline-end:8px;animation:attxr 1s linear infinite}@keyframes attxr{to{transform:rotate(360deg)}}',
+    '.attx-wait{margin-top:10px}.attx-wbar{height:4px;background:var(--line,#e4e0d6);border-radius:2px;overflow:hidden}.attx-wbar i{display:block;height:100%;width:40%;background:#1a3a51;border-radius:2px;animation:attxm 1.2s ease-in-out infinite}@keyframes attxm{0%{margin-left:-40%}100%{margin-left:100%}}',
+    '.attx-wtxt{font-size:12px;color:var(--ink-muted,#5a6478);margin-top:6px}',
     '.attx-big{font-size:15px;padding:13px 26px}',
     '.attx-msg{margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px}',
     '.attx-msg.err{background:var(--red-bg,#f5e0de);color:var(--red,#b04540)}.attx-msg.ok{background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59)}',
@@ -1829,10 +1859,10 @@ document.addEventListener('click', function(e) {
       if (!ov.querySelector('#attx-ck').checked) return say('err', L('e_confirm'));
       if (!o.noCode && code.length < 4) return say('err', L('e_code_len'));
       if (!pad.has()) return say('err', L('e_sig'));
-      b.disabled = true; say('ok', L('working'));
+      var sdone = busyOn(b, 'saving', true); say('ok', L('working'));
       var body = { sheetId: o.sheetId, signature: pad.png(), device: deviceId() }; if (!o.noCode) body.code = code; if (o.needName) body.name = name;
       call(o.signAction, body).then(function (r) {
-        b.disabled = false;
+        sdone(); b.disabled = false;
         if (r.ok && r.data.ok) { closeModal(); o.onDone(r.data); } else say('err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : ''));
       });
     };
@@ -1862,7 +1892,7 @@ document.addEventListener('click', function(e) {
     var h = idCard(d.name, d.nameAr, (lang() === 'ar' ? (d.designationAr || d.designation) : d.designation), d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
     if (!d.consent) {
       h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p><button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
-      setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this; b.disabled = true; call('w_consent').then(function (r) { if (r.ok) wLoad().then(function () { wRender(); }); else { b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
+      setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this, done = busyOn(b, 'saving'); call('w_consent').then(function (r) { if (r.ok) wAfter(r); else { done(); b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
       return;
     }
     var rec = d.record || {}; var line, btn = '';
@@ -1888,16 +1918,22 @@ document.addEventListener('click', function(e) {
     host.querySelector('#attx-nx').onclick = function () { wLoad(shiftMonth(S.month, 1)).then(function () { wRender(); }); };
     Array.prototype.forEach.call(host.querySelectorAll('[data-attx-sign]'), function (b) { b.onclick = function () { wOpenSign(b.getAttribute('data-attx-sign')); }; });
   }
+  // The server answer already carries the new status. If it does not, load it as before.
+  function wAfter(r) {
+    var st = r && r.data && r.data.status;
+    if (st && st.enabled !== false) { S.data = st; S.month = st.month; wRender(); }
+    else wLoad().then(function () { wRender(); });
+  }
   function wPress(purpose, btn) {
-    var pm = host.querySelector('#attx-pm');
-    function fin(r) { if (r.ok && r.data.ok !== false) { wLoad().then(function () { wRender(); }); } else { btn.disabled = false; pm.innerHTML = ''; msgBox(pm, 'err', errText(r.data.error)); } }
+    var pm = host.querySelector('#attx-pm'), busyKey = purpose === 'checkout' ? 'ckout' : 'ckin', done = function () {};
+    function fin(r) { if (r.ok && r.data.ok !== false) { wAfter(r); } else { done(); btn.disabled = false; pm.innerHTML = ''; msgBox(pm, 'err', errText(r.data.error)); } }
     if (S.data.settings && S.data.settings.mode === 'code') {
       pm.innerHTML = '<div class="attx-row" style="margin-top:10px"><button class="attx-btn sec" id="attx-rc">' + esc(L('sendCode')) + '</button></div><input class="attx-in attx-code" id="attx-pc" inputmode="numeric" maxlength="6" placeholder="••••••" aria-label="' + esc(L('enterCode')) + '"><button class="attx-btn" id="attx-pg">' + esc(L('confirm')) + '</button>';
       pm.querySelector('#attx-rc').onclick = function () { var b = this; b.disabled = true; call('w_request_code', { purpose: purpose }).then(function (r) { b.disabled = false; if (r.ok && r.data.ok) msgBox(pm, 'ok', L('codeSent')); else msgBox(pm, 'err', errText(r.data.error)); }); };
-      pm.querySelector('#attx-pg').onclick = function () { var c = pm.querySelector('#attx-pc').value.replace(/\D/g, ''); if (c.length < 4) return msgBox(pm, 'err', L('e_code_len')); this.disabled = true; call('w_press', { purpose: purpose, code: c, device: deviceId() }).then(function (r) { if (!(r.ok && r.data.ok !== false)) { var g = pm.querySelector('#attx-pg'); if (g) g.disabled = false; msgBox(pm, 'err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : '')); } else fin(r); }); };
+      pm.querySelector('#attx-pg').onclick = function () { var c = pm.querySelector('#attx-pc').value.replace(/\D/g, ''); if (c.length < 4) return msgBox(pm, 'err', L('e_code_len')); var gb = this, gdone = busyOn(gb, busyKey, true); call('w_press', { purpose: purpose, code: c, device: deviceId() }).then(function (r) { if (!(r.ok && r.data.ok !== false)) { gdone(); var g = pm.querySelector('#attx-pg'); if (g) g.disabled = false; msgBox(pm, 'err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : '')); } else fin(r); }); };
       return;
     }
-    btn.disabled = true; call('w_press', { purpose: purpose, device: deviceId() }).then(fin);
+    done = busyOn(btn, busyKey); call('w_press', { purpose: purpose, device: deviceId() }).then(fin);
   }
   function wOpenSign(month) {
     call('w_status', { month: month }).then(function (r) {
