@@ -15999,11 +15999,14 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       leaveNone: 'No leave (clear)', leaveAnnual: 'Annual leave', leaveSick: 'Sick leave', leaveOther: 'Other leave', saved: 'Saved.',
       setHead: 'Remote attendance settings', setSeal: 'Apply the company seal automatically after approval', setWork: 'Show work completed on the timesheet',
       setRemind: 'Remind the worker after (days)', setOverdue: 'Warn Admins when a Manager waits more than (days)', setStart: 'Work starts', setEnd: 'Work ends',
-      setGrace: 'Grace time (minutes)', setBreak: 'Break (minutes)', setMode: 'Check-in method', modeCode: 'Email code', modeReceipt: 'Button and receipt email',
+      setGrace: 'Grace time (minutes)', setBreak: 'Break (minutes)', setMode: 'Check-in method', modeCode: 'Email code', modeReceipt: 'Button and receipt email', modeButton: 'Button only (no code, no email)',
       logHead: 'Every email sent by this feature', colWhen: 'When', colTo: 'To', colSubject: 'Subject', colResult: 'Result', sent: 'Sent', failed: 'Failed',
       memberBox: 'Remote work attendance', memberOn: 'Remote worker: daily check-in and check-out', memberApprover: 'Who approves the monthly timesheet',
       memberSave: 'Save attendance setting', memberSaved: 'Saved. The worker received an email with the link.', memberSavedQuiet: 'Saved.',
       memberHint: 'When this is on, the worker sees the attendance box in the link and must check in and out every day.',
+      setRemOn: 'Send reminder emails to check in and check out', setRemBefore: 'Check-in reminder: minutes before work starts', setRemAfter: 'Check-out reminder: minutes after work ends',
+      setHolidays: 'Official holidays (one per line: date, then name)', setHolidaysHint: 'Example: 2026-12-02 National Day. No reminders are sent on these days, and they are not counted in the expected hours.',
+      e_bad_value: 'One of the values is not valid.', e_no_code_needed: 'No code is needed. Press the button directly.', e_bad_holiday: 'Line {0} of the holidays is not valid. Use the format 2026-12-02 National Day.',
       e_no_manager_link: 'This worker has no Manager Link yet, or it has no manager email. Create the Manager Link first.',
       e_no_email: 'This team member has no email address. Add it first.', e_not_admin: 'Only Admins can use this page.', e_no_session: 'Please sign in again.',
       e_bad_session: 'Please sign in again.', e_locked: 'This month is locked.', e_month_locked: 'This month is locked. Reopen the timesheet first.',
@@ -16041,11 +16044,14 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       leaveNone: 'بدون إجازة (إلغاء)', leaveAnnual: 'إجازة سنوية', leaveSick: 'إجازة مرضية', leaveOther: 'إجازة أخرى', saved: 'تم الحفظ.',
       setHead: 'إعدادات الحضور عن بُعد', setSeal: 'تطبيق ختم الشركة تلقائياً بعد الاعتماد', setWork: 'إظهار الأعمال المنجزة في الكشف',
       setRemind: 'تذكير الموظف بعد (أيام)', setOverdue: 'تنبيه المسؤولين عند تأخر المدير أكثر من (أيام)', setStart: 'بداية العمل', setEnd: 'نهاية العمل',
-      setGrace: 'فترة السماح (دقائق)', setBreak: 'الاستراحة (دقائق)', setMode: 'طريقة تسجيل الحضور', modeCode: 'رمز بالبريد', modeReceipt: 'زر مع رسالة إيصال',
+      setGrace: 'فترة السماح (دقائق)', setBreak: 'الاستراحة (دقائق)', setMode: 'طريقة تسجيل الحضور', modeCode: 'رمز بالبريد', modeReceipt: 'زر مع رسالة إيصال', modeButton: 'زر فقط (بدون رمز وبدون رسالة)',
       logHead: 'كل رسالة أرسلتها هذه الميزة', colWhen: 'الوقت', colTo: 'إلى', colSubject: 'الموضوع', colResult: 'النتيجة', sent: 'أُرسلت', failed: 'فشلت',
       memberBox: 'الحضور والانصراف للعمل عن بُعد', memberOn: 'عامل عن بُعد: حضور وانصراف يومي', memberApprover: 'من يعتمد الكشف الشهري',
       memberSave: 'حفظ إعداد الحضور', memberSaved: 'تم الحفظ. وصلت الموظف رسالة بالرابط.', memberSavedQuiet: 'تم الحفظ.',
       memberHint: 'عند التفعيل يرى الموظف صندوق الحضور في رابطه ويجب أن يسجّل الحضور والانصراف كل يوم.',
+      setRemOn: 'إرسال رسائل تذكير بتسجيل الحضور والانصراف', setRemBefore: 'تذكير الحضور: عدد الدقائق قبل بداية العمل', setRemAfter: 'تذكير الانصراف: عدد الدقائق بعد نهاية العمل',
+      setHolidays: 'العطل الرسمية (سطر لكل عطلة: التاريخ ثم الاسم)', setHolidaysHint: 'مثال: 2026-12-02 اليوم الوطني. لا تُرسل تذكيرات في هذه الأيام ولا تُحسب ضمن الساعات المتوقعة.',
+      e_bad_value: 'إحدى القيم غير صالحة.', e_bad_holiday: 'السطر {0} من العطل غير صالح. استخدم الصيغة 2026-12-02 اليوم الوطني.',
       e_no_manager_link: 'لا يوجد رابط مدير لهذا الموظف بعد، أو لا يحتوي على بريد المدير. أنشئ رابط المدير أولاً.',
       e_no_email: 'لا يوجد بريد إلكتروني لهذا العضو. أضفه أولاً.', e_not_admin: 'هذه الصفحة للمسؤولين فقط.', e_no_session: 'يرجى تسجيل الدخول مجدداً.',
       e_bad_session: 'يرجى تسجيل الدخول مجدداً.', e_locked: 'هذا الشهر مقفل.', e_month_locked: 'هذا الشهر مقفل. أعد فتح الكشف أولاً.',
@@ -16321,12 +16327,23 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       '<div class="attr-field"><label>' + E(L('setOverdue')) + '</label><input type="number" min="1" max="30" id="attr-s-over" value="' + E(s.manager_overdue_days) + '"></div>' +
       '<div class="attr-field"><label>' + E(L('setStart')) + '</label><input type="time" id="attr-s-start" value="' + E(s.work_start) + '"></div><div class="attr-field"><label>' + E(L('setEnd')) + '</label><input type="time" id="attr-s-end" value="' + E(s.work_end) + '"></div>' +
       '<div class="attr-field"><label>' + E(L('setGrace')) + '</label><input type="number" min="0" max="120" id="attr-s-grace" value="' + E(s.grace_minutes) + '"></div><div class="attr-field"><label>' + E(L('setBreak')) + '</label><input type="number" min="0" max="240" id="attr-s-brk" value="' + E(s.break_minutes) + '"></div></div>' +
-      '<div class="attr-field"><label>' + E(L('setMode')) + '</label><select id="attr-s-mode"><option value="code" ' + (s.checkin_mode !== 'receipt' ? 'selected' : '') + '>' + E(L('modeCode')) + '</option><option value="receipt" ' + (s.checkin_mode === 'receipt' ? 'selected' : '') + '>' + E(L('modeReceipt')) + '</option></select></div>';
+      '<label class="attr-field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="attr-s-remon" ' + ck(s.reminders_enabled) + '> ' + E(L('setRemOn')) + '</label>' +
+      '<div class="attr-grid2"><div class="attr-field"><label>' + E(L('setRemBefore')) + '</label><input type="number" min="0" max="180" id="attr-s-rembef" value="' + E(s.reminder_checkin_before) + '"></div>' +
+      '<div class="attr-field"><label>' + E(L('setRemAfter')) + '</label><input type="number" min="0" max="180" id="attr-s-remaft" value="' + E(s.reminder_checkout_after) + '"></div></div>' +
+      '<div class="attr-field"><label>' + E(L('setMode')) + '</label><select id="attr-s-mode"><option value="code" ' + (s.checkin_mode !== 'receipt' ? 'selected' : '') + '>' + E(L('modeCode')) + '</option><option value="receipt" ' + (s.checkin_mode === 'receipt' ? 'selected' : '') + '>' + E(L('modeReceipt')) + '</option><option value="button" ' + (s.checkin_mode === 'button' ? 'selected' : '') + '>' + E(L('modeButton')) + '</option></select></div>' +
+      '<div class="attr-field"><label>' + E(L('setHolidays')) + '</label><textarea id="attr-s-hol" rows="5" dir="ltr" style="font-family:monospace">' + E((s.holidays || []).map(function (h) { return h.date + ' ' + (h.name || ''); }).join('\n')) + '</textarea><div class="attr-note">' + E(L('setHolidaysHint')) + '</div></div>';
     openModal(L('setHead'), h, '<button class="btn ghost" onclick="closeModal()">' + E(L('cancel')) + '</button> <button class="btn" onclick="attrSaveSettings()">' + E(L('save')) + '</button>');
   };
   window.attrSaveSettings = async function () {
     var g = function (i) { return document.getElementById(i); };
-    var payload = { auto_seal: g('attr-s-seal').checked, show_work_completed: g('attr-s-work').checked, worker_reminder_days: g('attr-s-rem').value, manager_overdue_days: g('attr-s-over').value,
+    var hol = [], lines = (g('attr-s-hol').value || '').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].trim(); if (!ln) continue;
+      var mt = ln.match(/^(\d{4}-\d{2}-\d{2})\s*[,:\-–]?\s*(.*)$/);
+      if (!mt) { g('attr-setmsg').innerHTML = '<div class="attr-err">' + E(L('e_bad_holiday', i + 1)) + '</div>'; return; }
+      hol.push({ date: mt[1], name: mt[2] });
+    }
+    var payload = { reminders_enabled: g('attr-s-remon').checked, reminder_checkin_before: g('attr-s-rembef').value, reminder_checkout_after: g('attr-s-remaft').value, holidays: hol, auto_seal: g('attr-s-seal').checked, show_work_completed: g('attr-s-work').checked, worker_reminder_days: g('attr-s-rem').value, manager_overdue_days: g('attr-s-over').value,
       work_start: g('attr-s-start').value, work_end: g('attr-s-end').value, grace_minutes: g('attr-s-grace').value, break_minutes: g('attr-s-brk').value, checkin_mode: g('attr-s-mode').value };
     try { await api('a_settings', { settings: payload }); closeModal(); toast(L('saved')); refresh(false); }
     catch (e) { g('attr-setmsg').innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
