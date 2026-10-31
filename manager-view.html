@@ -1344,5 +1344,293 @@ function openMySubmissions() {
 
 loadPartnerView();
 </script>
+<script id="attx-script">
+/* ===== Remote attendance block (added). Everything is prefixed "attx". Does not touch existing code. ===== */
+(function () {
+  'use strict';
+  var ROLE = 'manager';           // 'worker' or 'manager'
+  var API = SUPABASE_URL + '/functions/v1/attendance';
+  var TOKEN = new URLSearchParams(window.location.search).get('token');
+  if (!TOKEN) return;
+  var S = { data: null, month: null, busy: false };
+
+  var D = {
+    en: {
+      title_w: 'Remote work attendance', title_m: 'Timesheet approvals',
+      today: 'Today', notIn: 'You have not checked in yet.', inAt: 'Checked in at', outAt: 'Checked out at', leaveToday: 'You are on leave today.',
+      checkin: 'Check in', checkout: 'Check out', done: 'Done for today.',
+      consentTitle: 'Before you start', consentText: 'To record your remote attendance, the system saves the time of each check-in and check-out, the date, your device type and your network address. This is used only for your monthly timesheet and for company records, and it is kept for 5 years. Each month you will confirm and sign your timesheet.',
+      consentBtn: 'I understand and agree',
+      sendCode: 'Send code to my email', codeSent: 'A code was sent to your email. It is valid for a few minutes.', enterCode: 'Enter the 6-digit code', confirm: 'Confirm', cancel: 'Cancel', close: 'Close', back: 'Back',
+      signNeeded: 'Timesheet ready for your signature', review: 'Review and sign', signTitle: 'Confirm and sign your timesheet',
+      iConfirm: 'I confirm that these records are correct.', drawSign: 'Draw your signature below', clear: 'Clear', signBtn: 'Sign timesheet',
+      signedOk: 'Your timesheet was signed and sent for approval.', approvedOk: 'The timesheet was approved and signed. The PDF is sent by email.',
+      month: 'Month', date: 'Date', inL: 'In', outL: 'Out', net: 'Net hours', notes: 'Notes',
+      days: 'Days worked', leave: 'Leave days', absent: 'Absent days', late: 'Late days', missing: 'Missing check-out', worked: 'Hours worked', expected: 'Expected hours', diff: 'Difference', ot: 'Overtime',
+      workDone: 'Work completed this month', noRows: 'No records for this month yet.',
+      sheets: 'Your timesheets', docNo: 'Document', status: 'Status', pdfMail: 'PDF sent by email',
+      st_draft: 'Waiting for your signature', st_awaiting_approver: 'Waiting for approval', st_approved: 'Approved and locked',
+      f_late: 'Late', f_missing: 'No check-out', f_early: 'Left early', f_newdev: 'New device', f_corrected: 'Corrected', f_overtime: 'Overtime', f_weekend: 'Weekend', f_holiday: 'Holiday', f_leave: 'Leave',
+      approver_manager: 'Your approver: your manager', approver_admin: 'Your approver: the administration',
+      mgrIntro: 'Remote worker', mgrNone: 'No timesheets yet.', mgrReview: 'Review and approve', mgrTitle: 'Approve timesheet', fullName: 'Your full name', fullNameHint: 'Type your full name as it will appear on the signature.', approveBtn: 'Approve and sign',
+      working: 'Please wait…', retry: 'Try again.',
+      e_bad_token: 'This link is not valid.', e_not_enabled: 'Remote attendance is not switched on for you.', e_consent_needed: 'Please accept the notice first.', e_no_email: 'No email address is saved for you. Please contact the administration.',
+      e_on_leave: 'You are on leave today.', e_already_in: 'You already checked in today.', e_no_check_in: 'You have not checked in today.', e_already_out: 'You already checked out today.', e_month_locked: 'This month is already approved and locked.',
+      e_no_code_needed: 'No code is needed.', e_code_wrong: 'The code is wrong.', e_code_expired: 'The code has expired. Request a new one.', e_code_locked: 'Too many wrong codes. Request a new code.', e_code_none: 'Request a code first.', e_too_many_codes: 'Too many codes requested. Please wait and try later.',
+      e_not_signable: 'This timesheet cannot be signed now.', e_not_approvable: 'This timesheet cannot be approved now.', e_not_yours: 'This timesheet is not assigned to you.', e_no_manager_email: 'No manager email is saved. Please contact the administration.',
+      e_name_required: 'Please type your full name.', e_bad_png: 'Please draw your signature.', e_assets_missing: 'The system is not fully set up yet. Please contact the administration.', e_server_error: 'Server error. Please try again.', e_net: 'No connection. Please try again.', e_sig: 'Please draw your signature.', e_confirm: 'Please tick the confirmation box.', e_code_len: 'Please enter the code.'
+    },
+    ar: {
+      title_w: 'حضور العمل عن بُعد', title_m: 'اعتماد كشوف الحضور',
+      today: 'اليوم', notIn: 'لم تسجّل حضورك بعد.', inAt: 'تم تسجيل الحضور الساعة', outAt: 'تم تسجيل الانصراف الساعة', leaveToday: 'أنت في إجازة اليوم.',
+      checkin: 'تسجيل الحضور', checkout: 'تسجيل الانصراف', done: 'اكتمل يومك.',
+      consentTitle: 'قبل أن تبدأ', consentText: 'لتسجيل حضورك عن بُعد، يحفظ النظام وقت كل حضور وانصراف، والتاريخ، ونوع جهازك وعنوان شبكتك. تُستخدم هذه البيانات لكشف الحضور الشهري وسجلات الشركة فقط، وتُحفظ لمدة 5 سنوات. وفي نهاية كل شهر ستؤكد كشفك وتوقّع عليه.',
+      consentBtn: 'أفهم وأوافق',
+      sendCode: 'أرسل الرمز إلى بريدي', codeSent: 'تم إرسال رمز إلى بريدك الإلكتروني. صالح لدقائق قليلة.', enterCode: 'أدخل الرمز المكوّن من 6 أرقام', confirm: 'تأكيد', cancel: 'إلغاء', close: 'إغلاق', back: 'رجوع',
+      signNeeded: 'كشف الحضور جاهز لتوقيعك', review: 'مراجعة وتوقيع', signTitle: 'أكّد كشف الحضور ووقّع عليه',
+      iConfirm: 'أؤكد أن هذه السجلات صحيحة.', drawSign: 'ارسم توقيعك في الأسفل', clear: 'مسح', signBtn: 'توقيع الكشف',
+      signedOk: 'تم توقيع الكشف وإرساله للاعتماد.', approvedOk: 'تم اعتماد الكشف وتوقيعه. تم إرسال ملف PDF بالبريد.',
+      month: 'الشهر', date: 'التاريخ', inL: 'الحضور', outL: 'الانصراف', net: 'صافي الساعات', notes: 'ملاحظات',
+      days: 'أيام العمل', leave: 'أيام الإجازة', absent: 'أيام الغياب', late: 'أيام التأخر', missing: 'انصراف غير مسجّل', worked: 'الساعات المنجزة', expected: 'الساعات المطلوبة', diff: 'الفرق', ot: 'ساعات إضافية',
+      workDone: 'الأعمال المنجزة هذا الشهر', noRows: 'لا توجد سجلات لهذا الشهر بعد.',
+      sheets: 'كشوفك', docNo: 'المستند', status: 'الحالة', pdfMail: 'تم إرسال PDF بالبريد',
+      st_draft: 'بانتظار توقيعك', st_awaiting_approver: 'بانتظار الاعتماد', st_approved: 'معتمد ومقفل',
+      f_late: 'تأخر', f_missing: 'بلا انصراف', f_early: 'انصراف مبكر', f_newdev: 'جهاز جديد', f_corrected: 'مصحّح', f_overtime: 'إضافي', f_weekend: 'عطلة أسبوعية', f_holiday: 'عطلة رسمية', f_leave: 'إجازة',
+      approver_manager: 'جهة الاعتماد: مديرك', approver_admin: 'جهة الاعتماد: الإدارة',
+      mgrIntro: 'موظف عن بُعد', mgrNone: 'لا توجد كشوف بعد.', mgrReview: 'مراجعة واعتماد', mgrTitle: 'اعتماد الكشف', fullName: 'اسمك الكامل', fullNameHint: 'اكتب اسمك الكامل كما سيظهر مع التوقيع.', approveBtn: 'اعتماد وتوقيع',
+      working: 'يرجى الانتظار…', retry: 'حاول مرة أخرى.',
+      e_bad_token: 'هذا الرابط غير صالح.', e_not_enabled: 'الحضور عن بُعد غير مفعّل لك.', e_consent_needed: 'يرجى الموافقة على الإشعار أولاً.', e_no_email: 'لا يوجد بريد إلكتروني محفوظ لك. تواصل مع الإدارة.',
+      e_on_leave: 'أنت في إجازة اليوم.', e_already_in: 'سجّلت حضورك اليوم بالفعل.', e_no_check_in: 'لم تسجّل حضورك اليوم.', e_already_out: 'سجّلت انصرافك اليوم بالفعل.', e_month_locked: 'هذا الشهر معتمد ومقفل.',
+      e_no_code_needed: 'لا حاجة لرمز.', e_code_wrong: 'الرمز غير صحيح.', e_code_expired: 'انتهت صلاحية الرمز. اطلب رمزاً جديداً.', e_code_locked: 'محاولات خاطئة كثيرة. اطلب رمزاً جديداً.', e_code_none: 'اطلب رمزاً أولاً.', e_too_many_codes: 'طلبات رموز كثيرة. انتظر ثم حاول لاحقاً.',
+      e_not_signable: 'لا يمكن توقيع هذا الكشف الآن.', e_not_approvable: 'لا يمكن اعتماد هذا الكشف الآن.', e_not_yours: 'هذا الكشف غير مُسند إليك.', e_no_manager_email: 'لا يوجد بريد للمدير. تواصل مع الإدارة.',
+      e_name_required: 'يرجى كتابة اسمك الكامل.', e_bad_png: 'يرجى رسم توقيعك.', e_assets_missing: 'النظام غير مكتمل الإعداد. تواصل مع الإدارة.', e_server_error: 'خطأ في الخادم. حاول مرة أخرى.', e_net: 'لا يوجد اتصال. حاول مرة أخرى.', e_sig: 'يرجى رسم توقيعك.', e_confirm: 'يرجى وضع علامة التأكيد.', e_code_len: 'يرجى إدخال الرمز.'
+    }
+  };
+  function lang() { return (typeof currentLang !== 'undefined' && currentLang === 'ar') ? 'ar' : 'en'; }
+  function L(k) { var d = D[lang()]; return d[k] != null ? d[k] : (D.en[k] != null ? D.en[k] : k); }
+  function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s == null ? '' : s) : String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function errText(code) { var k = 'e_' + code; var d = D[lang()]; return d[k] || (D.en[k] ? D.en[k] : L('e_server_error')); }
+  function deviceId() { try { var k = 'attx_dev', v = localStorage.getItem(k); if (!v) { v = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem(k, v); } return v; } catch (e) { return 'nodev'; } }
+  function fmtMin(m) { if (m == null) return '–'; var neg = m < 0; m = Math.abs(Math.round(m)); var h = Math.floor(m / 60), r = m % 60; var s = lang() === 'ar' ? (h + ' س ' + r + ' د') : (h + 'h ' + r + 'm'); return (neg ? '−' : '') + s; }
+  function fmtMonth(m) { try { var p = m.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, 1)).toLocaleDateString(lang() === 'ar' ? 'ar' : 'en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return m; } }
+  function fmtDay(d) { try { var p = d.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).toLocaleDateString(lang() === 'ar' ? 'ar' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (e) { return d; } }
+  function shiftMonth(m, n) { var p = m.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1 + n, 1)); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
+
+  function call(action, body) {
+    var b = { action: action, token: TOKEN }; for (var k in (body || {})) b[k] = body[k];
+    var ctl = new AbortController(); var to = setTimeout(function () { ctl.abort(); }, 25000);
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify(b), signal: ctl.signal, cache: 'no-store' })
+      .then(function (r) { clearTimeout(to); return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, data: j || {} }; }); })
+      .catch(function () { clearTimeout(to); return { ok: false, status: 0, data: { error: 'net' } }; });
+  }
+
+  // ---------- host + styles ----------
+  var st = document.createElement('style'); st.id = 'attx-style';
+  st.textContent = [
+    '#attx-host{margin:0 0 18px}',
+    '.attx-card{background:var(--bg-card,#fff);border:1px solid var(--line,#e4e0d6);border-radius:12px;box-shadow:var(--shadow,none);padding:16px 18px;margin-bottom:12px}',
+    '.attx-h{font-size:16px;font-weight:700;color:var(--accent,#1a3a52);margin:0 0 10px}',
+    '.attx-muted{color:var(--ink-muted,#5a6478);font-size:13px}',
+    '.attx-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}',
+    '.attx-btn{border:none;border-radius:9px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent,#1a3a52);color:#fff;font-family:inherit}',
+    '.attx-btn.sec{background:#fff;color:var(--accent,#1a3a52);border:1px solid var(--line-strong,#c8c2b0)}',
+    '.attx-btn.go{background:var(--green,#4a7c59)}.attx-btn.out{background:var(--amber,#c47e2a)}',
+    '.attx-btn[disabled]{opacity:.5;cursor:not-allowed}',
+    '.attx-big{font-size:15px;padding:13px 26px}',
+    '.attx-msg{margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px}',
+    '.attx-msg.err{background:var(--red-bg,#f5e0de);color:var(--red,#b04540)}.attx-msg.ok{background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59)}',
+    '.attx-banner{background:var(--amber-bg,#faf0e0);border:1px solid var(--amber,#c47e2a);border-radius:12px;padding:12px 16px;margin-bottom:12px}',
+    '.attx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:10px 0}',
+    '.attx-tile{background:var(--bg,#f5f3ee);border-radius:9px;padding:8px 10px}.attx-tile b{display:block;font-size:16px;color:var(--ink,#1a1f2e)}.attx-tile span{font-size:11px;color:var(--ink-muted,#5a6478)}',
+    '.attx-tw{overflow-x:auto}.attx-t{width:100%;border-collapse:collapse;font-size:13px}',
+    '.attx-t th,.attx-t td{padding:6px 8px;border-bottom:1px solid var(--line,#e4e0d6);text-align:start;white-space:nowrap}',
+    '.attx-t th{font-size:11px;color:var(--ink-muted,#5a6478);font-weight:600}',
+    '.attx-fl{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:99px;background:var(--amber-bg,#faf0e0);color:var(--amber,#c47e2a);margin-inline-end:4px}',
+    '.attx-nav{display:flex;align-items:center;gap:8px;margin-bottom:6px}.attx-nav b{min-width:130px;text-align:center}',
+    '.attx-ov{position:fixed;inset:0;background:rgba(26,31,46,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 12px}',
+    '.attx-md{background:var(--bg-card,#fff);border-radius:14px;max-width:640px;width:100%;padding:18px 20px}',
+    '.attx-in{width:100%;padding:10px 12px;border:1px solid var(--line-strong,#c8c2b0);border-radius:9px;font-size:15px;font-family:inherit;margin:6px 0}',
+    '.attx-code{letter-spacing:6px;text-align:center;font-size:20px;direction:ltr}',
+    '.attx-cv{width:100%;height:160px;border:1.5px dashed var(--line-strong,#c8c2b0);border-radius:10px;background:#fff;touch-action:none;display:block}',
+    '.attx-lbl{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:10px 0}',
+    '.attx-pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:99px;font-weight:600}',
+    '.attx-pill.draft{background:var(--amber-bg,#faf0e0);color:var(--amber,#c47e2a)}.attx-pill.awaiting_approver{background:#e6edf5;color:var(--accent,#1a3a52)}.attx-pill.approved{background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59)}'
+  ].join('\n');
+  document.head.appendChild(st);
+  var host = document.createElement('div'); host.id = 'attx-host';
+  var app = document.getElementById('app'); var wrap = app && app.parentNode;
+  if (!wrap) return;
+  wrap.insertBefore(host, app);
+  function setHTML(h) { host.innerHTML = h; }
+
+  // ---------- shared renderers ----------
+  function msgBox(el, kind, text) { var m = el.querySelector('.attx-msg'); if (!m) { m = document.createElement('div'); m.className = 'attx-msg'; el.appendChild(m); } m.className = 'attx-msg ' + kind; m.textContent = text; }
+  function tilesHtml(c) {
+    var t = (c && c.totals) || {};
+    var items = [['days', t.days], ['leave', t.leave], ['absent', t.absent], ['late', t.late], ['missing', t.missing]].map(function (x) { return '<div class="attx-tile"><b>' + esc(x[1] == null ? 0 : x[1]) + '</b><span>' + esc(L(x[0])) + '</span></div>'; });
+    items.push('<div class="attx-tile"><b>' + esc(fmtMin(t.workedMin)) + '</b><span>' + esc(L('worked')) + '</span></div>');
+    items.push('<div class="attx-tile"><b>' + esc(fmtMin(t.expectedMin)) + '</b><span>' + esc(L('expected')) + '</span></div>');
+    items.push('<div class="attx-tile"><b>' + esc(fmtMin(t.diffMin)) + '</b><span>' + esc(L('diff')) + '</span></div>');
+    if (t.otMin) items.push('<div class="attx-tile"><b>' + esc(fmtMin(t.otMin)) + '</b><span>' + esc(L('ot')) + '</span></div>');
+    return '<div class="attx-tiles">' + items.join('') + '</div>';
+  }
+  function tableHtml(c) {
+    var rows = (c && c.rows) || []; if (!rows.length) return '<div class="attx-muted">' + esc(L('noRows')) + '</div>';
+    var h = '<div class="attx-tw"><table class="attx-t"><thead><tr><th>' + esc(L('date')) + '</th><th>' + esc(L('inL')) + '</th><th>' + esc(L('outL')) + '</th><th>' + esc(L('net')) + '</th><th>' + esc(L('notes')) + '</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var fl = (r.flags || []).map(function (f) { return '<span class="attx-fl">' + esc(L('f_' + f)) + '</span>'; }).join('');
+      h += '<tr><td>' + esc(fmtDay(r.d)) + '</td><td style="direction:ltr">' + esc(r.in ? r.in.slice(0, 5) : '–') + '</td><td style="direction:ltr">' + esc(r.out ? r.out.slice(0, 5) : '–') + '</td><td>' + esc(r.net != null ? fmtMin(r.net) : '–') + '</td><td>' + fl + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+  function workHtml(c) {
+    var w = (c && c.work) || []; if (!c || !c.showWork || !w.length) return '';
+    var ar = lang() === 'ar';
+    return '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;font-size:13px">' + esc(L('workDone')) + ' (' + w.length + ')</summary><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:13px">' +
+      w.map(function (x) { return '<li>' + esc(ar ? (x.tAr || x.t) : (x.tEn || x.t)) + (x.p ? ' <span class="attx-muted">— ' + esc(ar ? (x.pAr || x.p) : (x.pEn || x.p)) + '</span>' : '') + '</li>'; }).join('') + '</ul></details>';
+  }
+  function statusPill(s) { return '<span class="attx-pill ' + esc(s) + '">' + esc(L('st_' + s)) + '</span>'; }
+
+  // ---------- modal + signature ----------
+  function openModal(html) { closeModal(); var ov = document.createElement('div'); ov.className = 'attx-ov'; ov.id = 'attx-ov'; ov.innerHTML = '<div class="attx-md">' + html + '</div>'; document.body.appendChild(ov); return ov; }
+  function closeModal() { var o = document.getElementById('attx-ov'); if (o) o.parentNode.removeChild(o); }
+  function sigPad(cv) {
+    cv.width = 640; cv.height = 200; var cx = cv.getContext('2d'); cx.lineWidth = 3; cx.lineCap = 'round'; cx.lineJoin = 'round'; cx.strokeStyle = '#111';
+    var down = false, drawn = false, pts = 0;
+    function pos(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+    cv.addEventListener('pointerdown', function (e) { down = true; var p = pos(e); cx.beginPath(); cx.moveTo(p.x, p.y); try { cv.setPointerCapture(e.pointerId); } catch (x) { } e.preventDefault(); });
+    cv.addEventListener('pointermove', function (e) { if (!down) return; var p = pos(e); cx.lineTo(p.x, p.y); cx.stroke(); pts++; if (pts > 6) drawn = true; e.preventDefault(); });
+    function up() { down = false; } cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    return { has: function () { return drawn; }, clear: function () { cx.clearRect(0, 0, cv.width, cv.height); drawn = false; pts = 0; }, png: function () { return cv.toDataURL('image/png'); } };
+  }
+  function signForm(o) {
+    // o: {title, content, needName, requestCodeBody, signAction, signBody(extra), onDone}
+    var ov = openModal(
+      '<div class="attx-h">' + esc(o.title) + '</div>' +
+      '<div class="attx-muted" style="margin-bottom:6px">' + esc(fmtMonth(o.content.month)) + (o.sub ? ' · ' + esc(o.sub) : '') + '</div>' + tilesHtml(o.content) + tableHtml(o.content) + workHtml(o.content) +
+      '<hr style="border:none;border-top:1px solid var(--line,#e4e0d6);margin:14px 0">' +
+      (o.needName ? '<label class="attx-muted">' + esc(L('fullName')) + '</label><input class="attx-in" id="attx-name" autocomplete="name"><div class="attx-muted" style="margin-bottom:6px">' + esc(L('fullNameHint')) + '</div>' : '') +
+      '<label class="attx-lbl"><input type="checkbox" id="attx-ck"><span>' + esc(L('iConfirm')) + '</span></label>' +
+      '<div class="attx-row"><button class="attx-btn sec" id="attx-sc">' + esc(L('sendCode')) + '</button></div>' +
+      '<input class="attx-in attx-code" id="attx-cd" inputmode="numeric" maxlength="6" placeholder="••••••" aria-label="' + esc(L('enterCode')) + '">' +
+      '<div class="attx-muted" style="margin:8px 0 4px">' + esc(L('drawSign')) + '</div><canvas class="attx-cv" id="attx-cv"></canvas>' +
+      '<div class="attx-row" style="margin-top:10px"><button class="attx-btn go" id="attx-go">' + esc(o.goLabel) + '</button><button class="attx-btn sec" id="attx-clr">' + esc(L('clear')) + '</button><button class="attx-btn sec" id="attx-x">' + esc(L('cancel')) + '</button></div><div id="attx-mm"></div>');
+    var pad = sigPad(ov.querySelector('#attx-cv')); var mm = ov.querySelector('#attx-mm');
+    function say(k, t) { mm.className = 'attx-msg ' + k; mm.textContent = t; }
+    ov.querySelector('#attx-x').onclick = closeModal;
+    ov.querySelector('#attx-clr').onclick = function () { pad.clear(); };
+    ov.querySelector('#attx-sc').onclick = function () {
+      var b = this; b.disabled = true; say('ok', L('working'));
+      call(o.codeAction, o.codeBody).then(function (r) { b.disabled = false; if (r.ok && r.data.ok) say('ok', L('codeSent')); else say('err', errText(r.data.error)); });
+    };
+    ov.querySelector('#attx-go').onclick = function () {
+      var b = this, name = o.needName ? ov.querySelector('#attx-name').value.trim() : null, code = ov.querySelector('#attx-cd').value.replace(/\D/g, '');
+      if (o.needName && name.length < 3) return say('err', L('e_name_required'));
+      if (!ov.querySelector('#attx-ck').checked) return say('err', L('e_confirm'));
+      if (code.length < 4) return say('err', L('e_code_len'));
+      if (!pad.has()) return say('err', L('e_sig'));
+      b.disabled = true; say('ok', L('working'));
+      var body = { sheetId: o.sheetId, code: code, signature: pad.png(), device: deviceId() }; if (o.needName) body.name = name;
+      call(o.signAction, body).then(function (r) {
+        b.disabled = false;
+        if (r.ok && r.data.ok) { closeModal(); o.onDone(r.data); } else say('err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : ''));
+      });
+    };
+    return ov;
+  }
+
+  // ---------- WORKER ----------
+  function wLoad(month) {
+    return call('w_status', month ? { month: month } : {}).then(function (r) {
+      if (!r.ok || !r.data || r.data.enabled === false) { setHTML(''); return null; }
+      S.data = r.data; S.month = r.data.month; return r.data;
+    });
+  }
+  function wRender(flash) {
+    var d = S.data; if (!d) return setHTML('');
+    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
+    if (!d.consent) {
+      h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p><button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
+      setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this; b.disabled = true; call('w_consent').then(function (r) { if (r.ok) wLoad().then(function () { wRender(); }); else { b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
+      return;
+    }
+    var rec = d.record || {}; var line, btn = '';
+    if (rec.leave) line = L('leaveToday');
+    else if (!rec.in) { line = L('notIn'); btn = '<button class="attx-btn go attx-big" id="attx-in">' + esc(L('checkin')) + '</button>'; }
+    else if (!rec.out) { line = L('inAt') + ' ' + rec.in; btn = '<button class="attx-btn out attx-big" id="attx-out">' + esc(L('checkout')) + '</button>'; }
+    else line = L('inAt') + ' ' + rec.in + ' · ' + L('outAt') + ' ' + rec.out + '. ' + L('done');
+    h += '<div class="attx-muted">' + esc(L('today')) + ' · ' + esc(fmtDay(d.today)) + ' · <span style="direction:ltr;display:inline-block">' + esc(d.serverTime) + '</span></div><p style="font-size:15px;margin:6px 0 10px">' + esc(line) + '</p><div class="attx-row">' + btn + '</div><div id="attx-pm"></div>';
+    h += '<div class="attx-muted" style="margin-top:8px">' + esc(L(d.approver === 'manager' ? 'approver_manager' : 'approver_admin')) + '</div></div>';
+    (d.pendingMonths || []).forEach(function (m) {
+      h += '<div class="attx-banner"><b>' + esc(L('signNeeded')) + ' — ' + esc(fmtMonth(m)) + '</b><div style="margin-top:8px"><button class="attx-btn" data-attx-sign="' + esc(m) + '">' + esc(L('review')) + '</button></div></div>';
+    });
+    if (flash) h += '<div class="attx-msg ok" style="margin-bottom:12px">' + esc(flash) + '</div>';
+    h += '<div class="attx-card"><div class="attx-nav"><button class="attx-btn sec" id="attx-pv">' + (lang() === 'ar' ? '›' : '‹') + '</button><b>' + esc(fmtMonth(d.month)) + '</b><button class="attx-btn sec" id="attx-nx">' + (lang() === 'ar' ? '‹' : '›') + '</button></div>' + tilesHtml(d.content) + tableHtml(d.content) + workHtml(d.content) + '</div>';
+    var sh = (d.sheets || []);
+    if (sh.length) h += '<div class="attx-card"><div class="attx-h">' + esc(L('sheets')) + '</div><div class="attx-tw"><table class="attx-t"><thead><tr><th>' + esc(L('month')) + '</th><th>' + esc(L('docNo')) + '</th><th>' + esc(L('status')) + '</th><th></th></tr></thead><tbody>' +
+      sh.map(function (s) { return '<tr><td>' + esc(fmtMonth(s.month)) + '</td><td style="direction:ltr">' + esc(s.docNo || '') + '</td><td>' + statusPill(s.status) + '</td><td class="attx-muted">' + (s.hasPdf ? esc(L('pdfMail')) : '') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+    setHTML(h);
+    var bin = host.querySelector('#attx-in'), bout = host.querySelector('#attx-out');
+    if (bin) bin.onclick = function () { wPress('checkin', bin); };
+    if (bout) bout.onclick = function () { wPress('checkout', bout); };
+    host.querySelector('#attx-pv').onclick = function () { wLoad(shiftMonth(S.month, -1)).then(function () { wRender(); }); };
+    host.querySelector('#attx-nx').onclick = function () { wLoad(shiftMonth(S.month, 1)).then(function () { wRender(); }); };
+    Array.prototype.forEach.call(host.querySelectorAll('[data-attx-sign]'), function (b) { b.onclick = function () { wOpenSign(b.getAttribute('data-attx-sign')); }; });
+  }
+  function wPress(purpose, btn) {
+    var pm = host.querySelector('#attx-pm');
+    function fin(r) { if (r.ok && r.data.ok !== false) { wLoad().then(function () { wRender(); }); } else { btn.disabled = false; pm.innerHTML = ''; msgBox(pm, 'err', errText(r.data.error)); } }
+    if (S.data.settings && S.data.settings.mode === 'code') {
+      pm.innerHTML = '<div class="attx-row" style="margin-top:10px"><button class="attx-btn sec" id="attx-rc">' + esc(L('sendCode')) + '</button></div><input class="attx-in attx-code" id="attx-pc" inputmode="numeric" maxlength="6" placeholder="••••••" aria-label="' + esc(L('enterCode')) + '"><button class="attx-btn" id="attx-pg">' + esc(L('confirm')) + '</button>';
+      pm.querySelector('#attx-rc').onclick = function () { var b = this; b.disabled = true; call('w_request_code', { purpose: purpose }).then(function (r) { b.disabled = false; if (r.ok && r.data.ok) msgBox(pm, 'ok', L('codeSent')); else msgBox(pm, 'err', errText(r.data.error)); }); };
+      pm.querySelector('#attx-pg').onclick = function () { var c = pm.querySelector('#attx-pc').value.replace(/\D/g, ''); if (c.length < 4) return msgBox(pm, 'err', L('e_code_len')); this.disabled = true; call('w_press', { purpose: purpose, code: c, device: deviceId() }).then(function (r) { if (!(r.ok && r.data.ok !== false)) { var g = pm.querySelector('#attx-pg'); if (g) g.disabled = false; msgBox(pm, 'err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : '')); } else fin(r); }); };
+      return;
+    }
+    btn.disabled = true; call('w_press', { purpose: purpose, device: deviceId() }).then(fin);
+  }
+  function wOpenSign(month) {
+    call('w_status', { month: month }).then(function (r) {
+      if (!r.ok || !r.data.enabled) return;
+      var sh = (r.data.sheets || []).filter(function (s) { return s.month === month && s.status === 'draft'; })[0];
+      if (!sh) return;
+      signForm({ title: L('signTitle'), content: r.data.content, sheetId: sh.id, needName: false, goLabel: L('signBtn'), codeAction: 'w_request_code', codeBody: { purpose: 'sign', sheetId: sh.id }, signAction: 'w_sign',
+        onDone: function () { wLoad().then(function () { wRender(L('signedOk')); }); } });
+    });
+  }
+
+  // ---------- MANAGER ----------
+  function mLoad() {
+    return call('m_status').then(function (r) {
+      if (!r.ok || !r.data || r.data.enabled === false) { setHTML(''); S.data = null; return null; }
+      S.data = r.data; return r.data;
+    });
+  }
+  function mRender(flash) {
+    var d = S.data; if (!d) return setHTML('');
+    var ar = lang() === 'ar', who = ar ? (d.workerAr || d.worker) : d.worker;
+    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_m')) + '</div><div class="attx-muted">' + esc(L('mgrIntro')) + ': <b>' + esc(who) + '</b></div>';
+    if (flash) h += '<div class="attx-msg ok">' + esc(flash) + '</div>';
+    if (!d.sheets.length) h += '<p class="attx-muted" style="margin-top:10px">' + esc(L('mgrNone')) + '</p>';
+    else h += '<div class="attx-tw" style="margin-top:10px"><table class="attx-t"><thead><tr><th>' + esc(L('month')) + '</th><th>' + esc(L('docNo')) + '</th><th>' + esc(L('status')) + '</th><th></th></tr></thead><tbody>' +
+      d.sheets.map(function (s) { return '<tr><td>' + esc(fmtMonth(s.month)) + '</td><td style="direction:ltr">' + esc(s.docNo || '') + '</td><td>' + statusPill(s.status) + '</td><td>' + (s.status === 'awaiting_approver' ? '<button class="attx-btn" data-attx-rv="' + esc(s.id) + '">' + esc(L('mgrReview')) + '</button>' : (s.hasPdf ? '<span class="attx-muted">' + esc(L('pdfMail')) + '</span>' : '')) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '</div>';
+    setHTML(h);
+    Array.prototype.forEach.call(host.querySelectorAll('[data-attx-rv]'), function (b) { b.onclick = function () { mOpen(b.getAttribute('data-attx-rv')); }; });
+  }
+  function mOpen(id) {
+    var s = (S.data.sheets || []).filter(function (x) { return x.id === id; })[0]; if (!s || !s.content) return;
+    var ar = lang() === 'ar';
+    signForm({ title: L('mgrTitle'), sub: ar ? (S.data.workerAr || S.data.worker) : S.data.worker, content: s.content, sheetId: id, needName: true, goLabel: L('approveBtn'), codeAction: 'm_request_code', codeBody: { sheetId: id }, signAction: 'm_sign',
+      onDone: function () { mLoad().then(function () { mRender(L('approvedOk')); }); } });
+  }
+
+  // ---------- start + language follow ----------
+  function repaint() { if (!S.data) return; if (ROLE === 'worker') wRender(); else mRender(); }
+  var prev = window.setLang;
+  if (typeof prev === 'function') window.setLang = function () { var r = prev.apply(this, arguments); try { repaint(); } catch (e) { } return r; };
+  if (ROLE === 'worker') wLoad().then(function (d) { if (d) wRender(); }); else mLoad().then(function (d) { if (d) mRender(); });
+})();
+
+</script>
 </body>
 </html>
