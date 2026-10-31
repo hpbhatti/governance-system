@@ -1660,6 +1660,7 @@ document.addEventListener('click', function(e) {
       f_late: 'Late', f_missing: 'No check-out', f_early: 'Left early', f_newdev: 'New device', f_corrected: 'Corrected', f_overtime: 'Overtime', f_weekend: 'Weekend', f_holiday: 'Holiday', f_leave: 'Leave',
       approver_manager: 'Your approver: your manager', approver_admin: 'Your approver: the administration',
       mgrIntro: 'Remote worker', mgrNone: 'No timesheets yet.', mgrReview: 'Review and approve', mgrTitle: 'Approve timesheet', fullName: 'Your full name', fullNameHint: 'Type your full name as it will appear on the signature.', approveBtn: 'Approve and sign',
+      empId: 'Employee ID', emailL: 'Email', workMode: 'Work mode', remote: 'Remote', signDirect: 'You confirm and sign here. No code is needed.',
       working: 'Please wait…', retry: 'Try again.',
       e_bad_token: 'This link is not valid.', e_not_enabled: 'Remote attendance is not switched on for you.', e_consent_needed: 'Please accept the notice first.', e_no_email: 'No email address is saved for you. Please contact the administration.',
       e_on_leave: 'You are on leave today.', e_already_in: 'You already checked in today.', e_no_check_in: 'You have not checked in today.', e_already_out: 'You already checked out today.', e_month_locked: 'This month is already approved and locked.',
@@ -1685,6 +1686,7 @@ document.addEventListener('click', function(e) {
       f_late: 'تأخر', f_missing: 'بلا انصراف', f_early: 'انصراف مبكر', f_newdev: 'جهاز جديد', f_corrected: 'مصحّح', f_overtime: 'إضافي', f_weekend: 'عطلة أسبوعية', f_holiday: 'عطلة رسمية', f_leave: 'إجازة',
       approver_manager: 'جهة الاعتماد: مديرك', approver_admin: 'جهة الاعتماد: الإدارة',
       mgrIntro: 'موظف عن بُعد', mgrNone: 'لا توجد كشوف بعد.', mgrReview: 'مراجعة واعتماد', mgrTitle: 'اعتماد الكشف', fullName: 'اسمك الكامل', fullNameHint: 'اكتب اسمك الكامل كما سيظهر مع التوقيع.', approveBtn: 'اعتماد وتوقيع',
+      empId: 'الرقم الوظيفي', emailL: 'البريد الإلكتروني', workMode: 'نمط العمل', remote: 'عن بُعد', signDirect: 'تؤكد وتوقّع هنا مباشرة. لا حاجة لرمز.',
       working: 'يرجى الانتظار…', retry: 'حاول مرة أخرى.',
       e_bad_token: 'هذا الرابط غير صالح.', e_not_enabled: 'الحضور عن بُعد غير مفعّل لك.', e_consent_needed: 'يرجى الموافقة على الإشعار أولاً.', e_no_email: 'لا يوجد بريد إلكتروني محفوظ لك. تواصل مع الإدارة.',
       e_on_leave: 'أنت في إجازة اليوم.', e_already_in: 'سجّلت حضورك اليوم بالفعل.', e_no_check_in: 'لم تسجّل حضورك اليوم.', e_already_out: 'سجّلت انصرافك اليوم بالفعل.', e_month_locked: 'هذا الشهر معتمد ومقفل.',
@@ -1740,6 +1742,13 @@ document.addEventListener('click', function(e) {
     '.attx-code{letter-spacing:6px;text-align:center;font-size:20px;direction:ltr}',
     '.attx-cv{width:100%;height:160px;border:1.5px dashed var(--line-strong,#c8c2b0);border-radius:10px;background:#fff;touch-action:none;display:block}',
     '.attx-lbl{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:10px 0}',
+    '.attx-id{background:var(--bg-card,#fff);border:1px solid var(--line,#e4e0d6);border-radius:14px;box-shadow:var(--shadow,none);overflow:hidden;margin-bottom:12px}',
+    '.attx-idtop{background:var(--accent,#1a3a52);color:#fff;padding:14px 18px;display:flex;gap:14px;align-items:center}',
+    '.attx-av{width:48px;height:48px;border-radius:50%;background:var(--gold,#c9a96e);color:var(--accent,#1a3a52);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex:none}',
+    '.attx-idn{font-size:18px;font-weight:700;line-height:1.25}.attx-idd{font-size:13px;opacity:.85;margin-top:2px}',
+    '.attx-idb{padding:10px 18px;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px}',
+    '.attx-idb span{color:var(--ink-muted,#5a6478);font-size:12px;padding-top:2px}.attx-idb b{font-weight:600;word-break:break-all}',
+    '.attx-chip{display:inline-block;background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59);border-radius:99px;padding:1px 10px;font-weight:700;letter-spacing:.5px;direction:ltr}',
     '.attx-pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:99px;font-weight:600}',
     '.attx-pill.draft{background:var(--amber-bg,#faf0e0);color:var(--amber,#c47e2a)}.attx-pill.awaiting_approver{background:#e6edf5;color:var(--accent,#1a3a52)}.attx-pill.approved{background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59)}'
   ].join('\n');
@@ -1798,26 +1807,26 @@ document.addEventListener('click', function(e) {
       '<hr style="border:none;border-top:1px solid var(--line,#e4e0d6);margin:14px 0">' +
       (o.needName ? '<label class="attx-muted">' + esc(L('fullName')) + '</label><input class="attx-in" id="attx-name" autocomplete="name"><div class="attx-muted" style="margin-bottom:6px">' + esc(L('fullNameHint')) + '</div>' : '') +
       '<label class="attx-lbl"><input type="checkbox" id="attx-ck"><span>' + esc(L('iConfirm')) + '</span></label>' +
-      '<div class="attx-row"><button class="attx-btn sec" id="attx-sc">' + esc(L('sendCode')) + '</button></div>' +
-      '<input class="attx-in attx-code" id="attx-cd" inputmode="numeric" maxlength="6" placeholder="••••••" aria-label="' + esc(L('enterCode')) + '">' +
-      '<div class="attx-muted" style="margin:8px 0 4px">' + esc(L('drawSign')) + '</div><canvas class="attx-cv" id="attx-cv"></canvas>' +
+      (o.noCode ? '' : '<div class="attx-row"><button class="attx-btn sec" id="attx-sc">' + esc(L('sendCode')) + '</button></div>' +
+      '<input class="attx-in attx-code" id="attx-cd" inputmode="numeric" maxlength="6" placeholder="••••••" aria-label="' + esc(L('enterCode')) + '">') +
+      (o.noCode ? '<div class="attx-muted" style="margin-top:8px">' + esc(L('signDirect')) + '</div>' : '') + '<div class="attx-muted" style="margin:8px 0 4px">' + esc(L('drawSign')) + '</div><canvas class="attx-cv" id="attx-cv"></canvas>' +
       '<div class="attx-row" style="margin-top:10px"><button class="attx-btn go" id="attx-go">' + esc(o.goLabel) + '</button><button class="attx-btn sec" id="attx-clr">' + esc(L('clear')) + '</button><button class="attx-btn sec" id="attx-x">' + esc(L('cancel')) + '</button></div><div id="attx-mm"></div>');
     var pad = sigPad(ov.querySelector('#attx-cv')); var mm = ov.querySelector('#attx-mm');
     function say(k, t) { mm.className = 'attx-msg ' + k; mm.textContent = t; }
     ov.querySelector('#attx-x').onclick = closeModal;
     ov.querySelector('#attx-clr').onclick = function () { pad.clear(); };
-    ov.querySelector('#attx-sc').onclick = function () {
+    if (!o.noCode) ov.querySelector('#attx-sc').onclick = function () {
       var b = this; b.disabled = true; say('ok', L('working'));
       call(o.codeAction, o.codeBody).then(function (r) { b.disabled = false; if (r.ok && r.data.ok) say('ok', L('codeSent')); else say('err', errText(r.data.error)); });
     };
     ov.querySelector('#attx-go').onclick = function () {
-      var b = this, name = o.needName ? ov.querySelector('#attx-name').value.trim() : null, code = ov.querySelector('#attx-cd').value.replace(/\D/g, '');
+      var b = this, name = o.needName ? ov.querySelector('#attx-name').value.trim() : null, code = o.noCode ? '' : ov.querySelector('#attx-cd').value.replace(/\D/g, '');
       if (o.needName && name.length < 3) return say('err', L('e_name_required'));
       if (!ov.querySelector('#attx-ck').checked) return say('err', L('e_confirm'));
-      if (code.length < 4) return say('err', L('e_code_len'));
+      if (!o.noCode && code.length < 4) return say('err', L('e_code_len'));
       if (!pad.has()) return say('err', L('e_sig'));
       b.disabled = true; say('ok', L('working'));
-      var body = { sheetId: o.sheetId, code: code, signature: pad.png(), device: deviceId() }; if (o.needName) body.name = name;
+      var body = { sheetId: o.sheetId, signature: pad.png(), device: deviceId() }; if (!o.noCode) body.code = code; if (o.needName) body.name = name;
       call(o.signAction, body).then(function (r) {
         b.disabled = false;
         if (r.ok && r.data.ok) { closeModal(); o.onDone(r.data); } else say('err', errText(r.data.error) + (r.data.left != null && r.data.error === 'code_wrong' ? ' (' + r.data.left + ')' : ''));
@@ -1826,6 +1835,14 @@ document.addEventListener('click', function(e) {
     return ov;
   }
 
+  function idCard(nameEn, nameAr, designation, empId, email) {
+    var nm = lang() === 'ar' ? (nameAr || nameEn) : (nameEn || nameAr), ini = '';
+    String(nm || '').trim().split(/\s+/).slice(0, 2).forEach(function (w) { ini += w.charAt(0); });
+    return '<div class="attx-id"><div class="attx-idtop"><div class="attx-av">' + esc(ini.toUpperCase()) + '</div><div><div class="attx-idn">' + esc(nm) + '</div>' + (designation ? '<div class="attx-idd">' + esc(designation) + '</div>' : '') + '</div></div>' +
+      '<div class="attx-idb"><span>' + esc(L('empId')) + '</span><b>' + (empId ? '<i class="attx-chip" style="font-style:normal">' + esc(empId) + '</i>' : '–') + '</b>' +
+      (email ? '<span>' + esc(L('emailL')) + '</span><b style="direction:ltr;text-align:start">' + esc(email) + '</b>' : '') +
+      '<span>' + esc(L('workMode')) + '</span><b>' + esc(L('remote')) + '</b></div></div>';
+  }
   // ---------- WORKER ----------
   function wLoad(month) {
     return call('w_status', month ? { month: month } : {}).then(function (r) {
@@ -1835,7 +1852,7 @@ document.addEventListener('click', function(e) {
   }
   function wRender(flash) {
     var d = S.data; if (!d) return setHTML('');
-    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
+    var h = idCard(d.name, d.nameAr, d.designation, d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
     if (!d.consent) {
       h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p><button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
       setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this; b.disabled = true; call('w_consent').then(function (r) { if (r.ok) wLoad().then(function () { wRender(); }); else { b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
@@ -1880,7 +1897,7 @@ document.addEventListener('click', function(e) {
       if (!r.ok || !r.data.enabled) return;
       var sh = (r.data.sheets || []).filter(function (s) { return s.month === month && s.status === 'draft'; })[0];
       if (!sh) return;
-      signForm({ title: L('signTitle'), content: r.data.content, sheetId: sh.id, needName: false, goLabel: L('signBtn'), codeAction: 'w_request_code', codeBody: { purpose: 'sign', sheetId: sh.id }, signAction: 'w_sign',
+      signForm({ title: L('signTitle'), content: r.data.content, sheetId: sh.id, needName: false, noCode: true, goLabel: L('signBtn'), signAction: 'w_sign',
         onDone: function () { wLoad().then(function () { wRender(L('signedOk')); }); } });
     });
   }
@@ -1895,7 +1912,7 @@ document.addEventListener('click', function(e) {
   function mRender(flash) {
     var d = S.data; if (!d) return setHTML('');
     var ar = lang() === 'ar', who = ar ? (d.workerAr || d.worker) : d.worker;
-    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_m')) + '</div><div class="attx-muted">' + esc(L('mgrIntro')) + ': <b>' + esc(who) + '</b></div>';
+    var h = '<div class="attx-card"><div class="attx-h">' + esc(L('title_m')) + '</div><div class="attx-muted">' + esc(L('mgrIntro')) + ': <b>' + esc(who) + '</b>' + (d.workerId ? ' · <span class="attx-chip">' + esc(d.workerId) + '</span>' : '') + (d.workerDesignation ? ' · ' + esc(d.workerDesignation) : '') + '</div>';
     if (flash) h += '<div class="attx-msg ok">' + esc(flash) + '</div>';
     if (!d.sheets.length) h += '<p class="attx-muted" style="margin-top:10px">' + esc(L('mgrNone')) + '</p>';
     else h += '<div class="attx-tw" style="margin-top:10px"><table class="attx-t"><thead><tr><th>' + esc(L('month')) + '</th><th>' + esc(L('docNo')) + '</th><th>' + esc(L('status')) + '</th><th></th></tr></thead><tbody>' +
@@ -1907,7 +1924,7 @@ document.addEventListener('click', function(e) {
   function mOpen(id) {
     var s = (S.data.sheets || []).filter(function (x) { return x.id === id; })[0]; if (!s || !s.content) return;
     var ar = lang() === 'ar';
-    signForm({ title: L('mgrTitle'), sub: ar ? (S.data.workerAr || S.data.worker) : S.data.worker, content: s.content, sheetId: id, needName: true, goLabel: L('approveBtn'), codeAction: 'm_request_code', codeBody: { sheetId: id }, signAction: 'm_sign',
+    signForm({ title: L('mgrTitle'), sub: (ar ? (S.data.workerAr || S.data.worker) : S.data.worker) + (S.data.workerId ? ' · ' + S.data.workerId : '') + (S.data.workerDesignation ? ' · ' + S.data.workerDesignation : ''), content: s.content, sheetId: id, needName: true, goLabel: L('approveBtn'), codeAction: 'm_request_code', codeBody: { sheetId: id }, signAction: 'm_sign',
       onDone: function () { mLoad().then(function () { mRender(L('approvedOk')); }); } });
   }
 
