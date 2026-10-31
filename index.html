@@ -6331,7 +6331,8 @@ async function applyContentLanguage(lang) {
   for (const m of missing) {
     const ok = await ensureBilingual(m.obj, m.key, lang, m.force);
     if (ok) {
-      m.obj[m.key] = m.obj[m.key + cap];
+      // Show the slot of the language that is active NOW. The user may have switched back while this ran.
+      { const _cc = currentLang === 'ar' ? 'Ar' : 'En'; if (m.obj[m.key + _cc]) m.obj[m.key] = m.obj[m.key + _cc]; }
       changedSinceLastPaint = true;
     }
     // else: it already shows the honest other-language fallback from above —
@@ -6537,6 +6538,9 @@ function saveTeamMember(id) {
     toast(t('toastSavedChanges'));
     markRowDirty('internal_team', newM.id);
   }
+  // Same as projects and tasks: translate the designation into the other language in the background after saving.
+  { const _tmObj = id ? getTeamMember(id) : state.team[state.team.length - 1];
+    if (_tmObj && _tmObj.role) ensureBilingual(_tmObj, 'role', detectContentLang(_tmObj.role) === 'ar' ? 'en' : 'ar').then(ok => { if (ok) saveState(); }); }
   saveState();
   closeModal();
   render(state.detailParam);
