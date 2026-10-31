@@ -6493,6 +6493,10 @@ function showTeamMemberForm(memberId) {
       <label>${t('fieldMemberRole')}</label>
       <input id="f-member-role" value="${escapeHtml(editing?.role || '')}" placeholder="${t('fieldMemberRolePh')}">
     </div>
+    <div class="form-row">
+      <label>${currentLang === 'ar' ? 'الرقم الوظيفي (اختياري)' : 'Employee ID (optional)'}</label>
+      <input id="f-member-empid" dir="ltr" value="${escapeHtml(editing?.employeeId || '')}" placeholder="SOE-1003">
+    </div>
   `;
   const foot = `
     <button class="btn" onclick="saveTeamMember('${memberId || ''}')">${editing ? t('saveChanges') : t('addTeamMember')}</button>
@@ -6504,11 +6508,16 @@ function showTeamMemberForm(memberId) {
 function saveTeamMember(id) {
   const name = document.getElementById('f-member-name').value.trim();
   if (!name) { formError(t('alertMemberNameRequired')); return; }
+  const empIdEl = document.getElementById('f-member-empid');
+  const empIdVal = empIdEl ? empIdEl.value.trim().toUpperCase() : '';
+  if (empIdVal && !/^SOE-\d{3,6}$/.test(empIdVal)) { formError(currentLang === 'ar' ? 'صيغة الرقم الوظيفي غير صحيحة. مثال: SOE-1003' : 'Employee ID format is not valid. Example: SOE-1003'); return; }
+  if (empIdVal && state.team.some(m => m.id !== id && String(m.employeeId || '').toUpperCase() === empIdVal)) { formError(currentLang === 'ar' ? 'هذا الرقم الوظيفي مستخدم لموظف آخر.' : 'This Employee ID is already used by another member.'); return; }
   const data = {
     name,
     email: document.getElementById('f-member-email').value.trim(),
     role: document.getElementById('f-member-role').value.trim()
   };
+  if (empIdEl) data.employeeId = empIdVal;
   if (id) {
     const m = getTeamMember(id);
     Object.assign(m, data);
@@ -15999,7 +16008,7 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       leaveNone: 'No leave (clear)', leaveAnnual: 'Annual leave', leaveSick: 'Sick leave', leaveOther: 'Other leave', saved: 'Saved.',
       setHead: 'Remote attendance settings', setSeal: 'Apply the company seal automatically after approval', setWork: 'Show work completed on the timesheet',
       setRemind: 'Remind the worker after (days)', setOverdue: 'Warn Admins when a Manager waits more than (days)', setStart: 'Work starts', setEnd: 'Work ends',
-      setGrace: 'Grace time (minutes)', setBreak: 'Break (minutes)', setMode: 'Check-in method', modeCode: 'Email code', modeReceipt: 'Button and receipt email', modeButton: 'Button only (no code, no email)',
+      setGrace: 'Grace time (minutes)', setBreak: 'Break (minutes)', setMode: 'Check-in method', modeCode: 'Email code', modeReceipt: 'Button and receipt email', modeButton: 'Online – Company System (no code, no email)', setAdminMail: 'Send Admin emails to', admBoth: 'Both Admins',
       logHead: 'Every email sent by this feature', colWhen: 'When', colTo: 'To', colSubject: 'Subject', colResult: 'Result', sent: 'Sent', failed: 'Failed',
       memberBox: 'Remote work attendance', memberOn: 'Remote worker: daily check-in and check-out', memberApprover: 'Who approves the monthly timesheet',
       memberSave: 'Save attendance setting', memberSaved: 'Saved. The worker received an email with the link.', memberSavedQuiet: 'Saved.',
@@ -16044,7 +16053,7 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       leaveNone: 'بدون إجازة (إلغاء)', leaveAnnual: 'إجازة سنوية', leaveSick: 'إجازة مرضية', leaveOther: 'إجازة أخرى', saved: 'تم الحفظ.',
       setHead: 'إعدادات الحضور عن بُعد', setSeal: 'تطبيق ختم الشركة تلقائياً بعد الاعتماد', setWork: 'إظهار الأعمال المنجزة في الكشف',
       setRemind: 'تذكير الموظف بعد (أيام)', setOverdue: 'تنبيه المسؤولين عند تأخر المدير أكثر من (أيام)', setStart: 'بداية العمل', setEnd: 'نهاية العمل',
-      setGrace: 'فترة السماح (دقائق)', setBreak: 'الاستراحة (دقائق)', setMode: 'طريقة تسجيل الحضور', modeCode: 'رمز بالبريد', modeReceipt: 'زر مع رسالة إيصال', modeButton: 'زر فقط (بدون رمز وبدون رسالة)',
+      setGrace: 'فترة السماح (دقائق)', setBreak: 'الاستراحة (دقائق)', setMode: 'طريقة تسجيل الحضور', modeCode: 'رمز بالبريد', modeReceipt: 'زر مع رسالة إيصال', modeButton: 'إلكتروني – نظام الشركة (بدون رمز وبدون رسالة)', setAdminMail: 'إرسال رسائل المسؤولين إلى', admBoth: 'كلا المسؤولين',
       logHead: 'كل رسالة أرسلتها هذه الميزة', colWhen: 'الوقت', colTo: 'إلى', colSubject: 'الموضوع', colResult: 'النتيجة', sent: 'أُرسلت', failed: 'فشلت',
       memberBox: 'الحضور والانصراف للعمل عن بُعد', memberOn: 'عامل عن بُعد: حضور وانصراف يومي', memberApprover: 'من يعتمد الكشف الشهري',
       memberSave: 'حفظ إعداد الحضور', memberSaved: 'تم الحفظ. وصلت الموظف رسالة بالرابط.', memberSavedQuiet: 'تم الحفظ.',
@@ -16331,6 +16340,7 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       '<div class="attr-grid2"><div class="attr-field"><label>' + E(L('setRemBefore')) + '</label><input type="number" min="0" max="180" id="attr-s-rembef" value="' + E(s.reminder_checkin_before) + '"></div>' +
       '<div class="attr-field"><label>' + E(L('setRemAfter')) + '</label><input type="number" min="0" max="180" id="attr-s-remaft" value="' + E(s.reminder_checkout_after) + '"></div></div>' +
       '<div class="attr-field"><label>' + E(L('setMode')) + '</label><select id="attr-s-mode"><option value="code" ' + (s.checkin_mode !== 'receipt' ? 'selected' : '') + '>' + E(L('modeCode')) + '</option><option value="receipt" ' + (s.checkin_mode === 'receipt' ? 'selected' : '') + '>' + E(L('modeReceipt')) + '</option><option value="button" ' + (s.checkin_mode === 'button' ? 'selected' : '') + '>' + E(L('modeButton')) + '</option></select></div>' +
+      '<div class="attr-field"><label>' + E(L('setAdminMail')) + '</label><select id="attr-s-adm"><option value="both" ' + ((s.admin_mail_to || 'both') === 'both' ? 'selected' : '') + '>' + E(L('admBoth')) + '</option>' + ((S.ov && S.ov.admins) || []).map(function (a) { return '<option value="' + E(a.email) + '" ' + (String(s.admin_mail_to || '').toLowerCase() === String(a.email).toLowerCase() ? 'selected' : '') + '>' + E(a.name || a.email) + ' (' + E(a.email) + ')</option>'; }).join('') + '</select></div>' +
       '<div class="attr-field"><label>' + E(L('setHolidays')) + '</label><textarea id="attr-s-hol" rows="5" dir="ltr" style="font-family:monospace">' + E((s.holidays || []).map(function (h) { return h.date + ' ' + (h.name || ''); }).join('\n')) + '</textarea><div class="attr-note">' + E(L('setHolidaysHint')) + '</div></div>';
     openModal(L('setHead'), h, '<button class="btn ghost" onclick="closeModal()">' + E(L('cancel')) + '</button> <button class="btn" onclick="attrSaveSettings()">' + E(L('save')) + '</button>');
   };
@@ -16344,7 +16354,7 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
       hol.push({ date: mt[1], name: mt[2] });
     }
     var payload = { reminders_enabled: g('attr-s-remon').checked, reminder_checkin_before: g('attr-s-rembef').value, reminder_checkout_after: g('attr-s-remaft').value, holidays: hol, auto_seal: g('attr-s-seal').checked, show_work_completed: g('attr-s-work').checked, worker_reminder_days: g('attr-s-rem').value, manager_overdue_days: g('attr-s-over').value,
-      work_start: g('attr-s-start').value, work_end: g('attr-s-end').value, grace_minutes: g('attr-s-grace').value, break_minutes: g('attr-s-brk').value, checkin_mode: g('attr-s-mode').value };
+      work_start: g('attr-s-start').value, work_end: g('attr-s-end').value, grace_minutes: g('attr-s-grace').value, break_minutes: g('attr-s-brk').value, checkin_mode: g('attr-s-mode').value, admin_mail_to: g('attr-s-adm').value };
     try { await api('a_settings', { settings: payload }); closeModal(); toast(L('saved')); refresh(false); }
     catch (e) { g('attr-setmsg').innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
   };
