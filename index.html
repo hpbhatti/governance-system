@@ -5992,7 +5992,7 @@ function collectUntranslatedStrings() {
     (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); });
     for (let i = before; i < items.length; i++) items[i].parentPartner = p;
   });
-  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
+  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); maybeAdd(m, 'role'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -6076,7 +6076,7 @@ function collectUntranslatedStringsToArabic() {
     (p.team || []).forEach(m => { m.__table = 'partners'; maybeAdd(m, 'name'); });
     for (let i = before; i < items.length; i++) items[i].parentPartner = p;
   });
-  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); });
+  state.team.forEach(m => { m.__table = 'internal_team'; maybeAdd(m, 'name'); maybeAdd(m, 'role'); });
   state.projects.forEach(p => { p.__table = 'projects'; maybeAdd(p, 'name'); maybeAdd(p, 'description'); });
   return items;
 }
@@ -6258,6 +6258,7 @@ function migrateBilingualContent() {
   });
   (state.team || []).forEach(m => {
     mig(m, 'name');
+    mig(m, 'role');
   });
 }
 
@@ -6314,6 +6315,7 @@ async function applyContentLanguage(lang) {
   });
   (state.team || []).forEach(m => {
     applyField(m, 'name');
+    applyField(m, 'role');
   });
   (state.projects || []).forEach(p => {
     applyField(p, 'name');
@@ -6520,13 +6522,17 @@ function saveTeamMember(id) {
   if (empIdEl) data.employeeId = empIdVal;
   if (id) {
     const m = getTeamMember(id);
+    const _prevRole = m.role;
     Object.assign(m, data);
     if (m.name) setBilingualField(m, 'name', m.name);
+    if (m.role && m.role !== _prevRole) setBilingualField(m, 'role', m.role);
+    else if (!m.role) { m.roleEn = ''; m.roleAr = ''; }
     toast(t('toastSavedChanges'));
     markRowDirty('internal_team', id);
   } else {
     const newM = { id: 'tm_' + uid(), ...data, createdAt: todayDate() };
     if (newM.name) setBilingualField(newM, 'name', newM.name);
+    if (newM.role) setBilingualField(newM, 'role', newM.role);
     state.team.push(newM);
     toast(t('toastSavedChanges'));
     markRowDirty('internal_team', newM.id);
