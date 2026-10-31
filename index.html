@@ -15700,7 +15700,7 @@ document.getElementById('auth-email').addEventListener('keydown', function(e) { 
       // links like the PMO notification email's "#pendingApprovals" CTA
       // never actually landed anywhere but the dashboard. This is the read
       // side of the same hash that navigate() now writes on every click.
-      const _KNOWN_HASH_VIEWS = ['dashboard','agenda','reports','reportsArchive','pendingApprovals','calendar','calAgenda','team','partners','projects','actions','meetings','scoringSettings'];
+      const _KNOWN_HASH_VIEWS = ['dashboard','agenda','reports','reportsArchive','pendingApprovals','calendar','calAgenda','team','partners','projects','actions','meetings','scoringSettings','remoteAttendance'];
       const _rawHash = (window.location.hash || '').replace(/^#/, '');
       const [_hashView, _hashParam] = _rawHash.split('/');
       if (_hashView && _KNOWN_HASH_VIEWS.includes(_hashView)) {
@@ -15928,5 +15928,448 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   if (document.body) weStart(); else document.addEventListener('DOMContentLoaded', weStart);
 })();
 </script>
+<!-- ===================== REMOTE ATTENDANCE (Admin) — added block =====================
+     Separate from all existing code. Everything here uses the prefix "attr".
+     It talks only to the "attendance" Edge Function. It does not read or write
+     any existing table. ============================================================ -->
+<style id="attr-style">
+  .attr-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .attr-card { background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .attr-h { font-size:15px; font-weight:600; margin:22px 0 10px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  .attr-tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .attr-tab { border:1px solid var(--line); background:var(--bg-card); color:var(--ink-muted); border-radius:20px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+  .attr-tab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .attr-nav-badge { background:var(--red); color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-inline-start:auto; font-family:'Reem Kufi',serif; }
+  .attr-field { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; font-size:13px; color:var(--ink-muted); }
+  .attr-field input, .attr-field select, .attr-field textarea { padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); font-size:14px; font-family:inherit; color:var(--ink); }
+  .attr-note { font-size:12px; color:var(--ink-faint); line-height:1.6; }
+  .attr-err { background:#fbeae9; color:#9b2c2c; border:1px solid #f0c0bd; border-radius:8px; padding:9px 12px; font-size:13px; margin-bottom:12px; }
+  .attr-ok { background:var(--green-bg); color:var(--green); border:1px solid rgba(74,124,89,.3); border-radius:8px; padding:9px 12px; font-size:13px; margin-bottom:12px; }
+  .attr-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0 14px; }
+  .attr-tile { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .attr-tile b { display:block; font-size:18px; color:var(--accent); font-family:'Reem Kufi',serif; }
+  .attr-tile span { font-size:11px; color:var(--ink-muted); }
+  .attr-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .attr-tbl th { text-align:start; font-weight:600; color:var(--ink-muted); padding:6px 8px; border-bottom:1px solid var(--line); background:var(--bg); }
+  .attr-tbl td { padding:6px 8px; border-bottom:1px solid var(--line); }
+  .attr-scroll { max-height:300px; overflow:auto; border:1px solid var(--line); border-radius:8px; margin-bottom:12px; }
+  .attr-sigwrap { border:1px dashed var(--line-strong); border-radius:10px; background:#fff; padding:6px; margin-bottom:8px; }
+  .attr-sigwrap canvas { width:100%; height:150px; touch-action:none; display:block; cursor:crosshair; }
+  .attr-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .attr-chip { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; background:#eee9dd; color:var(--ink-muted); margin-inline-end:4px; }
+  .attr-chip.w { background:var(--amber-bg); color:var(--amber); }
+  .attr-chip.r { background:var(--red-bg); color:var(--red); }
+  .attr-chip.g { background:var(--green-bg); color:var(--green); }
+  @media (max-width:720px){ .attr-grid2{grid-template-columns:1fr;} .attr-tiles{grid-template-columns:repeat(2,1fr);} }
+</style>
+<script id="attr-script">
+(function () {
+  'use strict';
+  var FN_URL = SUPABASE_URL + '/functions/v1/attendance';
+  var S = { allowed: false, ov: null, badge: 0, tab: 'main', logRows: null, month: null, loading: false, lastFetch: 0, sig: null };
+
+  /* ---------------- text (English + Arabic) ---------------- */
+  var D = {
+    en: {
+      nav: 'Remote workers', title: 'Remote workers', sub: 'Daily check-in and check-out, monthly timesheets and approvals',
+      tabMain: 'Overview', tabLog: 'Email trail', loading: 'Loading…', close: 'Close', cancel: 'Cancel', save: 'Save', refresh: 'Refresh',
+      stWorkers: 'Remote workers', stWait: 'Waiting for your action', stWorker: 'Waiting for worker', stDone: 'Approved',
+      secAction: 'Needs your action', secWorkers: 'Remote workers', secSheets: 'Monthly timesheets', none: 'Nothing here.',
+      colName: 'Name', colRole: 'Position', colApprover: 'Approver', colToday: 'Today', colSince: 'Since', colMonth: 'Month', colDoc: 'Document',
+      colStatus: 'Status', colWait: 'Waiting', colWorker: 'Worker', days: 'days', day: 'day',
+      stDraft: 'Waiting for the worker', stAwait: 'Waiting for approval', stApproved: 'Approved and locked',
+      today_none: 'No record', onLeave: 'On leave', in: 'In', out: 'Out',
+      apMgr: 'Manager (Manager Link)', apAdmin: 'Admin', btnReview: 'Review and sign', btnView: 'View', btnPdf: 'Signed PDF', btnRemind: 'Remind',
+      btnReopen: 'Reopen', btnRecords: 'Days and corrections', btnCloseMonth: 'Close month', btnSettings: 'Settings',
+      closeMonthTitle: 'Close a month', closeMonthText: 'This creates the monthly timesheet of every remote worker and sends the worker an email. It is safe to repeat.',
+      monthLabel: 'Month', closeMonthGo: 'Create timesheets', closeMonthDone: 'Done. Sheets created: {0}. Already existing: {1}.',
+      sheetTitle: 'Timesheet', worker: 'Worker', month: 'Month', approver: 'Approver', status: 'Status', hash: 'Content hash',
+      tDays: 'Days present', tLeave: 'Leave days', tAbsent: 'Absent days', tLate: 'Late days', tWorked: 'Worked', tExpected: 'Expected', tDiff: 'Difference', tOt: 'Overtime', tMissing: 'Missing check-out',
+      colDate: 'Date', colIn: 'Check in', colOut: 'Check out', colNet: 'Net', colNotes: 'Notes', workDone: 'Work completed this month',
+      f_late: 'Late', f_early: 'Left early', f_missing: 'No check-out', f_newdev: 'New device', f_corrected: 'Corrected', f_overtime: 'Overtime', f_weekend: 'Weekend', f_leave: 'Leave',
+      sigs: 'Signatures', sigEmp: 'Worker', sigMgr: 'Manager', sigAdm: 'Admin', signedOn: 'signed',
+      signHead: 'Approve and sign', signStep1: 'Step 1. Send a one-time code to your email.', sendCode: 'Send me a code', codeSent: 'The code was sent to your email. It is valid for 10 minutes.',
+      signStep2: 'Step 2. Enter the code and draw your signature.', code: 'Code (6 digits)', draw: 'Draw your signature in the box', clear: 'Clear', approveBtn: 'Approve and sign',
+      overrideNote: 'This timesheet belongs to the Manager. You are signing in place of the Manager. A reason is required and is saved in the log.', reason: 'Reason',
+      signedOk: 'Approved. The signed PDF was emailed.', needSig: 'Please draw your signature.', needCode: 'Please enter the 6-digit code.',
+      pdfOpen: 'Opening the signed PDF…', reminded: 'Reminder sent.', reopenTitle: 'Reopen this timesheet', reopenText: 'The signed version is kept. A new version is created and the worker must sign again.',
+      reopenGo: 'Reopen', reopened: 'Reopened. New document: {0}.',
+      recTitle: 'Days and corrections', recText: 'Corrections keep the old values and your reason in the log. A month with an approved timesheet is locked. Reopen it first.',
+      corrHead: 'Correct a day', leaveHead: 'Set or clear leave', date: 'Date', timeIn: 'Check in (HH:MM)', timeOut: 'Check out (HH:MM)', leaveType: 'Leave type',
+      leaveNone: 'No leave (clear)', leaveAnnual: 'Annual leave', leaveSick: 'Sick leave', leaveOther: 'Other leave', saved: 'Saved.',
+      setHead: 'Remote attendance settings', setSeal: 'Apply the company seal automatically after approval', setWork: 'Show work completed on the timesheet',
+      setRemind: 'Remind the worker after (days)', setOverdue: 'Warn Admins when a Manager waits more than (days)', setStart: 'Work starts', setEnd: 'Work ends',
+      setGrace: 'Grace time (minutes)', setBreak: 'Break (minutes)', setMode: 'Check-in method', modeCode: 'Email code', modeReceipt: 'Button and receipt email',
+      logHead: 'Every email sent by this feature', colWhen: 'When', colTo: 'To', colSubject: 'Subject', colResult: 'Result', sent: 'Sent', failed: 'Failed',
+      memberBox: 'Remote work attendance', memberOn: 'Remote worker: daily check-in and check-out', memberApprover: 'Who approves the monthly timesheet',
+      memberSave: 'Save attendance setting', memberSaved: 'Saved. The worker received an email with the link.', memberSavedQuiet: 'Saved.',
+      memberHint: 'When this is on, the worker sees the attendance box in the link and must check in and out every day.',
+      e_no_manager_link: 'This worker has no Manager Link yet, or it has no manager email. Create the Manager Link first.',
+      e_no_email: 'This team member has no email address. Add it first.', e_not_admin: 'Only Admins can use this page.', e_no_session: 'Please sign in again.',
+      e_bad_session: 'Please sign in again.', e_locked: 'This month is locked.', e_month_locked: 'This month is locked. Reopen the timesheet first.',
+      e_code_wrong: 'The code is wrong.', e_code_expired: 'The code expired. Send a new one.', e_code_locked: 'Too many wrong tries. Send a new code.', e_code_none: 'No open code. Send a new one.',
+      e_too_many_codes: 'Too many codes requested. Wait a few minutes.', e_reason_required: 'A reason is required.', e_bad_time: 'Use the time format HH:MM.',
+      e_has_check_in: 'This day has a check-in. Use Correct instead.', e_not_approvable: 'This timesheet cannot be approved now.', e_assets_missing: 'Files for the PDF are missing in the bucket.',
+      e_bad_png: 'The signature image is not valid. Draw it again.', e_server_error: 'Server error. Try again.', e_default: 'Something went wrong.'
+    },
+    ar: {
+      nav: 'العاملون عن بُعد', title: 'العاملون عن بُعد', sub: 'الحضور والانصراف اليومي والكشوف الشهرية والاعتماد',
+      tabMain: 'نظرة عامة', tabLog: 'سجل الرسائل', loading: 'جارٍ التحميل…', close: 'إغلاق', cancel: 'إلغاء', save: 'حفظ', refresh: 'تحديث',
+      stWorkers: 'العاملون عن بُعد', stWait: 'بانتظار إجرائك', stWorker: 'بانتظار الموظف', stDone: 'معتمد',
+      secAction: 'يحتاج إجراءً منك', secWorkers: 'العاملون عن بُعد', secSheets: 'الكشوف الشهرية', none: 'لا يوجد شيء هنا.',
+      colName: 'الاسم', colRole: 'المسمى', colApprover: 'المعتمِد', colToday: 'اليوم', colSince: 'منذ', colMonth: 'الشهر', colDoc: 'المستند',
+      colStatus: 'الحالة', colWait: 'الانتظار', colWorker: 'الموظف', days: 'أيام', day: 'يوم',
+      stDraft: 'بانتظار الموظف', stAwait: 'بانتظار الاعتماد', stApproved: 'معتمد ومقفل',
+      today_none: 'لا يوجد تسجيل', onLeave: 'في إجازة', in: 'حضور', out: 'انصراف',
+      apMgr: 'المدير (رابط المدير)', apAdmin: 'المسؤول', btnReview: 'مراجعة وتوقيع', btnView: 'عرض', btnPdf: 'ملف PDF الموقّع', btnRemind: 'تذكير',
+      btnReopen: 'إعادة فتح', btnRecords: 'الأيام والتصحيحات', btnCloseMonth: 'إقفال الشهر', btnSettings: 'الإعدادات',
+      closeMonthTitle: 'إقفال شهر', closeMonthText: 'ينشئ هذا الإجراء الكشف الشهري لكل عامل عن بُعد ويرسل له رسالة. يمكن تكراره بأمان.',
+      monthLabel: 'الشهر', closeMonthGo: 'إنشاء الكشوف', closeMonthDone: 'تم. الكشوف المنشأة: {0}. الموجودة مسبقاً: {1}.',
+      sheetTitle: 'الكشف', worker: 'الموظف', month: 'الشهر', approver: 'المعتمِد', status: 'الحالة', hash: 'بصمة المحتوى',
+      tDays: 'أيام الحضور', tLeave: 'أيام الإجازة', tAbsent: 'أيام الغياب', tLate: 'أيام التأخر', tWorked: 'ساعات العمل', tExpected: 'المتوقع', tDiff: 'الفرق', tOt: 'الإضافي', tMissing: 'بدون انصراف',
+      colDate: 'التاريخ', colIn: 'الحضور', colOut: 'الانصراف', colNet: 'الصافي', colNotes: 'ملاحظات', workDone: 'الأعمال المنجزة هذا الشهر',
+      f_late: 'متأخر', f_early: 'انصراف مبكر', f_missing: 'بدون انصراف', f_newdev: 'جهاز جديد', f_corrected: 'مصحَّح', f_overtime: 'إضافي', f_weekend: 'عطلة أسبوعية', f_leave: 'إجازة',
+      sigs: 'التواقيع', sigEmp: 'الموظف', sigMgr: 'المدير', sigAdm: 'المسؤول', signedOn: 'وقّع',
+      signHead: 'الاعتماد والتوقيع', signStep1: 'الخطوة 1. أرسل رمزاً لمرة واحدة إلى بريدك.', sendCode: 'أرسل لي رمزاً', codeSent: 'تم إرسال الرمز إلى بريدك. صالح لمدة 10 دقائق.',
+      signStep2: 'الخطوة 2. أدخل الرمز وارسم توقيعك.', code: 'الرمز (6 أرقام)', draw: 'ارسم توقيعك داخل المربع', clear: 'مسح', approveBtn: 'اعتماد وتوقيع',
+      overrideNote: 'هذا الكشف يخص المدير. أنت توقّع بدلاً منه. السبب مطلوب ويُحفظ في السجل.', reason: 'السبب',
+      signedOk: 'تم الاعتماد. أُرسل ملف PDF الموقّع بالبريد.', needSig: 'يرجى رسم التوقيع.', needCode: 'يرجى إدخال الرمز المكوّن من 6 أرقام.',
+      pdfOpen: 'جارٍ فتح ملف PDF الموقّع…', reminded: 'تم إرسال التذكير.', reopenTitle: 'إعادة فتح هذا الكشف', reopenText: 'تبقى النسخة الموقعة محفوظة. تُنشأ نسخة جديدة ويجب على الموظف التوقيع مجدداً.',
+      reopenGo: 'إعادة الفتح', reopened: 'تمت إعادة الفتح. المستند الجديد: {0}.',
+      recTitle: 'الأيام والتصحيحات', recText: 'التصحيحات تحفظ القيم القديمة وسببك في السجل. الشهر الذي له كشف معتمد يكون مقفلاً. أعد فتحه أولاً.',
+      corrHead: 'تصحيح يوم', leaveHead: 'تحديد إجازة أو إلغاؤها', date: 'التاريخ', timeIn: 'الحضور (HH:MM)', timeOut: 'الانصراف (HH:MM)', leaveType: 'نوع الإجازة',
+      leaveNone: 'بدون إجازة (إلغاء)', leaveAnnual: 'إجازة سنوية', leaveSick: 'إجازة مرضية', leaveOther: 'إجازة أخرى', saved: 'تم الحفظ.',
+      setHead: 'إعدادات الحضور عن بُعد', setSeal: 'تطبيق ختم الشركة تلقائياً بعد الاعتماد', setWork: 'إظهار الأعمال المنجزة في الكشف',
+      setRemind: 'تذكير الموظف بعد (أيام)', setOverdue: 'تنبيه المسؤولين عند تأخر المدير أكثر من (أيام)', setStart: 'بداية العمل', setEnd: 'نهاية العمل',
+      setGrace: 'فترة السماح (دقائق)', setBreak: 'الاستراحة (دقائق)', setMode: 'طريقة تسجيل الحضور', modeCode: 'رمز بالبريد', modeReceipt: 'زر مع رسالة إيصال',
+      logHead: 'كل رسالة أرسلتها هذه الميزة', colWhen: 'الوقت', colTo: 'إلى', colSubject: 'الموضوع', colResult: 'النتيجة', sent: 'أُرسلت', failed: 'فشلت',
+      memberBox: 'الحضور والانصراف للعمل عن بُعد', memberOn: 'عامل عن بُعد: حضور وانصراف يومي', memberApprover: 'من يعتمد الكشف الشهري',
+      memberSave: 'حفظ إعداد الحضور', memberSaved: 'تم الحفظ. وصلت الموظف رسالة بالرابط.', memberSavedQuiet: 'تم الحفظ.',
+      memberHint: 'عند التفعيل يرى الموظف صندوق الحضور في رابطه ويجب أن يسجّل الحضور والانصراف كل يوم.',
+      e_no_manager_link: 'لا يوجد رابط مدير لهذا الموظف بعد، أو لا يحتوي على بريد المدير. أنشئ رابط المدير أولاً.',
+      e_no_email: 'لا يوجد بريد إلكتروني لهذا العضو. أضفه أولاً.', e_not_admin: 'هذه الصفحة للمسؤولين فقط.', e_no_session: 'يرجى تسجيل الدخول مجدداً.',
+      e_bad_session: 'يرجى تسجيل الدخول مجدداً.', e_locked: 'هذا الشهر مقفل.', e_month_locked: 'هذا الشهر مقفل. أعد فتح الكشف أولاً.',
+      e_code_wrong: 'الرمز غير صحيح.', e_code_expired: 'انتهت صلاحية الرمز. أرسل رمزاً جديداً.', e_code_locked: 'محاولات خاطئة كثيرة. أرسل رمزاً جديداً.', e_code_none: 'لا يوجد رمز مفتوح. أرسل رمزاً جديداً.',
+      e_too_many_codes: 'طلبات رموز كثيرة. انتظر بضع دقائق.', e_reason_required: 'السبب مطلوب.', e_bad_time: 'استخدم صيغة الوقت HH:MM.',
+      e_has_check_in: 'لهذا اليوم تسجيل حضور. استخدم التصحيح بدلاً من ذلك.', e_not_approvable: 'لا يمكن اعتماد هذا الكشف الآن.', e_assets_missing: 'ملفات ملف PDF ناقصة في المخزن.',
+      e_bad_png: 'صورة التوقيع غير صالحة. ارسمها مجدداً.', e_server_error: 'خطأ في الخادم. حاول مجدداً.', e_default: 'حدث خطأ ما.'
+    }
+  };
+  function L(k) {
+    var lang = (typeof currentLang !== 'undefined' && currentLang === 'ar') ? 'ar' : 'en';
+    var s = (D[lang] && D[lang][k]) || D.en[k] || k;
+    for (var i = 1; i < arguments.length; i++) s = s.replace('{' + (i - 1) + '}', arguments[i]);
+    return s;
+  }
+  var isAr = function () { return typeof currentLang !== 'undefined' && currentLang === 'ar'; };
+  var E = function (s) { return escapeHtml(s == null ? '' : String(s)); };
+  function errText(e) {
+    var c = (e && e.code) || 'default';
+    var k = 'e_' + c;
+    var m = (D.en[k]) ? L(k) : L('e_default');
+    if (c === 'code_wrong' && e.data && e.data.left != null) m += ' (' + e.data.left + ')';
+    return m;
+  }
+  function hmm(min) { if (min == null) return '–'; var neg = min < 0; min = Math.abs(Math.round(min)); return (neg ? '-' : '') + Math.floor(min / 60) + 'h ' + String(min % 60).padStart(2, '0') + 'm'; }
+  function nameOf(m) { return isAr() && m.nameAr ? m.nameAr : m.name; }
+
+  /* ---------------- server calls ---------------- */
+  async function api(action, body) {
+    var sess = await supabaseClient.auth.getSession();
+    var jwt = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    if (!jwt) throw { code: 'no_session' };
+    var r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify(Object.assign({ action: action }, body || {})) });
+    var j = {}; try { j = await r.json(); } catch (e) {}
+    if (!r.ok) throw { code: j.error || 'server_error', status: r.status, data: j };
+    return j;
+  }
+  async function refresh(silent) {
+    if (!supabaseClient || !_authUser) return;
+    if (S.loading) return; S.loading = true;
+    try {
+      var prevBadge = S.badge, prevAllowed = S.allowed;
+      S.ov = await api('a_overview'); S.allowed = true; S.badge = S.ov.badge || 0; S.lastFetch = Date.now();
+      if (prevBadge !== S.badge || prevAllowed !== S.allowed) { try { renderSidebar(); } catch (e) {} }
+      if (state.currentView === 'remoteAttendance') paint();
+    } catch (e) {
+      if (e && (e.code === 'not_admin' || e.code === 'bad_session')) { S.allowed = false; }
+      else if (!silent && state.currentView === 'remoteAttendance') { var r = document.getElementById('attr-root'); if (r) r.innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+    } finally { S.loading = false; }
+  }
+
+  /* ---------------- sidebar: button and red number ---------------- */
+  var _origSidebar = window.renderSidebar;
+  window.renderSidebar = function () {
+    var out = _origSidebar.apply(this, arguments);
+    try { injectNav(); } catch (e) { console.error('attr nav', e); }
+    return out;
+  };
+  function injectNav() {
+    if (!S.allowed) return;
+    var nav = document.querySelector('#sidebar .nav'); if (!nav || nav.querySelector('#attr-nav-btn')) return;
+    var b = document.createElement('button');
+    b.id = 'attr-nav-btn'; b.className = 'nav-item' + (state.currentView === 'remoteAttendance' ? ' active' : '');
+    b.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>' + E(L('nav')) +
+      (S.badge > 0 ? '<span class="attr-nav-badge">' + S.badge + '</span>' : '');
+    b.onclick = function () { navigate('remoteAttendance'); };
+    var settings = nav.querySelector('[data-view="settings"]');
+    if (settings) nav.insertBefore(b, settings); else nav.appendChild(b);
+  }
+
+  /* ---------------- the page ---------------- */
+  views.remoteAttendance = function () {
+    setTimeout(function () { refresh(false); }, 0);
+    return '<div id="attr-root">' + (S.ov ? body() : '<div class="empty">' + E(L('loading')) + '</div>') + '</div>';
+  };
+  function paint() { var r = document.getElementById('attr-root'); if (r) r.innerHTML = body(); }
+  function statusChip(st) {
+    if (st === 'approved') return '<span class="badge green">' + E(L('stApproved')) + '</span>';
+    if (st === 'awaiting_approver') return '<span class="badge amber">' + E(L('stAwait')) + '</span>';
+    return '<span class="badge neutral">' + E(L('stDraft')) + '</span>';
+  }
+  function approverText(type, name) { return type === 'manager' ? L('apMgr') : (L('apAdmin') + (name ? ' · ' + name : '')); }
+  function body() {
+    var ov = S.ov; if (!ov) return '';
+    var sheets = ov.sheets || [], members = (ov.members || []).filter(function (m) { return m.remote; });
+    var needs = sheets.filter(function (s) { return s.needsAdmin; });
+    var waitW = sheets.filter(function (s) { return s.status === 'draft'; }).length, done = sheets.filter(function (s) { return s.status === 'approved'; }).length;
+    var h = '<div class="page-head"><div><h1 class="page-title">' + E(L('title')) + '</h1><div class="page-sub">' + E(L('sub')) + '</div></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="attrRefresh()">↻ ' + E(L('refresh')) + '</button>' +
+      '<button class="btn ghost" onclick="attrOpenSettings()">⚙ ' + E(L('btnSettings')) + '</button>' +
+      '<button class="btn" onclick="attrOpenCloseMonth()">' + E(L('btnCloseMonth')) + '</button></div></div>';
+    h += '<div class="attr-tabs"><button class="attr-tab ' + (S.tab === 'main' ? 'on' : '') + '" onclick="attrTab(\'main\')">' + E(L('tabMain')) + '</button>' +
+      '<button class="attr-tab ' + (S.tab === 'log' ? 'on' : '') + '" onclick="attrTab(\'log\')">' + E(L('tabLog')) + '</button></div>';
+    if (S.tab === 'log') return h + logBody();
+    h += '<div class="stats"><div class="stat"><div class="stat-label">' + E(L('stWorkers')) + '</div><div class="stat-value">' + members.length + '</div></div>' +
+      '<div class="stat ' + (needs.length ? 'danger' : 'good') + '"><div class="stat-label">' + E(L('stWait')) + '</div><div class="stat-value">' + needs.length + '</div></div>' +
+      '<div class="stat warn"><div class="stat-label">' + E(L('stWorker')) + '</div><div class="stat-value">' + waitW + '</div></div>' +
+      '<div class="stat good"><div class="stat-label">' + E(L('stDone')) + '</div><div class="stat-value">' + done + '</div></div></div>';
+    h += '<div class="attr-h">' + E(L('secAction')) + '</div><div class="table-wrap">';
+    if (!needs.length) h += '<div class="empty">' + E(L('none')) + '</div>';
+    else h += '<table><thead><tr><th>' + E(L('colWorker')) + '</th><th>' + E(L('colMonth')) + '</th><th>' + E(L('colApprover')) + '</th><th>' + E(L('colWait')) + '</th><th></th></tr></thead><tbody>' +
+      needs.map(function (s) { return '<tr><td><div class="name">' + E(s.name) + '</div><div class="sub">' + E(s.docNo) + '</div></td><td>' + E(s.month) + '</td><td>' + E(approverText(s.approverType, s.approverName)) + '</td><td>' + s.waitDays + ' ' + E(L('days')) +
+        '</td><td><button class="btn sm" onclick="attrOpenSheet(\'' + s.id + '\')">' + E(L('btnReview')) + '</button></td></tr>'; }).join('') + '</tbody></table>';
+    h += '</div><div class="attr-h">' + E(L('secWorkers')) + '</div><div class="table-wrap">';
+    if (!members.length) h += '<div class="empty">' + E(L('none')) + '</div>';
+    else h += '<table><thead><tr><th>' + E(L('colName')) + '</th><th>' + E(L('colRole')) + '</th><th>' + E(L('colApprover')) + '</th><th>' + E(L('colToday')) + '</th><th>' + E(L('colSince')) + '</th><th></th></tr></thead><tbody>' +
+      members.map(function (m) {
+        var t = m.today, tt = !t ? '<span class="sub">' + E(L('today_none')) + '</span>' : t.leave ? E(L('onLeave')) : (E(L('in')) + ' ' + E(t.in || '–') + ' · ' + E(L('out')) + ' ' + E(t.out || '–'));
+        return '<tr><td><div class="name">' + E(nameOf(m)) + '</div><div class="sub">' + E(m.email) + '</div></td><td>' + E(m.role) + '</td><td>' + E(approverText(m.approverType, adminName(m.approverAdmin))) + '</td><td>' + tt + '</td><td>' + E((m.enabledAt || '').slice(0, 10)) +
+          '</td><td><button class="btn ghost sm" onclick="attrOpenRecords(\'' + m.id + '\')">' + E(L('btnRecords')) + '</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    h += '</div><div class="attr-h">' + E(L('secSheets')) + '</div><div class="table-wrap">';
+    if (!sheets.length) h += '<div class="empty">' + E(L('none')) + '</div>';
+    else h += '<table><thead><tr><th>' + E(L('colWorker')) + '</th><th>' + E(L('colMonth')) + '</th><th>' + E(L('colDoc')) + '</th><th>' + E(L('colApprover')) + '</th><th>' + E(L('colStatus')) + '</th><th></th></tr></thead><tbody>' +
+      sheets.map(function (s) {
+        var acts = '<button class="btn ghost sm" onclick="attrOpenSheet(\'' + s.id + '\')">' + E(s.status === 'awaiting_approver' ? L('btnReview') : L('btnView')) + '</button>';
+        if (s.hasPdf) acts += ' <button class="btn ghost sm" onclick="attrPdf(\'' + s.id + '\')">' + E(L('btnPdf')) + '</button>';
+        if (s.status !== 'approved') acts += ' <button class="btn ghost sm" onclick="attrRemind(\'' + s.id + '\')">' + E(L('btnRemind')) + '</button>';
+        acts += ' <button class="btn ghost sm" onclick="attrOpenReopen(\'' + s.id + '\')">' + E(L('btnReopen')) + '</button>';
+        return '<tr><td><div class="name">' + E(s.name) + '</div></td><td>' + E(s.month) + '</td><td><div class="sub">' + E(s.docNo) + '</div></td><td>' + E(approverText(s.approverType, s.approverName)) + '</td><td>' + statusChip(s.status) + (s.status !== 'approved' ? ' <span class="sub">' + s.waitDays + ' ' + E(L('days')) + '</span>' : '') + '</td><td><div class="row-actions">' + acts + '</div></td></tr>';
+      }).join('') + '</tbody></table>';
+    return h + '</div>';
+  }
+  function adminName(email) { var a = ((S.ov && S.ov.admins) || []).filter(function (x) { return x.email === email; })[0]; return a ? a.name : ''; }
+  function logBody() {
+    var h = '<div class="attr-h">' + E(L('logHead')) + '</div><div class="table-wrap">';
+    if (!S.logRows) { loadLog(); return h + '<div class="empty">' + E(L('loading')) + '</div></div>'; }
+    if (!S.logRows.length) return h + '<div class="empty">' + E(L('none')) + '</div></div>';
+    return h + '<table><thead><tr><th>' + E(L('colWhen')) + '</th><th>' + E(L('colTo')) + '</th><th>' + E(L('colSubject')) + '</th><th>' + E(L('colResult')) + '</th><th></th></tr></thead><tbody>' +
+      S.logRows.map(function (r, i) { var d = r.detail || {}; return '<tr><td><div class="sub">' + E(String(r.at || '').replace('T', ' ').slice(0, 16)) + '</div></td><td>' + E((d.to || []).join(', ')) + '</td><td>' + E(d.subject || '') + '</td><td>' +
+        (r.action === 'mail' ? '<span class="badge green">' + E(L('sent')) + '</span>' : '<span class="badge red">' + E(L('failed')) + '</span>') + '</td><td><button class="btn ghost sm" onclick="attrShowMail(' + i + ')">' + E(L('btnView')) + '</button></td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  async function loadLog() { try { var r = await api('a_log', { kind: 'mail', limit: 200 }); S.logRows = r.rows || []; } catch (e) { S.logRows = []; } if (state.currentView === 'remoteAttendance') paint(); }
+  window.attrTab = function (t) { S.tab = t; if (t === 'log') S.logRows = null; paint(); };
+  window.attrRefresh = function () { refresh(false); };
+  window.attrShowMail = function (i) { var r = S.logRows[i]; if (!r) return; var d = r.detail || {}; openModal(E(d.subject || ''), '<div class="attr-note" style="margin-bottom:8px">' + E((d.to || []).join(', ')) + (d.attachments && d.attachments.length ? ' · 📎 ' + E(d.attachments.join(', ')) : '') + '</div><div style="border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;direction:ltr">' + (d.body || '') + '</div>', '<button class="btn ghost" onclick="closeModal()">' + E(L('close')) + '</button>'); };
+
+  /* ---------------- signature pad ---------------- */
+  function sigMount(id) {
+    var c = document.getElementById(id); if (!c) return null;
+    var ratio = window.devicePixelRatio || 1, w = c.clientWidth || 480, h = c.clientHeight || 150;
+    c.width = w * ratio; c.height = h * ratio; var ctx = c.getContext('2d'); ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#14294a';
+    var st = { ink: 0, down: false, c: c, ctx: ctx };
+    function pos(e) { var r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    c.addEventListener('pointerdown', function (e) { st.down = true; c.setPointerCapture(e.pointerId); var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); });
+    c.addEventListener('pointermove', function (e) { if (!st.down) return; var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); st.ink++; e.preventDefault(); });
+    var up = function () { st.down = false; }; c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+    return st;
+  }
+  window.attrSigClear = function () { var s = S.sig; if (!s) return; s.ctx.clearRect(0, 0, s.c.width, s.c.height); s.ink = 0; };
+
+  /* ---------------- review and sign a timesheet ---------------- */
+  function sheetHtml(c) {
+    var tt = c.totals || {};
+    var tiles = [[L('tDays'), tt.days], [L('tLeave'), tt.leave], [L('tAbsent'), tt.absent], [L('tLate'), tt.late], [L('tMissing'), tt.missing], [L('tWorked'), hmm(tt.workedMin)], [L('tExpected'), hmm(tt.expectedMin)], [L('tDiff'), hmm(tt.diffMin)], [L('tOt'), hmm(tt.otMin)]];
+    var h = '<div class="attr-tiles">' + tiles.map(function (x) { return '<div class="attr-tile"><b>' + E(x[1]) + '</b><span>' + E(x[0]) + '</span></div>'; }).join('') + '</div>';
+    h += '<div class="attr-scroll"><table class="attr-tbl"><thead><tr><th>' + E(L('colDate')) + '</th><th>' + E(L('colIn')) + '</th><th>' + E(L('colOut')) + '</th><th>' + E(L('colNet')) + '</th><th>' + E(L('colNotes')) + '</th></tr></thead><tbody>' +
+      (c.rows || []).map(function (r) {
+        var fl = (r.flags || []).map(function (f) { var cls = (f === 'late' || f === 'missing' || f === 'early') ? 'r' : (f === 'newdev' || f === 'corrected' || f === 'overtime') ? 'w' : ''; return '<span class="attr-chip ' + cls + '">' + E(L('f_' + f)) + '</span>'; }).join('');
+        return '<tr><td>' + E(r.d) + '</td><td>' + E(r.leave ? '–' : (r.in || '–')) + '</td><td>' + E(r.leave ? '–' : (r.out || '–')) + '</td><td>' + E(r.net != null ? hmm(r.net) : '–') + '</td><td>' + fl + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    if (c.showWork && c.work && c.work.length) h += '<div class="attr-note" style="font-weight:600;margin-bottom:4px">' + E(L('workDone')) + ' (' + c.work.length + ')</div><div class="attr-scroll" style="max-height:140px"><table class="attr-tbl"><tbody>' +
+      c.work.map(function (w) { return '<tr><td>' + E(isAr() ? w.tAr : w.tEn) + '</td><td>' + E(isAr() ? w.pAr : w.pEn) + '</td><td>' + E(w.d) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    return h;
+  }
+  window.attrOpenSheet = async function (id) {
+    openModal(L('sheetTitle'), '<div class="empty">' + E(L('loading')) + '</div>', '');
+    try {
+      var r = await api('a_sheet', { sheetId: id }), sh = r.sheet, sigs = r.signatures || [];
+      var s = ((S.ov && S.ov.sheets) || []).filter(function (x) { return x.id === id; })[0] || {};
+      var h = '<div class="attr-grid2" style="margin-bottom:6px"><div><div class="attr-note">' + E(L('worker')) + '</div><b>' + E((sh.content.member || {}).nameEn || s.name || '') + '</b></div><div><div class="attr-note">' + E(L('month')) + '</div><b>' + E(sh.month) + '</b> · ' + E(sh.docNo) + '</div>' +
+        '<div><div class="attr-note">' + E(L('approver')) + '</div>' + E(approverText(sh.approverType, sh.approverName)) + '</div><div><div class="attr-note">' + E(L('status')) + '</div>' + statusChip(sh.status) + '</div></div>';
+      h += sheetHtml(sh.content);
+      h += '<div class="attr-note" style="margin-bottom:6px">' + E(L('hash')) + ': <span style="font-family:monospace">' + E((sh.contentSha || '').slice(0, 16)) + '…</span></div>';
+      if (sigs.length) h += '<div style="margin-bottom:10px">' + sigs.map(function (g) { var rl = g.role === 'employee' ? L('sigEmp') : g.role === 'manager' ? L('sigMgr') : L('sigAdm'); return '<div class="attr-ok" style="margin-bottom:6px">✓ ' + E(rl) + ': ' + E(g.signer_name) + ' · ' + E(String(g.signed_at).replace('T', ' ').slice(0, 16)) + '</div>'; }).join('') + '</div>';
+      var foot = '<button class="btn ghost" onclick="closeModal()">' + E(L('close')) + '</button>';
+      if (sh.status === 'awaiting_approver') {
+        h += '<div id="attr-sign-area" class="attr-card"><div class="attr-h" style="margin-top:0">' + E(L('signHead')) + '</div>' +
+          (sh.approverType === 'manager' ? '<div class="attr-err" style="background:var(--amber-bg);color:var(--amber);border-color:rgba(196,126,42,.3)">' + E(L('overrideNote')) + '</div>' : '') +
+          '<div class="attr-note" style="margin-bottom:8px">' + E(L('signStep1')) + '</div><button class="btn" id="attr-code-btn" onclick="attrSendCode(\'' + id + '\')">' + E(L('sendCode')) + '</button><div id="attr-sign-step2"></div><div id="attr-sign-msg"></div></div>';
+      } else if (sh.hasPdf) foot = '<button class="btn" onclick="attrPdf(\'' + id + '\')">' + E(L('btnPdf')) + '</button> ' + foot;
+      openModal(L('sheetTitle') + ' — ' + (sh.docNo || ''), h, foot);
+    } catch (e) { openModal(L('sheetTitle'), '<div class="attr-err">' + E(errText(e)) + '</div>', '<button class="btn ghost" onclick="closeModal()">' + E(L('close')) + '</button>'); }
+  };
+  window.attrSendCode = async function (id) {
+    var m = document.getElementById('attr-sign-msg'), btn = document.getElementById('attr-code-btn'); if (btn) btn.disabled = true;
+    try {
+      await api('a_request_code', { sheetId: id });
+      var s = ((S.ov && S.ov.sheets) || []).filter(function (x) { return x.id === id; })[0] || {};
+      var over = s.approverType === 'manager';
+      document.getElementById('attr-sign-step2').innerHTML = '<div class="attr-ok" style="margin-top:10px">' + E(L('codeSent')) + '</div><div class="attr-note" style="margin-bottom:6px">' + E(L('signStep2')) + '</div>' +
+        '<div class="attr-field"><label>' + E(L('code')) + '</label><input id="attr-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:6px;font-size:18px;max-width:180px"></div>' +
+        (over ? '<div class="attr-field"><label>' + E(L('reason')) + '</label><input id="attr-reason" maxlength="300"></div>' : '') +
+        '<div class="attr-note" style="margin-bottom:4px">' + E(L('draw')) + '</div><div class="attr-sigwrap"><canvas id="attr-sig"></canvas></div>' +
+        '<div class="attr-row"><button class="btn ghost sm" onclick="attrSigClear()">' + E(L('clear')) + '</button><button class="btn" id="attr-approve" onclick="attrApprove(\'' + id + '\')">' + E(L('approveBtn')) + '</button></div>';
+      S.sig = sigMount('attr-sig'); if (m) m.innerHTML = '';
+    } catch (e) { if (m) m.innerHTML = '<div class="attr-err" style="margin-top:10px">' + E(errText(e)) + '</div>'; if (btn) btn.disabled = false; }
+  };
+  window.attrApprove = async function (id) {
+    var m = document.getElementById('attr-sign-msg'), code = (document.getElementById('attr-code') || {}).value || '', reasonEl = document.getElementById('attr-reason');
+    if (!/^\d{6}$/.test(code.trim())) { m.innerHTML = '<div class="attr-err">' + E(L('needCode')) + '</div>'; return; }
+    if (!S.sig || !S.sig.ink) { m.innerHTML = '<div class="attr-err">' + E(L('needSig')) + '</div>'; return; }
+    var btn = document.getElementById('attr-approve'); if (btn) btn.disabled = true;
+    try {
+      await api('a_sign', { sheetId: id, code: code.trim(), signature: S.sig.c.toDataURL('image/png'), reason: reasonEl ? reasonEl.value : undefined });
+      closeModal(); toast(L('signedOk')); refresh(false);
+    } catch (e) { m.innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; if (btn) btn.disabled = false; }
+  };
+  window.attrPdf = async function (id) { try { toast(L('pdfOpen')); var r = await api('a_pdf', { sheetId: id }); window.open(r.url, '_blank'); } catch (e) { toast(errText(e)); } };
+  window.attrRemind = async function (id) { try { await api('a_remind', { sheetId: id }); toast(L('reminded')); } catch (e) { toast(errText(e)); } };
+
+  /* ---------------- reopen ---------------- */
+  window.attrOpenReopen = function (id) {
+    openModal(L('reopenTitle'), '<div class="attr-note" style="margin-bottom:10px">' + E(L('reopenText')) + '</div><div id="attr-rm"></div><div class="attr-field"><label>' + E(L('reason')) + '</label><input id="attr-reopen-reason" maxlength="300"></div>',
+      '<button class="btn ghost" onclick="closeModal()">' + E(L('cancel')) + '</button> <button class="btn" onclick="attrReopen(\'' + id + '\')">' + E(L('reopenGo')) + '</button>');
+  };
+  window.attrReopen = async function (id) {
+    var reason = (document.getElementById('attr-reopen-reason') || {}).value || '';
+    try { var r = await api('a_reopen', { sheetId: id, reason: reason }); closeModal(); toast(L('reopened', r.newDocNo)); refresh(false); }
+    catch (e) { document.getElementById('attr-rm').innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+  };
+
+  /* ---------------- close month ---------------- */
+  function prevMonthStr() { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  window.attrOpenCloseMonth = function () {
+    openModal(L('closeMonthTitle'), '<div class="attr-note" style="margin-bottom:10px">' + E(L('closeMonthText')) + '</div><div id="attr-cm"></div><div class="attr-field"><label>' + E(L('monthLabel')) + '</label><input type="month" id="attr-cm-month" value="' + prevMonthStr() + '"></div>',
+      '<button class="btn ghost" onclick="closeModal()">' + E(L('cancel')) + '</button> <button class="btn" onclick="attrCloseMonth()">' + E(L('closeMonthGo')) + '</button>');
+  };
+  window.attrCloseMonth = async function () {
+    var mo = (document.getElementById('attr-cm-month') || {}).value;
+    try { var r = await api('a_close_month', { month: mo }), n = 0, ex = 0; (r.results || []).forEach(function (x) { if (x.created) n++; else ex++; }); closeModal(); toast(L('closeMonthDone', n, ex)); refresh(false); }
+    catch (e) { document.getElementById('attr-cm').innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+  };
+
+  /* ---------------- days and corrections ---------------- */
+  window.attrOpenRecords = function (memberId, month) {
+    month = month || prevMonthStr().slice(0, 4) + '-' + (new Date().getMonth() + 1 < 10 ? '0' : '') + (new Date().getMonth() + 1);
+    var d = new Date(); month = month || (d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    openModal(L('recTitle'), '<div class="empty">' + E(L('loading')) + '</div>', '');
+    api('a_records', { memberId: memberId, month: month }).then(function (r) {
+      var c = r.content, locked = r.sheet && r.sheet.status !== 'draft';
+      var h = '<div class="attr-note" style="margin-bottom:10px">' + E(L('recText')) + '</div><div class="attr-row" style="margin-bottom:10px"><div class="attr-field" style="margin:0"><label>' + E(L('monthLabel')) + '</label><input type="month" id="attr-rec-month" value="' + E(month) + '" onchange="attrOpenRecords(\'' + memberId + '\',this.value)"></div>' +
+        (r.sheet ? '<div>' + statusChip(r.sheet.status) + '</div>' : '') + '</div><div id="attr-recmsg"></div>' + sheetHtml(c);
+      if (!locked) h += '<div class="attr-card"><div class="attr-h" style="margin-top:0">' + E(L('corrHead')) + '</div><div class="attr-grid2"><div class="attr-field"><label>' + E(L('date')) + '</label><input type="date" id="attr-c-date" value="' + month + '-01"></div><div></div>' +
+        '<div class="attr-field"><label>' + E(L('timeIn')) + '</label><input id="attr-c-in" placeholder="08:00" maxlength="5"></div><div class="attr-field"><label>' + E(L('timeOut')) + '</label><input id="attr-c-out" placeholder="17:00" maxlength="5"></div></div>' +
+        '<div class="attr-field"><label>' + E(L('reason')) + '</label><input id="attr-c-reason" maxlength="300"></div><button class="btn sm" onclick="attrSaveCorrection(\'' + memberId + '\',\'' + month + '\')">' + E(L('save')) + '</button></div>' +
+        '<div class="attr-card"><div class="attr-h" style="margin-top:0">' + E(L('leaveHead')) + '</div><div class="attr-grid2"><div class="attr-field"><label>' + E(L('date')) + '</label><input type="date" id="attr-l-date" value="' + month + '-01"></div>' +
+        '<div class="attr-field"><label>' + E(L('leaveType')) + '</label><select id="attr-l-type"><option value="">' + E(L('leaveNone')) + '</option><option value="annual">' + E(L('leaveAnnual')) + '</option><option value="sick">' + E(L('leaveSick')) + '</option><option value="other">' + E(L('leaveOther')) + '</option></select></div></div>' +
+        '<button class="btn sm" onclick="attrSaveLeave(\'' + memberId + '\',\'' + month + '\')">' + E(L('save')) + '</button></div>';
+      openModal(L('recTitle'), h, '<button class="btn ghost" onclick="closeModal()">' + E(L('close')) + '</button>');
+    }).catch(function (e) { openModal(L('recTitle'), '<div class="attr-err">' + E(errText(e)) + '</div>', '<button class="btn ghost" onclick="closeModal()">' + E(L('close')) + '</button>'); });
+  };
+  window.attrSaveCorrection = async function (memberId, month) {
+    var g = function (i) { return (document.getElementById(i) || {}).value || ''; };
+    try { await api('a_correct', { memberId: memberId, date: g('attr-c-date'), in: g('attr-c-in'), out: g('attr-c-out'), reason: g('attr-c-reason') }); toast(L('saved')); attrOpenRecords(memberId, month); refresh(true); }
+    catch (e) { var m = document.getElementById('attr-recmsg'); if (m) m.innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+  };
+  window.attrSaveLeave = async function (memberId, month) {
+    var g = function (i) { return (document.getElementById(i) || {}).value || ''; };
+    try { await api('a_leave', { memberId: memberId, date: g('attr-l-date'), leave: g('attr-l-type') }); toast(L('saved')); attrOpenRecords(memberId, month); refresh(true); }
+    catch (e) { var m = document.getElementById('attr-recmsg'); if (m) m.innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+  };
+
+  /* ---------------- settings ---------------- */
+  window.attrOpenSettings = function () {
+    var s = (S.ov && S.ov.settings) || {}, ck = function (v) { return v !== false ? 'checked' : ''; };
+    var h = '<div id="attr-setmsg"></div>' +
+      '<label class="attr-field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="attr-s-seal" ' + ck(s.auto_seal) + '> ' + E(L('setSeal')) + '</label>' +
+      '<label class="attr-field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="attr-s-work" ' + ck(s.show_work_completed) + '> ' + E(L('setWork')) + '</label>' +
+      '<div class="attr-grid2"><div class="attr-field"><label>' + E(L('setRemind')) + '</label><input type="number" min="1" max="30" id="attr-s-rem" value="' + E(s.worker_reminder_days) + '"></div>' +
+      '<div class="attr-field"><label>' + E(L('setOverdue')) + '</label><input type="number" min="1" max="30" id="attr-s-over" value="' + E(s.manager_overdue_days) + '"></div>' +
+      '<div class="attr-field"><label>' + E(L('setStart')) + '</label><input type="time" id="attr-s-start" value="' + E(s.work_start) + '"></div><div class="attr-field"><label>' + E(L('setEnd')) + '</label><input type="time" id="attr-s-end" value="' + E(s.work_end) + '"></div>' +
+      '<div class="attr-field"><label>' + E(L('setGrace')) + '</label><input type="number" min="0" max="120" id="attr-s-grace" value="' + E(s.grace_minutes) + '"></div><div class="attr-field"><label>' + E(L('setBreak')) + '</label><input type="number" min="0" max="240" id="attr-s-brk" value="' + E(s.break_minutes) + '"></div></div>' +
+      '<div class="attr-field"><label>' + E(L('setMode')) + '</label><select id="attr-s-mode"><option value="code" ' + (s.checkin_mode !== 'receipt' ? 'selected' : '') + '>' + E(L('modeCode')) + '</option><option value="receipt" ' + (s.checkin_mode === 'receipt' ? 'selected' : '') + '>' + E(L('modeReceipt')) + '</option></select></div>';
+    openModal(L('setHead'), h, '<button class="btn ghost" onclick="closeModal()">' + E(L('cancel')) + '</button> <button class="btn" onclick="attrSaveSettings()">' + E(L('save')) + '</button>');
+  };
+  window.attrSaveSettings = async function () {
+    var g = function (i) { return document.getElementById(i); };
+    var payload = { auto_seal: g('attr-s-seal').checked, show_work_completed: g('attr-s-work').checked, worker_reminder_days: g('attr-s-rem').value, manager_overdue_days: g('attr-s-over').value,
+      work_start: g('attr-s-start').value, work_end: g('attr-s-end').value, grace_minutes: g('attr-s-grace').value, break_minutes: g('attr-s-brk').value, checkin_mode: g('attr-s-mode').value };
+    try { await api('a_settings', { settings: payload }); closeModal(); toast(L('saved')); refresh(false); }
+    catch (e) { g('attr-setmsg').innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+  };
+
+  /* ---------------- switch inside the existing Member Link window ---------------- */
+  var _origMemberModal = window.renderTeamMemberLinkModal;
+  window.renderTeamMemberLinkModal = function (memberId, memberName, token, isNew) {
+    var out = _origMemberModal.apply(this, arguments);
+    try { memberBox(memberId); } catch (e) { console.error('attr member box', e); }
+    return out;
+  };
+  async function memberBox(memberId) {
+    var host = document.getElementById('modal-body'); if (!host) return;
+    var box = document.createElement('div'); box.id = 'attr-member-box'; box.className = 'attr-card'; box.style.marginTop = '18px';
+    box.innerHTML = '<div class="attr-h" style="margin-top:0">' + E(L('memberBox')) + '</div><div class="attr-note">' + E(L('loading')) + '</div>'; host.appendChild(box);
+    try { if (!S.ov || Date.now() - S.lastFetch > 30000) await refresh(true); } catch (e) {}
+    if (!S.ov) { box.innerHTML = '<div class="attr-h" style="margin-top:0">' + E(L('memberBox')) + '</div><div class="attr-note">' + E(L('e_not_admin')) + '</div>'; return; }
+    var m = (S.ov.members || []).filter(function (x) { return x.id === memberId; })[0] || { remote: false, approverType: 'admin', approverAdmin: (S.ov.admins[0] || {}).email };
+    var opts = '<option value="manager" ' + (m.approverType === 'manager' ? 'selected' : '') + '>' + E(L('apMgr')) + '</option>' +
+      (S.ov.admins || []).map(function (a) { return '<option value="admin:' + E(a.email) + '" ' + (m.approverType === 'admin' && m.approverAdmin === a.email ? 'selected' : '') + '>' + E(L('apAdmin') + ' · ' + a.name) + '</option>'; }).join('');
+    box.innerHTML = '<div class="attr-h" style="margin-top:0">' + E(L('memberBox')) + '</div><div id="attr-mb-msg"></div>' +
+      '<label class="attr-field" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="attr-mb-on" ' + (m.remote ? 'checked' : '') + '> ' + E(L('memberOn')) + '</label>' +
+      '<div class="attr-field"><label>' + E(L('memberApprover')) + '</label><select id="attr-mb-ap">' + opts + '</select></div><div class="attr-note" style="margin-bottom:10px">' + E(L('memberHint')) + '</div>' +
+      '<button class="btn sm" id="attr-mb-save" onclick="attrSaveMember(\'' + memberId + '\')">' + E(L('memberSave')) + '</button>';
+  }
+  window.attrSaveMember = async function (memberId) {
+    var on = document.getElementById('attr-mb-on').checked, ap = document.getElementById('attr-mb-ap').value, msg = document.getElementById('attr-mb-msg'), btn = document.getElementById('attr-mb-save');
+    var was = ((S.ov && S.ov.members) || []).filter(function (x) { return x.id === memberId; })[0]; var wasOn = !!(was && was.remote);
+    btn.disabled = true;
+    try {
+      await api('a_member_set', { memberId: memberId, remote: on, approverType: ap === 'manager' ? 'manager' : 'admin', approverAdmin: ap.indexOf('admin:') === 0 ? ap.slice(6) : '' });
+      msg.innerHTML = '<div class="attr-ok">' + E(on && !wasOn ? L('memberSaved') : L('memberSavedQuiet')) + '</div>'; refresh(true);
+    } catch (e) { msg.innerHTML = '<div class="attr-err">' + E(errText(e)) + '</div>'; }
+    btn.disabled = false;
+  };
+
+  /* ---------------- start: check access and keep the red number fresh ---------------- */
+  var tries = 0;
+  (function boot() { if (_authUser) { refresh(true); } else if (tries++ < 60) { setTimeout(boot, 2000); } })();
+  setInterval(function () { if (_authUser && document.visibilityState === 'visible') refresh(true); }, 120000);
+})();
+</script>
+
 </body>
 </html>
