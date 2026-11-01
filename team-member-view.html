@@ -1648,6 +1648,9 @@ document.addEventListener('click', function(e) {
       checkin: 'Check in', checkout: 'Check out', done: 'Done for today.',
       consentTitle: 'Before you start', consentText: 'To record your remote attendance, the system saves the time of each check-in and check-out, the date, your device type and your network address. This is used only for your monthly timesheet and for company records, and it is kept for 5 years. Each month you will confirm and sign your timesheet.',
       consentBtn: 'I understand and agree',
+      hrsTitle: 'Your working hours', hrsOff: 'Official hours', hrsIn: 'Check in', hrsOut: 'Check out', hrsBrk: 'Break', hrsMin: 'minutes', hrsDays: 'Working days', hrsUntil: 'until', hrsTo: 'to',
+      hrsNote: function (a, b) { return 'Checking in after ' + a + ' is recorded as late. Checking out before ' + b + ' is recorded as early departure. Weekends and holidays are days off.'; },
+      dn: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       cl_present: 'Present', cl_off: 'Weekend / holiday', cl_absent: 'Absent', tapDay: 'Tap a day to see its details.', noDayRec: 'No record for this day.', dayOff: 'Weekend or holiday', dayHol: 'Holiday', dayAbs: 'Absent',
       ckin: 'Checking in…', ckout: 'Checking out…', saving: 'Saving…', pleaseWait: 'Please wait. Do not close this page.', slowWait: 'Still working. This can take a few more seconds.',
       sendCode: 'Send code to my email', codeSent: 'A code was sent to your email. It is valid for a few minutes.', enterCode: 'Enter the 6-digit code', confirm: 'Confirm', cancel: 'Cancel', close: 'Close', back: 'Back',
@@ -1676,6 +1679,9 @@ document.addEventListener('click', function(e) {
       checkin: 'تسجيل الحضور', checkout: 'تسجيل الانصراف', done: 'اكتمل يومك.',
       consentTitle: 'قبل أن تبدأ', consentText: 'لتسجيل حضورك عن بُعد، يحفظ النظام وقت كل حضور وانصراف، والتاريخ، ونوع جهازك وعنوان شبكتك. تُستخدم هذه البيانات لكشف الحضور الشهري وسجلات الشركة فقط، وتُحفظ لمدة 5 سنوات. وفي نهاية كل شهر ستؤكد كشفك وتوقّع عليه.',
       consentBtn: 'أفهم وأوافق',
+      hrsTitle: 'ساعات عملك', hrsOff: 'ساعات العمل الرسمية', hrsIn: 'تسجيل الحضور', hrsOut: 'تسجيل الانصراف', hrsBrk: 'الاستراحة', hrsMin: 'دقيقة', hrsDays: 'أيام العمل', hrsUntil: 'حتى', hrsTo: 'إلى',
+      hrsNote: function (a, b) { return 'تسجيل الحضور بعد ' + a + ' يُسجَّل تأخراً. تسجيل الانصراف قبل ' + b + ' يُسجَّل انصرافاً مبكراً. نهاية الأسبوع والعطل الرسمية أيام راحة.'; },
+      dn: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
       cl_present: 'حاضر', cl_off: 'عطلة / إجازة رسمية', cl_absent: 'غياب', tapDay: 'اضغط على يوم لعرض تفاصيله.', noDayRec: 'لا يوجد سجل لهذا اليوم.', dayOff: 'عطلة نهاية الأسبوع أو عطلة رسمية', dayHol: 'عطلة رسمية', dayAbs: 'غياب',
       ckin: 'جارٍ تسجيل الحضور…', ckout: 'جارٍ تسجيل الانصراف…', saving: 'جارٍ الحفظ…', pleaseWait: 'يرجى الانتظار وعدم إغلاق الصفحة.', slowWait: 'ما زال العمل جارياً. قد يستغرق ذلك بضع ثوانٍ إضافية.',
       sendCode: 'أرسل الرمز إلى بريدي', codeSent: 'تم إرسال رمز إلى بريدك الإلكتروني. صالح لدقائق قليلة.', enterCode: 'أدخل الرمز المكوّن من 6 أرقام', confirm: 'تأكيد', cancel: 'إلغاء', close: 'إغلاق', back: 'رجوع',
@@ -1747,6 +1753,14 @@ document.addEventListener('click', function(e) {
     '#attx-host{margin:0 0 18px}',
     '.attx-card{background:var(--bg-card,#fff);border:1px solid var(--line,#e4e0d6);border-radius:12px;box-shadow:var(--shadow,none);padding:16px 18px;margin-bottom:12px}',
     '.attx-h{font-size:16px;font-weight:700;color:var(--accent,#1a3a52);margin:0 0 10px}',
+    '.attx-hrs{background:var(--surface-2,#f3f1ea);border:1px solid var(--line,#e1ddd2);border-inline-start:4px solid #c9a84c;border-radius:9px;padding:9px 11px;margin:10px 0;font-size:13px}',
+    '.attx-hrs b.t{display:block;margin-bottom:4px;color:var(--accent,#1a3a52)}',
+    '.attx-hrs .r{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line,#e1ddd2)}',
+    '.attx-hrs .r:last-of-type{border:0}',
+    '.attx-hrs .r span{color:var(--ink-muted,#5a6478)}',
+    '.attx-hrs .r b{text-align:end;direction:ltr}',
+    '.attx-hrs .n{font-size:12px;color:var(--ink-muted,#5a6478);margin-top:5px}',
+    '.attx-hrs-s{font-size:12.5px;color:var(--ink-muted,#5a6478);margin:2px 0 8px;direction:ltr;text-align:start}',
     '.attx-muted{color:var(--ink-muted,#5a6478);font-size:13px}',
     '.attx-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}',
     '.attx-btn{border:none;border-radius:9px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent,#1a3a52);color:#fff;font-family:inherit}',
@@ -1950,11 +1964,37 @@ document.addEventListener('click', function(e) {
       b.onclick = function () { S.sel = b.getAttribute('data-attx-day'); w.innerHTML = calInner(d); calBind(d); };
     });
   }
+  function hrsMin(t) { var p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
+  function hrsFmt(n) { n = ((n % 1440) + 1440) % 1440; return ('0' + Math.floor(n / 60)).slice(-2) + ':' + ('0' + (n % 60)).slice(-2); }
+  function hrsDays(st) {
+    var wk = (st.weekend || []).map(Number), w = [], i; for (i = 0; i < 7; i++) if (wk.indexOf(i) < 0) w.push(i);
+    if (!w.length) return '';
+    var n = L('dn'), contig = true; for (i = 1; i < w.length; i++) if (w[i] !== w[i - 1] + 1) contig = false;
+    if (w.length > 2 && contig) return n[w[0]] + ' – ' + n[w[w.length - 1]];
+    return w.map(function (x) { return n[x]; }).join(lang() === 'ar' ? '، ' : ', ');
+  }
+  function hoursBox(d, full) {
+    var st = d && d.settings; if (!st || !st.start || !st.end) return '';
+    var s = hrsMin(st.start), e = hrsMin(st.end), g = +st.grace || 0, b = +st.brk || 0, lateAt = hrsFmt(s + g), earlyAt = hrsFmt(e - 30);
+    var h = '<div class="attx-hrs"><b class="t">' + esc(L('hrsTitle')) + '</b>' +
+      '<div class="r"><span>' + esc(L('hrsOff')) + '</span><b>' + esc(st.start) + ' – ' + esc(st.end) + '</b></div>' +
+      '<div class="r"><span>' + esc(L('hrsIn')) + '</span><b>' + esc(st.start) + (g ? (lang() === 'ar' ? '، ' : ', ') + esc(L('hrsUntil')) + ' ' + lateAt : '') + '</b></div>' +
+      '<div class="r"><span>' + esc(L('hrsOut')) + '</span><b>' + esc(st.end) + '</b></div>' +
+      (b > 0 ? '<div class="r"><span>' + esc(L('hrsBrk')) + '</span><b>' + b + ' ' + esc(L('hrsMin')) + '</b></div>' : '') +
+      (hrsDays(st) ? '<div class="r"><span>' + esc(L('hrsDays')) + '</span><b style="direction:inherit">' + esc(hrsDays(st)) + '</b></div>' : '') +
+      '<div class="n">' + esc(L('hrsNote')(lateAt, earlyAt)) + '</div></div>';
+    return h;
+  }
+  function hoursLine(d) {
+    var st = d && d.settings; if (!st || !st.start || !st.end) return '';
+    var g = +st.grace || 0;
+    return '<div class="attx-hrs-s">' + esc(L('hrsIn')) + ' ' + esc(st.start) + (g ? ' (' + esc(L('hrsUntil')) + ' ' + hrsFmt(hrsMin(st.start) + g) + ')' : '') + ' · ' + esc(L('hrsOut')) + ' ' + esc(st.end) + '</div>';
+  }
   function wRender(flash) {
     var d = S.data; if (!d) return setHTML('');
     var h = idCard(d.name, d.nameAr, (lang() === 'ar' ? (d.designationAr || d.designation) : d.designation), d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
     if (!d.consent) {
-      h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p><button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
+      h += '<div class="attx-h" style="font-size:14px">' + esc(L('consentTitle')) + '</div><p style="font-size:14px;margin-bottom:12px">' + esc(L('consentText')) + '</p>' + hoursBox(d) + '<button class="attx-btn" id="attx-consent">' + esc(L('consentBtn')) + '</button></div>';
       setHTML(h); host.querySelector('#attx-consent').onclick = function () { var b = this, done = busyOn(b, 'saving'); call('w_consent').then(function (r) { if (r.ok) wAfter(r); else { done(); b.disabled = false; msgBox(host.querySelector('.attx-card'), 'err', errText(r.data.error)); } }); };
       return;
     }
@@ -1963,7 +2003,7 @@ document.addEventListener('click', function(e) {
     else if (!rec.in) { line = L('notIn'); btn = '<button class="attx-btn go attx-big" id="attx-in">' + esc(L('checkin')) + '</button>'; }
     else if (!rec.out) { line = L('inAt') + ' ' + rec.in; btn = '<button class="attx-btn out attx-big" id="attx-out">' + esc(L('checkout')) + '</button>'; }
     else line = L('inAt') + ' ' + rec.in + ' · ' + L('outAt') + ' ' + rec.out + '. ' + L('done');
-    h += '<div class="attx-muted">' + esc(L('today')) + ' · ' + esc(fmtDay(d.today)) + ' · <span style="direction:ltr;display:inline-block">' + esc(d.serverTime) + '</span></div><p style="font-size:15px;margin:6px 0 10px">' + esc(line) + '</p><div class="attx-row">' + btn + '</div><div id="attx-pm"></div>';
+    h += '<div class="attx-muted">' + esc(L('today')) + ' · ' + esc(fmtDay(d.today)) + ' · <span style="direction:ltr;display:inline-block">' + esc(d.serverTime) + '</span></div><p style="font-size:15px;margin:6px 0 6px">' + esc(line) + '</p>' + hoursLine(d) + '<div class="attx-row">' + btn + '</div><div id="attx-pm"></div>';
     h += '<div class="attx-muted" style="margin-top:8px">' + esc(L(d.approver === 'manager' ? 'approver_manager' : 'approver_admin')) + '</div></div>';
     (d.pendingMonths || []).forEach(function (m) {
       h += '<div class="attx-banner"><b>' + esc(L('signNeeded')) + ' — ' + esc(fmtMonth(m)) + '</b><div style="margin-top:8px"><button class="attx-btn" data-attx-sign="' + esc(m) + '">' + esc(L('review')) + '</button></div></div>';
