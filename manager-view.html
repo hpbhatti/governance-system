@@ -1361,6 +1361,7 @@ loadPartnerView();
       checkin: 'Check in', checkout: 'Check out', done: 'Done for today.',
       consentTitle: 'Before you start', consentText: 'To record your remote attendance, the system saves the time of each check-in and check-out, the date, your device type and your network address. This is used only for your monthly timesheet and for company records, and it is kept for 5 years. Each month you will confirm and sign your timesheet.',
       consentBtn: 'I understand and agree',
+      cl_present: 'Present', cl_off: 'Weekend / holiday', cl_absent: 'Absent', tapDay: 'Tap a day to see its details.', noDayRec: 'No record for this day.', dayOff: 'Weekend or holiday', dayHol: 'Holiday', dayAbs: 'Absent',
       ckin: 'Checking in…', ckout: 'Checking out…', saving: 'Saving…', pleaseWait: 'Please wait. Do not close this page.', slowWait: 'Still working. This can take a few more seconds.',
       sendCode: 'Send code to my email', codeSent: 'A code was sent to your email. It is valid for a few minutes.', enterCode: 'Enter the 6-digit code', confirm: 'Confirm', cancel: 'Cancel', close: 'Close', back: 'Back',
       signNeeded: 'Timesheet ready for your signature', review: 'Review and sign', signTitle: 'Confirm and sign your timesheet',
@@ -1388,6 +1389,7 @@ loadPartnerView();
       checkin: 'تسجيل الحضور', checkout: 'تسجيل الانصراف', done: 'اكتمل يومك.',
       consentTitle: 'قبل أن تبدأ', consentText: 'لتسجيل حضورك عن بُعد، يحفظ النظام وقت كل حضور وانصراف، والتاريخ، ونوع جهازك وعنوان شبكتك. تُستخدم هذه البيانات لكشف الحضور الشهري وسجلات الشركة فقط، وتُحفظ لمدة 5 سنوات. وفي نهاية كل شهر ستؤكد كشفك وتوقّع عليه.',
       consentBtn: 'أفهم وأوافق',
+      cl_present: 'حاضر', cl_off: 'عطلة / إجازة رسمية', cl_absent: 'غياب', tapDay: 'اضغط على يوم لعرض تفاصيله.', noDayRec: 'لا يوجد سجل لهذا اليوم.', dayOff: 'عطلة نهاية الأسبوع أو عطلة رسمية', dayHol: 'عطلة رسمية', dayAbs: 'غياب',
       ckin: 'جارٍ تسجيل الحضور…', ckout: 'جارٍ تسجيل الانصراف…', saving: 'جارٍ الحفظ…', pleaseWait: 'يرجى الانتظار وعدم إغلاق الصفحة.', slowWait: 'ما زال العمل جارياً. قد يستغرق ذلك بضع ثوانٍ إضافية.',
       sendCode: 'أرسل الرمز إلى بريدي', codeSent: 'تم إرسال رمز إلى بريدك الإلكتروني. صالح لدقائق قليلة.', enterCode: 'أدخل الرمز المكوّن من 6 أرقام', confirm: 'تأكيد', cancel: 'إلغاء', close: 'إغلاق', back: 'رجوع',
       signNeeded: 'كشف الحضور جاهز لتوقيعك', review: 'مراجعة وتوقيع', signTitle: 'أكّد كشف الحضور ووقّع عليه',
@@ -1468,6 +1470,14 @@ loadPartnerView();
     '.attx-spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;vertical-align:-2px;margin-inline-end:8px;animation:attxr 1s linear infinite}@keyframes attxr{to{transform:rotate(360deg)}}',
     '.attx-wait{margin-top:10px}.attx-wbar{height:4px;background:var(--line,#e4e0d6);border-radius:2px;overflow:hidden}.attx-wbar i{display:block;height:100%;width:40%;background:#1a3a51;border-radius:2px;animation:attxm 1.2s ease-in-out infinite}@keyframes attxm{0%{margin-left:-40%}100%{margin-left:100%}}',
     '.attx-wtxt{font-size:12px;color:var(--ink-muted,#5a6478);margin-top:6px}',
+    '.attx-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0}.attx-cwd{font-size:10.5px;color:#8a92a3;text-align:center;padding:2px 0}',
+    '.attx-cd{height:50px;border-radius:9px;background:#f3f1ea;border:1.5px solid transparent;font:inherit;font-size:12px;padding:4px 5px;text-align:start;color:inherit;cursor:pointer;box-sizing:border-box;min-width:0;overflow:hidden}',
+    '.attx-cd small{display:block;font-size:8.5px;line-height:1.25;margin-top:2px;color:#5a6478;direction:ltr;text-align:start}.attx-cpad{background:transparent;cursor:default;border:0}',
+    '.attx-cok{background:#e4eee6}.attx-cla{background:#faefd9}.attx-cer{background:#f7e1df}.attx-clv{background:#e3ebf4}.attx-cab{background:#fff;border-color:#e3b3af}',
+    '.attx-cwk{background:repeating-linear-gradient(45deg,#f3f1ea 0 4px,#ebe8df 4px 8px);color:#a39e90}.attx-ctd{border-color:#1a3a51}',
+    '.attx-csel,.attx-csel.attx-cok,.attx-csel.attx-cla,.attx-csel.attx-cer,.attx-csel.attx-clv,.attx-csel.attx-cab,.attx-csel.attx-cwk{background:#1a3a51;color:#fff;border-color:#1a3a51}.attx-csel small{color:#dfe7ee}',
+    '.attx-clg{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:10.5px;color:#5a6478;margin-top:8px}.attx-clg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px}',
+    '.attx-cdet{border:1px solid var(--line,#e4e0d6);border-radius:10px;padding:10px 12px;margin:10px 0 4px;background:#faf8f3;font-size:13px}.attx-cdet .r{display:flex;justify-content:space-between;margin-top:4px;font-size:12.5px}.attx-cdet .r b{direction:ltr}',
     '.attx-big{font-size:15px;padding:13px 26px}',
     '.attx-msg{margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px}',
     '.attx-msg.err{background:var(--red-bg,#f5e0de);color:var(--red,#b04540)}.attx-msg.ok{background:var(--green-bg,#e8f0e8);color:var(--green,#4a7c59)}',
@@ -1600,6 +1610,59 @@ loadPartnerView();
       S.data = r.data; S.month = r.data.month; return r.data;
     });
   }
+  // ---------- WORKER CALENDAR (added) ----------
+  function calDetail(d) {
+    var ds = S.sel; if (!ds) return '<div class="attx-muted">' + esc(L('tapDay')) + '</div>';
+    var rows = (d.content && d.content.rows) || [], r = null; rows.forEach(function (x) { if (x.d === ds) r = x; });
+    var st = d.settings || {}, hol = (st.holidays || []).indexOf(ds) >= 0;
+    var h = '<b>' + esc(fmtDay(ds)) + '</b>';
+    if (r && (r.in || r.leave)) {
+      h += ' ' + (r.flags || []).map(function (f) { return '<span class="attx-fl">' + esc(L('f_' + f)) + '</span>'; }).join('');
+      if (!r.leave) h += '<div class="r"><span>' + esc(L('inL')) + '</span><b>' + esc(r.in ? r.in.slice(0, 5) : '–') + '</b></div><div class="r"><span>' + esc(L('outL')) + '</span><b>' + esc(r.out ? r.out.slice(0, 5) : '–') + '</b></div><div class="r"><span>' + esc(L('net')) + '</span><b>' + esc(r.net != null ? fmtMin(r.net) : '–') + '</b></div>';
+      return h;
+    }
+    var cl = calClass(d, ds, null);
+    h += '<div class="attx-muted" style="margin-top:6px">' + esc(cl.indexOf('attx-cwk') >= 0 ? L(hol ? 'dayHol' : 'dayOff') : (cl.indexOf('attx-cab') >= 0 ? L('dayAbs') : L('noDayRec'))) + '</div>';
+    return h;
+  }
+  function calClass(d, ds, r) {
+    var rows = (d.content && d.content.rows) || []; if (r === null) { rows.forEach(function (x) { if (x.d === ds) r = x; }); }
+    var st = d.settings || {}, wk = (st.weekend || []).map(Number), hol = (st.holidays || []).indexOf(ds) >= 0;
+    var p = ds.split('-'), wdn = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay(), off = wk.indexOf(wdn) >= 0 || hol;
+    var cls = '', from = d.enabledFrom || '0000-00-00';
+    if (r && r.leave) cls = 'attx-clv';
+    else if (r && r.in) { var f = r.flags || []; cls = f.indexOf('early') >= 0 ? 'attx-cer' : (f.indexOf('late') >= 0 || f.indexOf('missing') >= 0 ? 'attx-cla' : 'attx-cok'); }
+    else if (off) cls = 'attx-cwk';
+    else if (ds < d.today && ds >= from) cls = 'attx-cab';
+    return cls;
+  }
+  function calInner(d) {
+    var ar = lang() === 'ar', rows = (d.content && d.content.rows) || [], map = {}; rows.forEach(function (r) { map[r.d] = r; });
+    var p = d.month.split('-'), y = +p[0], mo = +p[1], n = new Date(Date.UTC(y, mo, 0)).getUTCDate(), first = new Date(Date.UTC(y, mo - 1, 1)).getUTCDay(), i, k;
+    var h = '<div class="attx-cal">';
+    for (i = 0; i < 7; i++) h += '<div class="attx-cwd">' + esc(new Date(Date.UTC(2026, 10, 1 + i)).toLocaleDateString(ar ? 'ar' : 'en-US', { weekday: 'short', timeZone: 'UTC' })) + '</div>';
+    for (i = 0; i < first; i++) h += '<div class="attx-cd attx-cpad"></div>';
+    for (k = 1; k <= n; k++) {
+      var ds = d.month + '-' + ('0' + k).slice(-2), r = map[ds] || null, cls = calClass(d, ds, r), sm = '';
+      if (r && r.in && !r.leave) sm = '<small>' + esc(r.in.slice(0, 5)) + '<br>' + (r.out ? esc(r.out.slice(0, 5)) : '…') + '</small>';
+      if (ds === d.today) cls += ' attx-ctd'; if (ds === S.sel) cls += ' attx-csel';
+      h += '<button type="button" class="attx-cd ' + cls + '" data-attx-day="' + ds + '">' + k + sm + '</button>';
+    }
+    h += '</div><div class="attx-clg">' + [['attx-cok', 'cl_present'], ['attx-cla', 'f_late'], ['attx-cer', 'f_early'], ['attx-clv', 'f_leave'], ['attx-cab', 'cl_absent'], ['attx-cwk', 'cl_off']].map(function (x) {
+      return '<span><i class="attx-cd ' + x[0] + '" style="height:10px;width:10px;padding:0;border-width:1px"></i>' + esc(L(x[1])) + '</span>'; }).join('') + '</div>';
+    return h + '<div class="attx-cdet" id="attx-cdet">' + calDetail(d) + '</div>';
+  }
+  function calHtml(d) {
+    if (S.sel && S.sel.slice(0, 7) !== d.month) S.sel = null;
+    if (!S.sel && d.today && d.today.slice(0, 7) === d.month) S.sel = d.today;
+    return '<div id="attx-calwrap">' + calInner(d) + '</div>';
+  }
+  function calBind(d) {
+    var w = host.querySelector('#attx-calwrap'); if (!w) return;
+    Array.prototype.forEach.call(w.querySelectorAll('[data-attx-day]'), function (b) {
+      b.onclick = function () { S.sel = b.getAttribute('data-attx-day'); w.innerHTML = calInner(d); calBind(d); };
+    });
+  }
   function wRender(flash) {
     var d = S.data; if (!d) return setHTML('');
     var h = idCard(d.name, d.nameAr, (lang() === 'ar' ? (d.designationAr || d.designation) : d.designation), d.employeeId, d.email) + '<div class="attx-card"><div class="attx-h">' + esc(L('title_w')) + '</div>';
@@ -1619,11 +1682,12 @@ loadPartnerView();
       h += '<div class="attx-banner"><b>' + esc(L('signNeeded')) + ' — ' + esc(fmtMonth(m)) + '</b><div style="margin-top:8px"><button class="attx-btn" data-attx-sign="' + esc(m) + '">' + esc(L('review')) + '</button></div></div>';
     });
     if (flash) h += '<div class="attx-msg ok" style="margin-bottom:12px">' + esc(flash) + '</div>';
-    h += '<div class="attx-card"><div class="attx-nav"><button class="attx-btn sec" id="attx-pv">' + (lang() === 'ar' ? '›' : '‹') + '</button><b>' + esc(fmtMonth(d.month)) + '</b><button class="attx-btn sec" id="attx-nx">' + (lang() === 'ar' ? '‹' : '›') + '</button></div>' + tilesHtml(d.content) + tableHtml(d.content) + workHtml(d.content) + '</div>';
+    h += '<div class="attx-card"><div class="attx-nav"><button class="attx-btn sec" id="attx-pv">' + (lang() === 'ar' ? '›' : '‹') + '</button><b>' + esc(fmtMonth(d.month)) + '</b><button class="attx-btn sec" id="attx-nx">' + (lang() === 'ar' ? '‹' : '›') + '</button></div>' + calHtml(d) + tilesHtml(d.content) + tableHtml(d.content) + workHtml(d.content) + '</div>';
     var sh = (d.sheets || []);
     if (sh.length) h += '<div class="attx-card"><div class="attx-h">' + esc(L('sheets')) + '</div><div class="attx-tw"><table class="attx-t"><thead><tr><th>' + esc(L('month')) + '</th><th>' + esc(L('docNo')) + '</th><th>' + esc(L('status')) + '</th><th></th></tr></thead><tbody>' +
       sh.map(function (s) { return '<tr><td>' + esc(fmtMonth(s.month)) + '</td><td style="direction:ltr">' + esc(s.docNo || '') + '</td><td>' + statusPill(s.status) + '</td><td class="attx-muted">' + (s.hasPdf ? esc(L('pdfMail')) : '') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
     setHTML(h);
+    calBind(d);
     var bin = host.querySelector('#attx-in'), bout = host.querySelector('#attx-out');
     if (bin) bin.onclick = function () { wPress('checkin', bin); };
     if (bout) bout.onclick = function () { wPress('checkout', bout); };
