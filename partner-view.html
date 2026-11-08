@@ -307,6 +307,20 @@
   .pv-ms-your-tag { font-size: 9px; font-weight: 600; color: #185fa5; background: #e6f1fb; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
   .pvd-tag { background:#e1ebf2; color:#1a3a52; border-radius:6px; padding:2px 8px; font-size:11.5px; font-weight:600; }
   .pvd-date { flex:1; min-width:0; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; background:#fff; }
+  .pvt-sub { padding:9px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .pvt-sub:last-child { border-bottom:none; }
+  .pvt-sub-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+  .pvt-who { font-weight:600; color:var(--ink); }
+  .pvt-sub-act { margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .pvt-link { color:#1a3a52; font-weight:600; cursor:pointer; text-decoration:underline; font-size:12px; }
+  .pvt-add-bar { display:flex; justify-content:flex-end; margin:10px 0 4px; }
+  .pvt-add-btn { padding:8px 14px; border-radius:8px; border:1px solid #1a3a52; background:#fff; color:#1a3a52; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; }
+  .pvt-pend { background:#fdf5e8; border:1px solid #e4e0d6; border-radius:10px; padding:10px 12px; margin:8px 0; font-size:12.5px; }
+  .pvt-pend-h { font-weight:700; color:#8a5a10; margin-bottom:6px; }
+  .pvt-pend-row { padding:6px 0; border-top:1px dashed #e4e0d6; }
+  .pvt-pend-row:first-of-type { border-top:none; }
+  .pvt-field { display:block; font-size:12px; color:var(--ink-muted); margin:10px 0 4px; }
+  .pvt-input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; box-sizing:border-box; background:#fff; }
   .pvd-as { font-size:11.5px; color:var(--ink-muted); margin-top:8px; }
   .pvd-as a { color:#1a3a52; font-weight:600; cursor:pointer; text-decoration:underline; }
   .pvd-who { display:block; width:100%; text-align:start; padding:11px 13px; border:1px solid var(--line); border-radius:10px; background:#fff; font-size:14px; font-family:inherit; margin-bottom:8px; cursor:pointer; }
@@ -400,6 +414,15 @@ proposalLinkPlaceholder: 'Optional link (e.g. Google Drive file)',
     pvdBefore: function(d){ return 'The end date cannot be earlier than the start date (' + d + ').'; },
     pvdAfterParent: function(d){ return 'The end date cannot be later than the main task date (' + d + ').'; },
     pvdApplied: 'Your end date is saved.', pvdSent: 'Your end date was sent to the admin for approval.',
+    pvtWholeTeam: function(n){ return 'Whole team (' + n + ' members)'; }, pvtTeamTask: 'Team task: each member has own subtask and own end date',
+    pvtThisIsMe: 'This is me', pvtMarkDone: 'Mark complete', pvtYourSub: 'Your part', pvtWaiting: 'Waiting for admin approval',
+    pvtAddedBy: function(n){ return n ? 'Added by partner · ' + n : 'Added by partner'; },
+    pvtAddTask: '+ Add task', pvtAddTitle: 'Add a task', pvtAddSub: 'The task is added to this project. You choose the dates.',
+    pvtFTitle: 'Task name', pvtFStart: 'Start date', pvtFEnd: 'End date', pvtFPriority: 'Priority', pvtFOwner: 'Task owner', pvtFSave: 'Add task',
+    pvtNeedTitle: 'Please write the task name.', pvtNeedEnd: 'Please choose an end date.',
+    pvtAddedLive: 'Your task is added.', pvtAddedWait: 'Your task was sent to the admin for approval.',
+    pvtPendingHead: 'Tasks you added', pvtPendingSt: 'Waiting for approval', pvtRejectedSt: 'Not approved',
+    pvtNotAllowed: 'Adding tasks is not allowed for this project.', pvtError: 'The task could not be added. Please try again.',
     pvdError: 'Could not save the date. Please try again.', pvdNotAllowed: 'This task no longer needs a date from you. The page will refresh.',
     pvgGroupOverdue: 'Overdue', pvgGroupThisWeek: 'Due this week', pvgGroupNextWeek: 'Due next week', pvgGroupLater: 'Due later', pvgGroupCompleted: 'Completed',
     pvgRangeThisWeek: function(d){ return 'today to Thu ' + d; },
@@ -510,6 +533,15 @@ proposalLinkPlaceholder: 'رابط اختياري (مثل ملف Google Drive)',
     pvdBefore: function(d){ return 'لا يمكن أن يكون تاريخ الانتهاء قبل تاريخ البدء (' + d + ').'; },
     pvdAfterParent: function(d){ return 'لا يمكن أن يكون تاريخ الانتهاء بعد تاريخ المهمة الرئيسية (' + d + ').'; },
     pvdApplied: 'تم حفظ تاريخ الانتهاء.', pvdSent: 'تم إرسال تاريخ الانتهاء للمسؤول للموافقة عليه.',
+    pvtWholeTeam: function(n){ return 'الفريق كاملاً (' + n + ' أعضاء)'; }, pvtTeamTask: 'مهمة فريق: لكل عضو مهمة فرعية وتاريخ انتهاء خاص به',
+    pvtThisIsMe: 'هذا أنا', pvtMarkDone: 'تحديد كمكتملة', pvtYourSub: 'حصتك', pvtWaiting: 'بانتظار موافقة المسؤول',
+    pvtAddedBy: function(n){ return n ? 'أضافها الشريك · ' + n : 'أضافها الشريك'; },
+    pvtAddTask: '+ إضافة مهمة', pvtAddTitle: 'إضافة مهمة', pvtAddSub: 'تضاف المهمة إلى هذا المشروع. أنت تختار التواريخ.',
+    pvtFTitle: 'اسم المهمة', pvtFStart: 'تاريخ البدء', pvtFEnd: 'تاريخ الانتهاء', pvtFPriority: 'الأولوية', pvtFOwner: 'مسؤول المهمة', pvtFSave: 'إضافة المهمة',
+    pvtNeedTitle: 'يرجى كتابة اسم المهمة.', pvtNeedEnd: 'يرجى اختيار تاريخ الانتهاء.',
+    pvtAddedLive: 'تمت إضافة مهمتك.', pvtAddedWait: 'تم إرسال مهمتك للمسؤول للموافقة عليها.',
+    pvtPendingHead: 'مهام أضفتها', pvtPendingSt: 'بانتظار الموافقة', pvtRejectedSt: 'لم تتم الموافقة',
+    pvtNotAllowed: 'إضافة المهام غير مسموحة لهذا المشروع.', pvtError: 'تعذرت إضافة المهمة. يرجى المحاولة مرة أخرى.',
     pvdError: 'تعذر حفظ التاريخ. يرجى المحاولة مرة أخرى.', pvdNotAllowed: 'هذه المهمة لم تعد بحاجة لتاريخ منك. سيتم تحديث الصفحة.',
     pvgGroupOverdue: 'متأخرة', pvgGroupThisWeek: 'مستحقة هذا الأسبوع', pvgGroupNextWeek: 'مستحقة الأسبوع القادم', pvgGroupLater: 'مستحقة لاحقًا', pvgGroupCompleted: 'المهام المنجزة',
     pvgRangeThisWeek: function(d){ return 'من اليوم حتى الخميس ' + d; },
@@ -963,6 +995,8 @@ function renderTaskCard(task, subtasks) {
     (task.feedsIntoMilestone ? '<div class="task-milestone-line">🚩 ' + t('neededFor') + ': ' + escapeHtml(milestoneTitle(task.feedsIntoMilestone)) + ' (' + fmtDate(task.feedsIntoMilestone.dueDate) + ')</div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     (task.stakeholder ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(stakeholderDisplayName(task.stakeholder)) + '</strong></div>' : '') +
+    (task.teamTask ? '<div class="stakeholder-line">👥 <strong>' + escapeHtml(t('pvtWholeTeam', subtasks.length)) + '</strong> · ' + escapeHtml(t('pvtTeamTask')) + '</div>' : '') +
+    (task.addedByPartner ? '<div class="stakeholder-line"><span class="pvd-tag">🤝 ' + escapeHtml(t('pvtAddedBy', '')) + '</span></div>' : '') +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
@@ -972,7 +1006,7 @@ function renderTaskCard(task, subtasks) {
       (cls === 'overdue' && pvgWorkDays(task.dueDate, todayStr()) > 0 ? '<span style="color:var(--red);font-weight:600">' + t('pvgOverdueWorkDays', pvgWorkDays(task.dueDate, todayStr())) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
-    renderSubtasks(subtasks) +
+    (task.teamTask ? pvtTeamSubtasksHtml(task, subtasks) : renderSubtasks(subtasks)) +
     (task.dateConfirmationStatus === 'needs_partner_date' ?
       (task.lastDateRejectionReason ?
         '<div class="date-reject-note">' +
@@ -1012,7 +1046,7 @@ function renderTaskCard(task, subtasks) {
         '<div class="date-confirm-waiting">⏳ ' + t('awaitingDateApprovalMsg') + '</div>' +
       '</div>'
     : '') +
-    (canPropose && task.dateConfirmationStatus !== 'pending' && task.dateConfirmationStatus !== 'needs_partner_date' && task.dateConfirmationStatus !== 'awaiting_approval' ?
+    (canPropose && !task.teamTask && task.dateConfirmationStatus !== 'pending' && task.dateConfirmationStatus !== 'needs_partner_date' && task.dateConfirmationStatus !== 'awaiting_approval' ?
       '<div class="propose-row">' +
         (_pendingTaskIds[task.id] === 'pending'
           // Already submitted and awaiting PMO confirmation — block re-submission
@@ -1158,6 +1192,7 @@ function pvgInitials(name) {
 function pvgIsOpen(tk) { return tk.status !== 'completed'; }
 function pvgBucket(tk, today, wkEnd, nxtEnd) {
   if (tk.status === 'completed') return 'done';
+  if (tk.teamTask && tk.status !== 'missed' && pvtActionSubs(tk).length > 0) return 'act';
   if ((tk.dateConfirmationStatus === 'pending' || tk.dateConfirmationStatus === 'needs_partner_date') && tk.status !== 'missed') return 'act';
   if (tk.status === 'missed') return 'ovd';
   if (tk.dueDate && tk.dueDate < today) return 'ovd';
@@ -1257,7 +1292,7 @@ function pvgRenderGroups(items, tasks, pid) {
 
   var actionTasks = items.filter(function(tk){ return pvgBucket(tk, today, wkEnd, nxtEnd) === 'act'; })
     .sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); });
-  var visible = items.filter(function(tk){ return sel === 'ALL' || pvgOwnerKey(tk) === sel; });
+  var visible = items.filter(function(tk){ return sel === 'ALL' || pvgOwnerKey(tk) === sel || pvtTeamHasPerson(tk, sel); });
   var by = { ovd: [], wk: [], nxt: [], later: [], done: [] };
   visible.forEach(function(tk){
     var b = pvgBucket(tk, today, wkEnd, nxtEnd);
@@ -1358,9 +1393,9 @@ function render(data) {
   mainTasks.forEach(function(tk) { (byProject[tk.projectId] = byProject[tk.projectId] || []).push(tk); });
 
   var projectSections = projects
-    .filter(function(p){ return (byProject[p.id] || []).length > 0; })
+    .filter(function(p){ return (byProject[p.id] || []).length > 0 || (p.authority && p.authority.addTasks); })
     .map(function(p) {
-      var items = byProject[p.id].slice().sort(function(a, b) {
+      var items = (byProject[p.id] || []).slice().sort(function(a, b) {
         var rank = { open: 0, overdue: 0, completed: 1, missed: 1 };
         var ac = taskStatusClass(a), bc = taskStatusClass(b);
         if (ac === 'overdue' && bc !== 'overdue') return -1;
@@ -1431,6 +1466,7 @@ function render(data) {
         renderMilestonesZone(p, milestoneYourTasksMap) +
         renderForwardLookingLine(p, personStats) +
         delayBox +
+        pvtAddBarHtml(p) + pvtPendingAddsHtml(p.id) +
         (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' : '') +
         (cardsHtml ? pvgRenderGroups(items, tasks, p.id) : '') +
         (p.attachments && p.attachments.length
@@ -1454,7 +1490,7 @@ function render(data) {
       '<div class="kpi k-done"><div class="kpi-label">' + t('completed') + '</div><div class="kpi-value">' + completed + '</div></div>' +
       '<div class="kpi k-open"><div class="kpi-label">' + t('open') + '</div><div class="kpi-value">' + open + '</div></div>' +
     '</div>' +
-    (mainTasks.length === 0 ? '<div class="state-box"><div class="icon">✅</div><div class="msg">' + t('noTasks') + '</div></div>' : projectSections) +
+    ((mainTasks.length === 0 && !projectSections) ? '<div class="state-box"><div class="icon">✅</div><div class="msg">' + t('noTasks') + '</div></div>' : projectSections) +
     '<div class="footer-note">' + t('footer') + '</div>';
 }
 
@@ -1512,7 +1548,7 @@ function pvdChoosingAsHtml() {
   return '<div class="pvd-as">' + escapeHtml(t('pvdChoosingAs', pvdMemberName(id))) + ' · <a onclick="pvdChangeMember()">' + escapeHtml(t('pvdChange')) + '</a></div>';
 }
 function pvdActionHint(items) {
-  var n = items.filter(function(tk) { return tk.dateConfirmationStatus === 'needs_partner_date'; }).length;
+  var n = items.filter(function(tk) { return tk.dateConfirmationStatus === 'needs_partner_date' || (tk.teamTask && pvtActionSubs(tk).some(function(st) { return st.dateConfirmationStatus === 'needs_partner_date'; })); }).length;
   if (n === 0) return t('pvgNeedsActionHint', items.length);
   return n === items.length ? t('pvdHintChoose') : t('pvdHintMixed');
 }
@@ -1543,6 +1579,131 @@ function pvdEnsureMember(cb) {
   if (id) return cb(id);
   pvdAskMember(cb);
 }
+// ── Team tasks (one main task + one subtask per member) and partner-added tasks ──
+function pvtMeId() {
+  var team = pvdTeam();
+  if (team.length === 1) return team[0].id;
+  return pvdStoredMemberId();
+}
+function pvtSubsOf(tk) { return ((lastData && lastData.tasks) || []).filter(function(st) { return st.parentId === tk.id; }); }
+// Parts of a team task that need an action from this person (or from anyone, when the browser does not know who is using it).
+function pvtActionSubs(tk) {
+  var me = pvtMeId();
+  return pvtSubsOf(tk).filter(function(st) {
+    if (st.status === 'completed' || st.status === 'missed') return false;
+    var needs = st.dateConfirmationStatus === 'needs_partner_date' || st.dateConfirmationStatus === 'pending';
+    return needs && (!me || st.ownerId === me);
+  });
+}
+function pvtTeamHasPerson(tk, key) {
+  if (!tk.teamTask || !key) return false;
+  return pvtSubsOf(tk).some(function(st) { var s = st.stakeholder; return s && (s.nameEn || s.nameRaw || s.nameAr || '') === key; });
+}
+function pvtThisIsMe(memberId) {
+  try { localStorage.setItem(pvdMemberKey(), memberId); } catch (e) {}
+  if (lastData) render(lastData);
+}
+function pvtTeamSubtasksHtml(parent, subs) {
+  if (!subs.length) return '';
+  var me = pvtMeId();
+  return '<div class="subtask-list">' + subs.map(function(st) {
+    var mine = !!me && st.ownerId === me;
+    var done = st.status === 'completed';
+    var who = st.stakeholder ? stakeholderDisplayName(st.stakeholder) : '';
+    var dateTxt = st.dueDate ? '<span class="subtask-due">📅 ' + fmtDate(st.dueDate) + '</span>'
+      : '<span class="subtask-due">' + escapeHtml(t('pvdEndDateYouChoose')) + '</span>';
+    var tag = st.datePartnerSet ? ' <span class="pvd-tag">📅 ' + escapeHtml(st.dateSetBy ? t('pvdSetByName', st.dateSetBy, fmtDate(st.datePartnerSet)) : t('pvdSetByYou', fmtDate(st.datePartnerSet))) + '</span>' : '';
+    var act = '';
+    if (!done && st.status !== 'missed') {
+      if (!me && pvdTeam().length > 1) {
+        act = '<a class="pvt-link" onclick="pvtThisIsMe(\'' + escapeHtml(st.ownerId || '') + '\')">' + escapeHtml(t('pvtThisIsMe')) + '</a>';
+      } else if (mine) {
+        if (st.dateConfirmationStatus === 'needs_partner_date') {
+          act = '<input type="date" class="pvd-date" id="pvd-date-' + escapeHtml(st.id) + '"' + (st.startDate ? ' min="' + escapeHtml(st.startDate) + '"' : '') + (parent.dueDate ? ' max="' + escapeHtml(parent.dueDate) + '"' : '') + '>' +
+            '<button class="propose-btn" style="flex:0 0 auto" onclick="pvdChooseEndDate(\'' + st.id + '\')">✓ ' + t('pvdConfirmBtn') + '</button>' +
+            (parent.dueDate ? '<div class="date-confirm-hint" style="flex-basis:100%;margin:0">' + escapeHtml(t('pvdAfterParent', fmtDate(parent.dueDate))) + '</div>' : '');
+        } else if (st.dateConfirmationStatus === 'pending') {
+          act = '<button class="propose-btn" onclick="openDateConfirm(\'' + st.id + '\', false)">✓ ' + t('confirmDateBtn') + '</button>' +
+            '<button class="propose-btn secondary" onclick="openDateConfirm(\'' + st.id + '\', true)">📅 ' + t('chooseOtherDateBtn') + '</button>';
+        } else if (st.dateConfirmationStatus === 'awaiting_approval') {
+          act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('awaitingDateApprovalMsg')) + '</span>';
+        } else if (_pendingTaskIds[st.id] === 'pending') {
+          act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('submittedPendingLabel')) + '</span>';
+        } else {
+          act = '<button class="propose-btn" onclick="openProposeComplete(\'' + st.id + '\')">✓ ' + t('pvtMarkDone') + '</button>';
+        }
+      }
+    }
+    return '<div class="pvt-sub"><div class="pvt-sub-top">' +
+      '<span class="subtask-title">◦ <span class="pvt-who">' + escapeHtml(who) + '</span>' + (mine ? ' <em style="color:var(--ink-faint)">(' + escapeHtml(t('pvtYourSub')) + ')</em>' : '') + '</span>' +
+      '<span class="subtask-tags">' + statusBadge(st) + dateTxt + '</span></div>' +
+      (tag ? '<div style="margin-top:4px">' + tag + '</div>' : '') +
+      (act ? '<div class="pvt-sub-act">' + act + '</div>' : '') + '</div>';
+  }).join('') + '</div>';
+}
+
+function pvtAddBarHtml(p) {
+  if (!(p.authority && p.authority.addTasks)) return '';
+  return '<div class="pvt-add-bar"><button class="pvt-add-btn" onclick="pvtOpenAdd(\'' + escapeHtml(p.id) + '\')">' + escapeHtml(t('pvtAddTask')) + '</button></div>';
+}
+function pvtPendingAddsHtml(pid) {
+  var list = ((lastData && lastData.pendingAdds) || []).filter(function(a) { return a.projectId === pid; });
+  if (!list.length) return '';
+  return '<div class="pvt-pend"><div class="pvt-pend-h">' + escapeHtml(t('pvtPendingHead')) + '</div>' + list.map(function(a) {
+    var rej = a.status === 'rejected';
+    return '<div class="pvt-pend-row"><strong>' + escapeHtml(a.title) + '</strong> · ' + (a.dueDate ? fmtDate(a.dueDate) : '') +
+      '<br><span style="color:' + (rej ? 'var(--red)' : '#8a5a10') + '">' + (rej ? '↩ ' + escapeHtml(t('pvtRejectedSt')) + (a.rejectionReason ? ': ' + escapeHtml(a.rejectionReason) : '') : '⏳ ' + escapeHtml(t('pvtPendingSt'))) + '</span></div>';
+  }).join('') + '</div>';
+}
+function pvtOpenAdd(projectId) {
+  pvdEnsureMember(function(memberId) {
+    var team = pvdTeam();
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal-box"><div style="font-weight:700;font-size:16px">' + escapeHtml(t('pvtAddTitle')) + '</div>' +
+      '<div style="font-size:12.5px;color:var(--ink-muted);margin:4px 0 6px;line-height:1.5">' + escapeHtml(t('pvtAddSub')) + '</div>' +
+      '<label class="pvt-field">' + escapeHtml(t('pvtFTitle')) + '</label><input class="pvt-input" id="pvt-title" maxlength="200">' +
+      '<label class="pvt-field">' + escapeHtml(t('pvtFStart')) + '</label><input class="pvt-input" type="date" id="pvt-start" value="' + escapeHtml(todayStr()) + '">' +
+      '<label class="pvt-field">' + escapeHtml(t('pvtFEnd')) + '</label><input class="pvt-input" type="date" id="pvt-end">' +
+      '<label class="pvt-field">' + escapeHtml(t('pvtFPriority')) + '</label><select class="pvt-input" id="pvt-prio"><option value="high">' + t('pHigh') + '</option><option value="medium" selected>' + t('pMedium') + '</option><option value="low">' + t('pLow') + '</option></select>' +
+      (team.length > 1 ? '<label class="pvt-field">' + escapeHtml(t('pvtFOwner')) + '</label><select class="pvt-input" id="pvt-owner">' +
+        team.map(function(m) { return '<option value="' + escapeHtml(m.id) + '"' + (m.id === memberId ? ' selected' : '') + '>' + escapeHtml(pvdMemberName(m.id)) + '</option>'; }).join('') + '</select>' : '') +
+      '<div class="modal-actions" style="margin-top:16px"><button onclick="this.closest(&quot;.modal-overlay&quot;).remove()">' + t('proposalCancelBtn') + '</button>' +
+      '<button class="primary" id="pvt-save">' + escapeHtml(t('pvtFSave')) + '</button></div></div>';
+    document.body.appendChild(overlay);
+    document.getElementById('pvt-save').onclick = function() {
+      var title = (document.getElementById('pvt-title').value || '').trim();
+      var start = document.getElementById('pvt-start').value;
+      var end = document.getElementById('pvt-end').value;
+      if (!title) { alert(t('pvtNeedTitle')); return; }
+      if (!end) { alert(t('pvtNeedEnd')); return; }
+      if (start && end < start) { alert(t('pvdBefore', fmtDate(start))); return; }
+      var btn = this; btn.disabled = true;
+      var ownerEl = document.getElementById('pvt-owner');
+      fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: getCurrentToken(), changeType: 'task_add', projectId: projectId, title: title, startDate: start || '', dueDate: end,
+          priority: document.getElementById('pvt-prio').value, ownerMemberId: ownerEl ? ownerEl.value : memberId, byMemberId: memberId, lang: currentLang })
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; }).then(function(j) { return { ok: res.ok, j: j }; });
+      }).then(function(r) {
+        if (!r.ok) {
+          btn.disabled = false;
+          var e = r.j && r.j.error;
+          if (e === 'before_start') alert(t('pvdBefore', fmtDate(r.j.startDate)));
+          else if (e === 'not_allowed') { overlay.remove(); alert(t('pvtNotAllowed')); loadPartnerView(); }
+          else alert(t('pvtError'));
+          return;
+        }
+        overlay.remove();
+        alert(r.j.applied ? t('pvtAddedLive') : t('pvtAddedWait'));
+        loadPartnerView();
+      }).catch(function() { btn.disabled = false; alert(t('pvtError')); });
+    };
+  });
+}
+
 function pvdChooseEndDate(taskId) {
   if (!lastData) return;
   var task = (lastData.tasks || []).find(function(tk) { return tk.id === taskId; });
