@@ -11102,6 +11102,10 @@ function pdaOwnerPartnerOf(ownerRaw) {
 function pdaEmptyDateAllowed(actionId) {
   const type = document.getElementById('f-type')?.value;
   if (type !== 'task') return false;
+  if (actionId) {
+    const a0 = state.actions.find(x => x.id === actionId);
+    if (a0 && !a0.dueDate && (a0.teamTask || a0.dateConfirmationStatus === 'needs_partner_date')) return pdtEditSettingOn(a0);
+  }
   let partner = pdaOwnerPartnerOf(document.getElementById('f-owner')?.value || '');
   if (!partner && !actionId) { try { const _ids = pdtSelectedIds(); if (_ids.length) partner = getPartnerForMemberId(_ids[0]) || null; } catch (e) {} }
   if (!partner) return false;
@@ -11432,12 +11436,57 @@ function pdtRefreshDate() {
     const h = document.getElementById('pda-date-hint'); if (h) h.remove();
   }
 }
+/* Editing without a date is allowed only while the partner-chooses-date setting is ON for this partner and project.
+   When the setting is off, the system behaves as before: every task needs a date. */
+function pdtEditSettingOn(a) {
+  try {
+    const pid = document.getElementById('f-project')?.value || a.projectId;
+    let partner = null;
+    if (a.ownerKind === 'partner' && a.ownerId) partner = getPartnerForMemberId(a.ownerId);
+    else if (a.teamTask) partner = getPartnerForMemberId((a.teamMemberIds || [])[0]) || getPartner(a.partnerId);
+    return !!partner && pdaEffective(partner, getProject(pid)).chooseDates;
+  } catch (e) { return false; }
+}
+
+/* Team subtasks never appear in the Depends On list or the Linked Deliverable list. Only the main task does. */
+function pdtIsTeamSub(id) {
+  const a = state.actions.find(x => x.id === id);
+  if (!a || !a.parentId) return false;
+  const p = state.actions.find(x => x.id === a.parentId);
+  return !!(p && p.teamTask);
+}
+function pdtTidyTaskForm(actionId) {
+  const editing = actionId ? state.actions.find(x => x.id === actionId) : null;
+  const dep = document.getElementById('f-depends-on-container');
+  if (dep && !dep.dataset.pdtObs) {
+    dep.dataset.pdtObs = '1';
+    const clean = () => dep.querySelectorAll('.dep-cb').forEach(cb => { if (!cb.checked && pdtIsTeamSub(cb.value)) { const l = cb.closest('label'); if (l) l.remove(); } });
+    new MutationObserver(clean).observe(dep, { childList: true });
+    clean();
+  }
+  const lk = document.getElementById('f-linked-task');
+  if (lk && !lk.dataset.pdtObs) {
+    lk.dataset.pdtObs = '1';
+    const clean2 = () => Array.from(lk.options).forEach(o => { if (o.value && !o.selected && pdtIsTeamSub(o.value)) o.remove(); });
+    new MutationObserver(clean2).observe(lk, { childList: true });
+    clean2();
+  }
+  if (editing && editing.teamTask && pdtEditSettingOn(editing)) {
+    const fix = () => {
+      const label = document.getElementById('due-label'); if (!label) return;
+      label.innerHTML = t('pdtMainEnd') + ' <span class="pda-tag pda-wait">' + t('pdtOptionalTag') + '</span>';
+      const h = document.getElementById('pda-date-hint'); if (h) h.remove();
+    };
+    fix(); setTimeout(fix, 0); setTimeout(fix, 150);
+  }
+}
 (function() {
   const orig = window.showActionForm;
   if (typeof orig !== 'function') return;
   window.showActionForm = function(actionId, defaultProjectId, defaultPartnerId, defaultType, defaultDate, parentId) {
     window._pdtSel = {};
     const r = orig.apply(this, arguments);
+    try { pdtTidyTaskForm(actionId); } catch (e) {}
     try {
       if (!actionId && !parentId) {
         ['f-project', 'f-type'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { window._pdtSel = {}; const ownerRow = document.getElementById('owner-row'); if (ownerRow) ownerRow.style.display = ''; pdtRenderTeamRow(); }); });
