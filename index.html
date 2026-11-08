@@ -4780,7 +4780,7 @@ function getPartnerCommitment(partnerId) {
   //     was edited in the system. Backdating a completion to its true date is
   //     always respected exactly as entered.
   const relevant = state.actions.filter(a =>
-    a.partnerId === partnerId && isTask(a) && !isInternalOwned(a));
+    a.partnerId === partnerId && isTask(a) && !isInternalOwned(a) && !a.teamTask);
 
   const completed = relevant.filter(isCompleted);
   const open = relevant.filter(isOpen);
@@ -5243,10 +5243,10 @@ function renderTaskNodeBody(a, subtasks) {
           var sDrift = getTaskDrift(sub);
           return '<div class="subtask-item ' + (isCompleted(sub) ? 'done' : '') + '">' +
             '<div style="flex:1"><div class="subtask-name">' + escapeHtml(sub.title) + '</div>' +
-            '<div class="subtask-date">' + fmtDate(sub.dueDate) +
+            '<div class="subtask-date">' + pdtSubOwnerHtml(sub) + fmtDate(sub.dueDate) +
             (isOpen(sub) && sDelay > 0 ? ' · <span style="color:var(--red)">+' + sDelay + ' ' + t('days') + '</span>' : '') +
             (sDrift > 0 ? ' · <span class="drift-chip">+' + sDrift + '</span>' : '') +
-            ' · ' + statusBadge(sub.status) + '</div></div>' +
+            ' · ' + statusBadge(sub.status) + pdtSubTagHtml(sub) + '</div></div>' +
             '<div style="display:flex;gap:4px">' +
             (isOpen(sub) ? '<button class="row-btn" onclick="event.stopPropagation();completeAction(\'' + sub.id + '\')">' + t('completeBtn') + '</button>' : '') +
             (isOpen(sub) ? '<button class="row-btn" onclick="event.stopPropagation();showExtendDialog(\'' + sub.id + '\')">📅</button>' : '') +
@@ -10937,7 +10937,8 @@ Object.assign(T.en, {
   pdaRemindSend: 'Send reminder ({0})', pdaRemindSent: 'Reminder sent to {0} member(s).', pdaRemindFail: 'Some reminders could not be sent. Please try again.',
   pdaNoLink: 'This partner has no active link yet. Create the link so the partner can choose the date.', pdaNoEmail: 'This member has no email on file.',
   pdaNeedsDateNoOwner: 'Choose a task owner from the partner team. The partner can choose the end date only for a partner team member.',
-  pdaChosenBy: 'chosen by {0}'
+  pdaChosenBy: 'chosen by {0}',
+  pdaInfoHint: 'The partner of this project chooses the end date. Choose a Task Owner from the partner team, then leave the End Date empty.'
 });
 Object.assign(T.ar, {
   pdaSecTitle: 'صلاحية الشريك في التواريخ', pdaSecSub: 'الإعداد الافتراضي لكل مشاريع هذا الشريك. كل شيء معطل حتى تفعّله. ويمكن للمشروع تجاوز هذا الإعداد.',
@@ -10960,7 +10961,8 @@ Object.assign(T.ar, {
   pdaRemindSend: 'إرسال التذكير ({0})', pdaRemindSent: 'تم إرسال التذكير إلى {0} عضو.', pdaRemindFail: 'تعذر إرسال بعض التذكيرات. يرجى المحاولة مرة أخرى.',
   pdaNoLink: 'لا يوجد رابط نشط لهذا الشريك بعد. أنشئ الرابط ليتمكن الشريك من اختيار التاريخ.', pdaNoEmail: 'لا يوجد بريد إلكتروني لهذا العضو.',
   pdaNeedsDateNoOwner: 'اختر مسؤول المهمة من فريق الشريك. يمكن للشريك اختيار تاريخ الانتهاء لعضو في فريق الشريك فقط.',
-  pdaChosenBy: 'اختاره {0}'
+  pdaChosenBy: 'اختاره {0}',
+  pdaInfoHint: 'شريك هذا المشروع يختار تاريخ الانتهاء. اختر مسؤول المهمة من فريق الشريك ثم اترك تاريخ الانتهاء فارغاً.'
 });
 
 (function pdaInjectCss() {
@@ -11128,7 +11130,17 @@ function pdaRefreshTaskDateHint() {
     hint.textContent = t('pdaEndDateHint');
   } else {
     if (label.dataset.pdaOrig && label.innerHTML.indexOf('pda-tag') !== -1) label.innerHTML = label.dataset.pdaOrig;
-    if (hint) hint.remove();
+    // Authority is on for this project but no partner owner is chosen yet: show a short pointer instead.
+    let info = false;
+    try { info = !editingId && document.getElementById('f-type')?.value === 'task' && pdaAnyAuthorityOn(document.getElementById('f-project')?.value); } catch (e) {}
+    if (info) {
+      if (!hint) {
+        hint = document.createElement('div'); hint.id = 'pda-date-hint'; hint.className = 'pda-call';
+        const row = due.closest('.form-row') || due.parentElement;
+        row.parentElement.insertBefore(hint, row.nextSibling);
+      }
+      hint.textContent = t('pdaInfoHint');
+    } else if (hint) hint.remove();
   }
 }
 (function() {
@@ -11225,12 +11237,13 @@ async function pdaSendRemind() {
       const proj = getProject(R.projectId);
       let body;
       if (R.mode === 'only') {
-        body = { recipients: [x.member.email], recipientName: pdaPick(x.member, 'name') || x.member.name, recipientType: 'partner_date_reminder',
-          items: x.tasks.map(a => ({ title: pdaPick(a, 'title') || a.title, projectName: proj ? pdaPick(proj, 'name') : '', startDate: a.startDate ? fmtDate(a.startDate) : '', isSubtask: !!a.parentId })),
-          linkUrl, lang: currentLang };
+        const _pl = pdaPartnerLang(x.partner);
+        body = { recipients: [x.member.email], recipientName: pdaPickL(x.member, 'name', _pl) || x.member.name, recipientType: 'partner_date_reminder',
+          items: x.tasks.map(a => ({ title: pdaPickL(a, 'title', _pl) || a.title, projectName: proj ? pdaPickL(proj, 'name', _pl) : '', startDate: a.startDate ? fmtDate(a.startDate) : '', isSubtask: !!a.parentId })),
+          linkUrl, lang: _pl };
       } else {
         const breakdown = computeProjectBreakdownForPartner(x.partner.id).map(b => Object.assign({}, b, { needsDateTasks: (b.needsDateTasks || []).filter(n => n.ownerId === x.member.id) }));
-        body = { recipients: [x.member.email], recipientName: x.member.name, recipientType: 'team_member', projectBreakdown: breakdown, linkUrl, lang: currentLang };
+        body = { recipients: [x.member.email], recipientName: x.member.name, recipientType: 'team_member', projectBreakdown: breakdown, linkUrl, lang: pdaPartnerLang(x.partner) };
       }
       const res = await fetch(SEND_EMAIL_FUNCTION_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.ok) sent++; else failed++;
@@ -11256,8 +11269,8 @@ async function pdaNotifyEndDateNeeded(task) {
     if (!member || !member.email) return skip('owner has no email on file');
     const proj = getProject(task.projectId);
     const res = await fetch(SEND_EMAIL_FUNCTION_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipients: [member.email], recipientName: pdaPick(member, 'name') || member.name, recipientType: 'partner_date_needed',
-        taskTitle: pdaPick(task, 'title') || task.title, projectName: proj ? pdaPick(proj, 'name') : '', startDate: task.startDate ? fmtDate(task.startDate) : '', linkUrl, lang: currentLang }) });
+      body: JSON.stringify({ recipients: [member.email], recipientName: pdaPickL(member, 'name', pdaPartnerLang(partner)) || member.name, recipientType: 'partner_date_needed',
+        taskTitle: pdaPickL(task, 'title', pdaPartnerLang(partner)) || task.title, projectName: proj ? pdaPickL(proj, 'name', pdaPartnerLang(partner)) : '', startDate: task.startDate ? fmtDate(task.startDate) : '', linkUrl, lang: pdaPartnerLang(partner) }) });
     if (!res.ok) console.warn('End-date request email answered ' + res.status);
   } catch (e) { console.warn('pdaNotifyEndDateNeeded failed: ' + (e && e.message ? e.message : e)); }
 }
@@ -11267,6 +11280,390 @@ function pdaChosenByHtml(row) {
   const n = row && typeof row.note_text === 'string' && row.note_text.indexOf('partner_chosen|') === 0 ? row.note_text.slice(15) : null;
   return n ? ' <span style="color:var(--ink-faint);font-size:11.5px">(' + t('pdaChosenBy', escapeHtml(n)) + ')</span>' : '';
 }
+
+/* ========== TEAM TASKS, PARTNER-ADDED TASKS, PER-PERSON EMAILS, PARTNER EMAIL LANGUAGE (new, self-contained) ==========
+   Extends the partner date authority block above. Existing functions are wrapped, never replaced. */
+Object.assign(T.en, {
+  pdtTeamTitle: 'Assign to team members', pdtSelectAll: 'Select all', pdtNew: 'NEW',
+  pdtHintNone: 'Tick one member for a normal task. Tick two or more for a team task. Or use the Task Owner list above for one person.',
+  pdtSumOne: 'Normal task for {0}.',
+  pdtSumManyChoose: '{0} members selected. The system creates one main task and {0} subtasks, one for each member. You set the main end date. Each member chooses his own end date, on or before the main date.',
+  pdtSumManyFixed: '{0} members selected. The system creates one main task and {0} subtasks, one for each member. Every subtask gets the main end date.',
+  pdtMainEnd: 'Main End Date', pdtSetByAdmin: 'set by Admin',
+  pdtWholeTeam: 'Whole team ({0})', pdtTeamOf: 'Team of {0}',
+  pdtParentClosed: 'All subtasks are done. The main task is completed.',
+  pdtAddedTag: 'Added by partner', pdtProposedByPartner: 'Added by partner',
+  pdtApprovedPartnerTask: 'Partner task approved. It is now active.',
+  pdtEmailLangTitle: 'Email language for this partner', pdtEmailLangFollow: 'Follow my screen language', pdtEmailLangEn: 'English', pdtEmailLangAr: 'Arabic',
+  pdtEmailLangHint: 'Emails to this partner use this language, whatever language your screen is in. Emails to your own PMO people keep their fixed language.',
+  pdtPickTitle: 'What should each person receive?',
+  pdtPickAll: 'One team email', pdtPickAllD: 'Everyone selected receives the same email with the tasks of the whole partner team.',
+  pdtPickEach: 'One email per person', pdtPickEachD: 'Each team member receives only his own remaining tasks and the tasks that need his end date. The main contact receives the team email.',
+  pdtPickLang: 'Email language: {0}',
+  pdtSentEach: '{0} emails sent.'
+});
+Object.assign(T.ar, {
+  pdtTeamTitle: 'تعيين لأعضاء الفريق', pdtSelectAll: 'تحديد الكل', pdtNew: 'جديد',
+  pdtHintNone: 'حدد عضواً واحداً لمهمة عادية. حدد عضوين أو أكثر لمهمة فريق. أو استخدم قائمة مسؤول المهمة أعلاه لشخص واحد.',
+  pdtSumOne: 'مهمة عادية لـ {0}.',
+  pdtSumManyChoose: 'تم تحديد {0} أعضاء. ينشئ النظام مهمة رئيسية واحدة و{0} مهام فرعية، واحدة لكل عضو. أنت تحدد تاريخ انتهاء المهمة الرئيسية. ويختار كل عضو تاريخ انتهائه، في تاريخ المهمة الرئيسية أو قبله.',
+  pdtSumManyFixed: 'تم تحديد {0} أعضاء. ينشئ النظام مهمة رئيسية واحدة و{0} مهام فرعية، واحدة لكل عضو. تحصل كل مهمة فرعية على تاريخ انتهاء المهمة الرئيسية.',
+  pdtMainEnd: 'تاريخ انتهاء المهمة الرئيسية', pdtSetByAdmin: 'يحدده المسؤول',
+  pdtWholeTeam: 'الفريق كاملاً ({0})', pdtTeamOf: 'فريق من {0}',
+  pdtParentClosed: 'اكتملت كل المهام الفرعية. تم إكمال المهمة الرئيسية.',
+  pdtAddedTag: 'أضافها الشريك', pdtProposedByPartner: 'أضافها الشريك',
+  pdtApprovedPartnerTask: 'تمت الموافقة على مهمة الشريك. أصبحت نشطة الآن.',
+  pdtEmailLangTitle: 'لغة البريد لهذا الشريك', pdtEmailLangFollow: 'اتباع لغة شاشتي', pdtEmailLangEn: 'الإنجليزية', pdtEmailLangAr: 'العربية',
+  pdtEmailLangHint: 'تُرسل رسائل هذا الشريك بهذه اللغة مهما كانت لغة شاشتك. أما رسائل فريق PMO لديك فتبقى بلغتها الثابتة.',
+  pdtPickTitle: 'ماذا يستلم كل شخص؟',
+  pdtPickAll: 'بريد واحد للفريق', pdtPickAllD: 'يستلم كل المحددين البريد نفسه بمهام فريق الشريك كاملاً.',
+  pdtPickEach: 'بريد لكل شخص', pdtPickEachD: 'يستلم كل عضو مهامه المتبقية فقط والمهام التي تحتاج تاريخ انتهاء منه. ويستلم جهة الاتصال الرئيسية بريد الفريق.',
+  pdtPickLang: 'لغة البريد: {0}',
+  pdtSentEach: 'تم إرسال {0} رسائل.'
+});
+
+(function pdtInjectCss() {
+  const st = document.createElement('style');
+  st.textContent = '.pda-mem input[type=checkbox]{width:auto;flex:0 0 auto;margin:3px 0 0}.pda-rad input{width:auto;flex:0 0 auto;margin-top:3px}';
+  document.head.appendChild(st);
+})();
+
+/* ---- Email language per partner (stored inside partner.authority.emailLang) ---- */
+function pdaPartnerLang(partner) {
+  const l = partner && partner.authority && partner.authority.emailLang;
+  return (l === 'en' || l === 'ar') ? l : currentLang;
+}
+function pdaPickL(o, base, lang) {
+  return lang === 'ar' ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '') : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
+}
+(function() {
+  const origSec = window.pdaPartnerSectionHtml;
+  if (typeof origSec === 'function') {
+    window.pdaPartnerSectionHtml = function(editing) {
+      const cur = (editing && editing.authority && editing.authority.emailLang) || '';
+      const extra = `<div class="pda-sec" id="pdt-lang-sec"><h4>${t('pdtEmailLangTitle')}</h4><p class="pda-sub">${t('pdtEmailLangHint')}</p>
+        <select id="pdt-p-emaillang">
+          <option value="" ${cur === '' ? 'selected' : ''}>${t('pdtEmailLangFollow')}</option>
+          <option value="en" ${cur === 'en' ? 'selected' : ''}>${t('pdtEmailLangEn')}</option>
+          <option value="ar" ${cur === 'ar' ? 'selected' : ''}>${t('pdtEmailLangAr')}</option></select></div>`;
+      return origSec.apply(this, arguments) + extra;
+    };
+  }
+  const origRead = window.pdaReadPartnerAuthority;
+  if (typeof origRead === 'function') {
+    window.pdaReadPartnerAuthority = function() {
+      const v = origRead.apply(this, arguments);
+      if (!v) return v;
+      const el = document.getElementById('pdt-p-emaillang');
+      if (el && (el.value === 'en' || el.value === 'ar')) v.emailLang = el.value;
+      return v;
+    };
+  }
+})();
+
+/* ---- Task form: member checklist ---- */
+function pdtGroups(projectId) {
+  const proj = getProject(projectId); const out = [];
+  const pids = Array.isArray(proj && proj.partnerIds) && proj.partnerIds.length ? proj.partnerIds : (proj && proj.partnerId ? [proj.partnerId] : []);
+  pids.forEach(pid => { const p = getPartner(pid); if (p && Array.isArray(p.team) && p.team.length) out.push({ partner: p, members: p.team }); });
+  return out;
+}
+function pdtSelectedIds() { return Object.keys(window._pdtSel || {}).filter(k => window._pdtSel[k]); }
+function pdtRenderTeamRow() {
+  const ownerRow = document.getElementById('owner-row'); if (!ownerRow) return;
+  let row = document.getElementById('pdt-team-row');
+  const type = document.getElementById('f-type')?.value;
+  const groups = pdtGroups(document.getElementById('f-project')?.value);
+  const worthShowing = type === 'task' && groups.some(g => g.members.length >= 2);
+  if (!worthShowing) { if (row) row.remove(); ownerRow.style.display = ''; window._pdtSel = {}; pdtRefreshDate(); return; }
+  if (!row) { row = document.createElement('div'); row.className = 'form-row'; row.id = 'pdt-team-row'; ownerRow.parentNode.insertBefore(row, ownerRow.nextSibling); }
+  const sel = window._pdtSel || {};
+  const activeGroup = (() => { const k = pdtSelectedIds()[0]; return k ? (groups.find(g => g.members.some(m => m.id === k)) || {}).partner : null; })();
+  const html = groups.map(g => {
+    const locked = activeGroup && activeGroup.id !== g.partner.id;
+    const allOn = g.members.every(m => sel[m.id]);
+    return `<div style="margin-bottom:8px;${locked ? 'opacity:.45' : ''}">
+      ${g.members.length >= 2 ? `<label class="pda-mem" style="border-top:0;padding:4px 0;align-items:center"><input type="checkbox" id="pdt-all-${g.partner.id}" ${allOn ? 'checked' : ''} ${locked ? 'disabled' : ''} onchange="pdtToggleAll('${g.partner.id}', this.checked)">
+        <span><b>${t('pdtSelectAll')}</b> <span class="pda-tag pda-wait" style="background:#c9a84c;color:#fff;border:0">${t('pdtNew')}</span>
+        <span style="color:var(--ink-faint);font-size:12px"> ${escapeHtml(g.partner.name)}</span></span></label>` : `<div style="font-size:12px;color:var(--ink-faint)">${escapeHtml(g.partner.name)}</div>`}
+      ${g.members.map(m => `<label class="pda-mem" style="padding:6px 0 6px 4px"><input type="checkbox" class="pdt-cb" value="${m.id}" ${sel[m.id] ? 'checked' : ''} ${locked ? 'disabled' : ''} onchange="pdtToggleOne('${m.id}', this.checked)">
+        <span><b>${escapeHtml(m.name)}</b> <span style="color:var(--ink-faint)">${escapeHtml(m.email || '')}</span></span></label>`).join('')}</div>`;
+  }).join('');
+  row.innerHTML = `<label>${t('pdtTeamTitle')}</label><div class="pda-sec" style="margin-top:4px">${html}<div class="pda-call" id="pdt-summary"></div></div>`;
+  pdtRefreshSummary();
+}
+function pdtToggleAll(partnerId, on) {
+  const g = pdtGroups(document.getElementById('f-project')?.value).find(x => x.partner.id === partnerId); if (!g) return;
+  window._pdtSel = {}; if (on) g.members.forEach(m => { window._pdtSel[m.id] = true; });
+  pdtAfterChange();
+}
+function pdtToggleOne(memberId, on) {
+  window._pdtSel = window._pdtSel || {};
+  if (on) window._pdtSel[memberId] = true; else delete window._pdtSel[memberId];
+  pdtAfterChange();
+}
+function pdtAfterChange() {
+  const ids = pdtSelectedIds(); const ownerEl = document.getElementById('f-owner'); const ownerRow = document.getElementById('owner-row');
+  if (ids.length === 1 && ownerEl) { ownerEl.value = 'p:' + ids[0]; if (ownerEl.value !== 'p:' + ids[0]) ownerEl.value = ''; }
+  else if (ids.length >= 2 && ownerEl) ownerEl.value = '';
+  else if (ids.length === 0 && ownerEl && ownerEl.value.indexOf('p:') === 0) ownerEl.value = '';
+  if (ownerRow) ownerRow.style.display = ids.length >= 2 ? 'none' : '';
+  pdtRenderTeamRow(); try { pdaRefreshTaskDateHint(); } catch (e) {} pdtRefreshDate();
+}
+function pdtMemberName(id) { const p = getPartnerForMemberId(id); const m = p && (p.team || []).find(x => x.id === id); return m ? m.name : ''; }
+function pdtRefreshSummary() {
+  const el = document.getElementById('pdt-summary'); if (!el) return;
+  const ids = pdtSelectedIds();
+  if (ids.length === 0) el.textContent = t('pdtHintNone');
+  else if (ids.length === 1) el.textContent = t('pdtSumOne', pdtMemberName(ids[0]));
+  else {
+    const p = getPartnerForMemberId(ids[0]); const eff = pdaEffective(p, getProject(document.getElementById('f-project')?.value));
+    el.textContent = t(eff.chooseDates ? 'pdtSumManyChoose' : 'pdtSumManyFixed', ids.length);
+  }
+}
+function pdtRefreshDate() {
+  const label = document.getElementById('due-label'); if (!label) return;
+  const team = pdtSelectedIds().length >= 2;
+  if (team) {
+    if (!label.dataset.pdaOrig) label.dataset.pdaOrig = label.innerHTML;
+    label.innerHTML = t('pdtMainEnd') + ' <span class="pda-tag pda-set">' + t('pdtSetByAdmin') + '</span>';
+    const h = document.getElementById('pda-date-hint'); if (h) h.remove();
+  }
+}
+(function() {
+  const orig = window.showActionForm;
+  if (typeof orig !== 'function') return;
+  window.showActionForm = function(actionId, defaultProjectId, defaultPartnerId, defaultType, defaultDate, parentId) {
+    window._pdtSel = {};
+    const r = orig.apply(this, arguments);
+    try {
+      if (!actionId && !parentId) {
+        ['f-project', 'f-type'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', () => { window._pdtSel = {}; const ownerRow = document.getElementById('owner-row'); if (ownerRow) ownerRow.style.display = ''; pdtRenderTeamRow(); }); });
+        const o = document.getElementById('f-owner');
+        if (o) o.addEventListener('change', () => { if (pdtSelectedIds().length) { window._pdtSel = {}; const ownerRow = document.getElementById('owner-row'); if (ownerRow) ownerRow.style.display = ''; pdtRenderTeamRow(); } });
+        pdtRenderTeamRow();
+      }
+    } catch (e) {}
+    return r;
+  };
+})();
+
+/* ---- Saving a team task: the normal save runs first for the main task, then the subtasks are created ---- */
+async function pdtBuildSubtasks(parent, ids) {
+  parent.teamTask = true; parent.teamMemberIds = ids.slice();
+  const g = pdtGroups(parent.projectId).find(x => x.members.some(m => m.id === ids[0]));
+  parent.teamAll = !!g && g.members.every(m => ids.indexOf(m.id) !== -1);
+  parent.ownerKind = ''; parent.ownerId = '';
+  markRowDirty('actions', parent.id);
+  const proj = getProject(parent.projectId);
+  const subs = ids.map(mid => {
+    const partner = getPartnerForMemberId(mid);
+    const waiting = pdaEffective(partner, proj).chooseDates;
+    const sub = { id: uid(), type: 'task', title: parent.title, projectId: parent.projectId, partnerId: parent.partnerId,
+      startDate: parent.startDate, dueDate: waiting ? null : parent.dueDate, originalDueDate: waiting ? null : parent.dueDate,
+      criticalNote: parent.criticalNote || '', feedsIntoMilestoneId: parent.feedsIntoMilestoneId || null,
+      priority: parent.priority, status: 'open', completedDate: null, reason: '', tracking: [], isMilestone: false,
+      ownerKind: 'partner', ownerId: mid, dependsOnIds: [], note: parent.note || '', parentId: parent.id, extensions: [], createdAt: todayDate() };
+    Object.keys(parent).forEach(k => { if (/^(title|criticalNote|note)(En|Ar|ManualEn|ManualAr)$/.test(k)) sub[k] = parent[k]; });
+    if (waiting) sub.dateConfirmationStatus = 'needs_partner_date';
+    return sub;
+  });
+  subs.forEach(s => { state.actions.push(s); markRowDirty('actions', s.id); });
+  saveState(); render(state.detailParam);
+  for (const s of subs) {
+    try { if (s.dateConfirmationStatus === 'needs_partner_date') await pdaNotifyEndDateNeeded(s); else await requestDateConfirmation(s); } catch (e) {}
+  }
+}
+(function() {
+  const orig = window.saveAction;
+  if (typeof orig !== 'function') return;
+  window.saveAction = function(id) {
+    const ids = !id ? pdtSelectedIds() : [];
+    const teamMode = ids.length >= 2 && !window._pendingParentId && document.getElementById('f-type')?.value === 'task';
+    if (!teamMode) return orig.apply(this, arguments);
+    const before = new Set(state.actions.map(a => a.id));
+    const ownerEl = document.getElementById('f-owner'); if (ownerEl) ownerEl.value = '';
+    const r = orig.apply(this, arguments);
+    const created = state.actions.filter(a => !before.has(a.id));
+    if (created.length === 1) { window._pdtSel = {}; pdtBuildSubtasks(created[0], ids); }
+    return r;
+  };
+})();
+
+/* ---- Display: team parent tag, owner and date tags on subtask rows, added-by-partner tag ---- */
+function pdtTeamTagText(a) {
+  const n = (a.teamMemberIds || []).length;
+  return a.teamAll ? t('pdtWholeTeam', n) : t('pdtTeamOf', n);
+}
+(function() {
+  const rt = window.responsibleTag;
+  if (typeof rt === 'function') window.responsibleTag = function(task) {
+    if (task && task.teamTask) return '<span class="resp-tag">👥 ' + escapeHtml(pdtTeamTagText(task)) + '</span>';
+    return rt.apply(this, arguments);
+  };
+  const rp = window.responsibleTagPlain;
+  if (typeof rp === 'function') window.responsibleTagPlain = function(task) {
+    if (task && task.teamTask) return '👥 ' + pdtTeamTagText(task);
+    return rp.apply(this, arguments);
+  };
+  const dt = window.pdaDateTagsHtml;
+  if (typeof dt === 'function') window.pdaDateTagsHtml = function(a) {
+    const base = dt.apply(this, arguments);
+    const add = a && a.addedByPartner ? '<span class="pda-tag pda-set">🤝 ' + t('pdtAddedTag') + (a.addedByName ? ' · ' + escapeHtml(a.addedByName) : '') + '</span>' : '';
+    return base + (base && add ? ' ' : '') + add;
+  };
+})();
+function pdtSubOwnerHtml(sub) {
+  const n = sub && sub.ownerKind === 'partner' && sub.ownerId ? pdtMemberName(sub.ownerId) : '';
+  return n ? '👤 <b>' + escapeHtml(n) + '</b> · ' : '';
+}
+function pdtSubTagHtml(sub) { const x = pdaDateTagsHtml(sub); return x ? ' · ' + x : ''; }
+
+/* ---- Auto-close the main task when every subtask is done ---- */
+(function() {
+  const orig = window.completeAction;
+  if (typeof orig !== 'function') return;
+  window.completeAction = function(id) {
+    const r = orig.apply(this, arguments);
+    try {
+      const a = state.actions.find(x => x.id === id);
+      if (a && a.parentId && isCompleted(a)) {
+        const p = state.actions.find(x => x.id === a.parentId);
+        if (p && p.teamTask && isOpen(p)) {
+          const subs = getSubtasks(p.id);
+          if (subs.length && subs.every(isCompleted)) {
+            p.status = 'completed'; p.completedDate = todayDate(); markRowDirty('actions', p.id); saveState(); render(state.detailParam); toast(t('pdtParentClosed'));
+          }
+        }
+      }
+    } catch (e) {}
+    return r;
+  };
+})();
+
+/* ---- Approving or rejecting a task that a partner added (arrives as an 'assign' proposal from a partner) ---- */
+async function pdtApprovePartnerTask(row, overrides) {
+  const parts = String(row.note_text || '').split('|');
+  const ownerId = parts[1] || ''; const byName = parts.slice(2).join('|') || '';
+  const finalStart = (overrides && 'startDate' in overrides) ? (overrides.startDate || null) : (row.proposed_start_date || null);
+  const finalDue = (overrides && overrides.dueDate) ? overrides.dueDate : row.proposed_due_date;
+  const datesChanged = finalDue !== row.proposed_due_date || finalStart !== (row.proposed_start_date || null);
+  const proj = getProject(row.proposed_project_id);
+  const newTask = { id: uid(), type: 'task', title: row.proposed_title, projectId: row.proposed_project_id,
+    partnerId: proj ? proj.partnerId : row.proposed_by_id, ownerKind: 'partner', ownerId, status: 'open', priority: row.proposed_priority || 'medium',
+    startDate: finalStart, dueDate: finalDue, originalDueDate: finalDue, completedDate: null, reason: '', tracking: [], dependsOnIds: [], extensions: [],
+    isMilestone: false, feedsIntoMilestoneId: null, createdAt: todayDate(), addedByPartner: true, addedByName: byName };
+  if (!datesChanged) { newTask.datePartnerSet = todayDate(); newTask.dateSetBy = byName || null; }
+  if (newTask.title) { const cap = detectContentLang(newTask.title) === 'ar' ? 'Ar' : 'En'; newTask['title' + cap] = newTask.title; newTask['titleManual' + cap] = false; }
+  state.actions.push(newTask); markRowDirty('actions', newTask.id); saveState();
+  try {
+    await supabaseClient.from('pending_changes').update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null }).eq('id', row.id);
+  } catch (e) {}
+  toast(t('pdtApprovedPartnerTask'));
+  refreshPendingApprovals();
+}
+(function() {
+  const oa = window.approveAssignment;
+  if (typeof oa === 'function') window.approveAssignment = async function(id, overrides) {
+    if (!supabaseClient) return;
+    const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+    if (row && row.proposed_by_type === 'partner') return pdtApprovePartnerTask(row, overrides);
+    return oa.apply(this, arguments);
+  };
+  const orj = window.rejectAssignment;
+  if (typeof orj === 'function') window.rejectAssignment = async function(id) {
+    const row = (_pendingApprovalsCache || []).find(r => r.id === id);
+    if (!(row && row.proposed_by_type === 'partner')) return orj.apply(this, arguments);
+    if (!supabaseClient) return;
+    const reason = prompt(t('rejectionReasonPrompt'));
+    if (reason === null) return;
+    if (!reason.trim()) { alert(t('rejectionReasonRequired')); return; }
+    try {
+      await supabaseClient.from('pending_changes').update({ status: 'rejected', rejection_reason: reason.trim(), reviewed_at: new Date().toISOString(), reviewed_by: (_authUser && _authUser.email) || null }).eq('id', id);
+    } catch (e) {}
+    toast(t('toastProposalRejected'));
+    refreshPendingApprovals();
+  };
+})();
+
+/* ---- Pending Approvals: cards for tasks added by a partner say so (the original text says "manager") ---- */
+(function() {
+  const ov = views && views.pendingApprovals;
+  if (typeof ov !== 'function') return;
+  views.pendingApprovals = function() {
+    let html = ov.apply(this, arguments);
+    try {
+      if (typeof html === 'string' && Array.isArray(_pendingApprovalsCache)) {
+        const phrase = t('proposedByManagerFor');
+        _pendingApprovalsCache.filter(r => r.change_type === 'assign' && r.proposed_by_type === 'partner').forEach(r => {
+          const i = html.indexOf("'" + r.id + "'"); if (i < 0) return;
+          const start = html.lastIndexOf('<div class="pending-approval-card', i); if (start < 0) return;
+          const nx = html.indexOf('<div class="pending-approval-card', i); const end = nx < 0 ? html.length : nx;
+          html = html.slice(0, start) + html.slice(start, end).replace(phrase, t('pdtProposedByPartner')) + html.slice(end);
+        });
+      }
+    } catch (e) {}
+    return html;
+  };
+})();
+
+/* ---- Send Email picker: one team email, or one email per person ---- */
+(function() {
+  const op = window.openPartnerEmailPicker;
+  if (typeof op === 'function') window.openPartnerEmailPicker = function(partnerId) {
+    const r = op.apply(this, arguments);
+    try {
+      const rows = document.getElementById('email-picker-rows'); const p = getPartner(partnerId);
+      if (rows && p && (p.team || []).length) {
+        const lang = pdaPartnerLang(p);
+        const box = document.createElement('div');
+        box.id = 'pdt-pick-mode';
+        box.innerHTML = `<div style="margin-top:14px;font-size:13px;font-weight:700">${t('pdtPickTitle')}</div>
+          <label class="pda-rad sel"><input type="radio" name="pdt-mode" value="all" checked onchange="pdtPickModeUi()"><span><b>${t('pdtPickAll')}</b><div class="pda-d">${t('pdtPickAllD')}</div></span></label>
+          <label class="pda-rad"><input type="radio" name="pdt-mode" value="each" onchange="pdtPickModeUi()"><span><b>${t('pdtPickEach')}</b><div class="pda-d">${t('pdtPickEachD')}</div></span></label>
+          <div class="pda-d" style="margin-top:6px">${t('pdtPickLang', lang === 'ar' ? t('pdtEmailLangAr') : t('pdtEmailLangEn'))}</div>`;
+        rows.parentNode.insertBefore(box, rows.nextSibling);
+      }
+    } catch (e) {}
+    return r;
+  };
+})();
+function pdtPickModeUi() {
+  Array.prototype.forEach.call(document.querySelectorAll('#pdt-pick-mode .pda-rad'), lbl => { const i = lbl.querySelector('input'); lbl.classList.toggle('sel', !!(i && i.checked)); });
+}
+async function pdtSendEachEmail(partnerId, candidateCount) {
+  const selected = [];
+  for (let i = 0; i < candidateCount; i++) { const el = document.getElementById('email-pick-' + i); if (el && el.checked) selected.push(el.value); }
+  if (selected.length === 0) { alert(t('alertSelectAtLeastOne')); return; }
+  const p = getPartner(partnerId); if (!p || !supabaseClient) return;
+  try {
+    p.lastEmailRecipients = selected; markRowDirty('partners', partnerId); saveState();
+    const linkUrl = await getOrCreateViewLink('partner_links', 'partner_id', partnerId, PARTNER_VIEW_BASE_URL, p.name);
+    let sent = 0;
+    for (const email of selected) {
+      const member = (p.team || []).find(m => m.email === email);
+      const breakdown = computeProjectBreakdownForPartner(partnerId, member ? member.id : undefined);
+      if (member && breakdown.length === 0) continue; // nothing left for this person
+      await dispatchStatusEmail([email], member ? member.name : p.name, member ? 'team_member' : 'partner', breakdown, linkUrl);
+      sent++;
+    }
+    closeModal(); toast(t('pdtSentEach', sent));
+  } catch (e) { alert(t('alertEmailSendFailed')); }
+}
+(function() {
+  const oc = window.confirmSendPartnerEmail;
+  if (typeof oc !== 'function') return;
+  window.confirmSendPartnerEmail = async function(partnerId, count) {
+    const p = getPartner(partnerId);
+    const l = p && p.authority && p.authority.emailLang;
+    window._pdaLangCtx = (l === 'en' || l === 'ar') ? l : null;
+    try {
+      const mode = (document.querySelector('input[name="pdt-mode"]:checked') || {}).value;
+      if (mode === 'each') return await pdtSendEachEmail(partnerId, count);
+      return await oc.apply(this, arguments);
+    } finally { window._pdaLangCtx = null; }
+  };
+})();
 
 async function deleteProject(id) {
   const p = getProject(id);
@@ -12123,7 +12520,7 @@ async function notifyPartnerDateDecision(task, approved, rejectionReason) {
     if (recipients.length === 0) return skip('no recipients selected for ' + (partner.name || partner.id) + ' via Send Email');
 
     const proj = getProject(task.projectId);
-    const pick = (o, base) => currentLang === 'ar'
+    const pick = (o, base) => pdaPartnerLang(partner) === 'ar'
       ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
       : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
     const sendRes = await fetch(SEND_EMAIL_FUNCTION_URL, {
@@ -12137,7 +12534,7 @@ async function notifyPartnerDateDecision(task, approved, rejectionReason) {
         dueDate: fmtDate(task.dueDate),
         rejectionReason: rejectionReason || '',
         linkUrl: PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
-        lang: currentLang,
+        lang: pdaPartnerLang(partner),
       }),
     });
     if (!sendRes.ok) {
@@ -12184,7 +12581,7 @@ async function requestDateConfirmation(task) {
     if (recipients.length === 0) return skip('no recipients selected for ' + (partner.name || partner.id) + ' via Send Email');
 
     const proj = getProject(task.projectId);
-    const pick = (o, base) => currentLang === 'ar'
+    const pick = (o, base) => pdaPartnerLang(partner) === 'ar'
       ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '')
       : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
     const sendRes = await fetch(SEND_EMAIL_FUNCTION_URL, {
@@ -12197,7 +12594,7 @@ async function requestDateConfirmation(task) {
         projectName: proj ? pick(proj, 'name') : '',
         dueDate: fmtDate(task.dueDate),
         linkUrl: PARTNER_VIEW_BASE_URL + '?token=' + linkRows[0].token,
-        lang: currentLang,
+        lang: pdaPartnerLang(partner),
       }),
     });
     // fetch() does NOT throw on an error HTTP status (a 400 or 500 response
@@ -13612,12 +14009,14 @@ function computeProjectBreakdownForTeamMember(memberId) {
   return Object.values(byProject);
 }
 
-function computeProjectBreakdownForPartner(partnerId) {
+function computeProjectBreakdownForPartner(partnerId, onlyMemberId) {
   const p = getPartner(partnerId);
   const teamIds = new Set((p && p.team || []).map(m => m.id));
   const byProject = {};
   state.actions.forEach(a => {
     if (a.type === 'meeting' || isCompleted(a) || isMissed(a)) return;
+    if (a.teamTask) return; // container of a team task: its subtasks are counted instead
+    if (onlyMemberId && !(a.ownerKind === 'partner' && a.ownerId === onlyMemberId)) return;
     const belongsToThisPartner = a.ownerKind === 'partner'
       ? teamIds.has(a.ownerId)
       : (a.ownerKind !== 'internal' && (getProject(a.projectId) || {}).partnerId === partnerId);
@@ -13657,7 +14056,7 @@ async function dispatchStatusEmail(recipients, recipientName, recipientType, pro
   const res = await fetch(SEND_EMAIL_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipients, recipientName, recipientType, projectBreakdown, linkUrl, lang: currentLang }),
+    body: JSON.stringify({ recipients, recipientName, recipientType, projectBreakdown, linkUrl, lang: window._pdaLangCtx || currentLang }),
   });
   if (!res.ok) throw new Error('send failed');
 }
