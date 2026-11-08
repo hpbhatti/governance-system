@@ -11102,7 +11102,8 @@ function pdaOwnerPartnerOf(ownerRaw) {
 function pdaEmptyDateAllowed(actionId) {
   const type = document.getElementById('f-type')?.value;
   if (type !== 'task') return false;
-  const partner = pdaOwnerPartnerOf(document.getElementById('f-owner')?.value || '');
+  let partner = pdaOwnerPartnerOf(document.getElementById('f-owner')?.value || '');
+  if (!partner && !actionId) { try { const _ids = pdtSelectedIds(); if (_ids.length) partner = getPartnerForMemberId(_ids[0]) || null; } catch (e) {} }
   if (!partner) return false;
   if (actionId) {
     const a = state.actions.find(x => x.id === actionId);
@@ -11287,9 +11288,9 @@ Object.assign(T.en, {
   pdtTeamTitle: 'Assign to team members', pdtSelectAll: 'Select all', pdtNew: 'NEW',
   pdtHintNone: 'Tick one member for a normal task. Tick two or more for a team task. Or use the Task Owner list above for one person.',
   pdtSumOne: 'Normal task for {0}.',
-  pdtSumManyChoose: '{0} members selected. The system creates one main task and {0} subtasks, one for each member. You set the main end date. Each member chooses his own end date, on or before the main date.',
+  pdtSumManyChoose: '{0} members selected. The system creates one main task and {0} subtasks, one for each member. The main end date is optional. Leave it empty and each member chooses his own end date. If you enter a main end date, each member must choose a date on or before it.',
   pdtSumManyFixed: '{0} members selected. The system creates one main task and {0} subtasks, one for each member. Every subtask gets the main end date.',
-  pdtMainEnd: 'Main End Date', pdtSetByAdmin: 'set by Admin',
+  pdtMainEnd: 'Main End Date', pdtSetByAdmin: 'set by Admin', pdtOptionalTag: 'optional', pdtNeedOwnerOrDate: 'Choose a task owner from the partner team and leave the end date empty. Or enter an end date.',
   pdtWholeTeam: 'Whole team ({0})', pdtTeamOf: 'Team of {0}',
   pdtParentClosed: 'All subtasks are done. The main task is completed.',
   pdtAddedTag: 'Added by partner', pdtProposedByPartner: 'Added by partner',
@@ -11306,9 +11307,9 @@ Object.assign(T.ar, {
   pdtTeamTitle: 'تعيين لأعضاء الفريق', pdtSelectAll: 'تحديد الكل', pdtNew: 'جديد',
   pdtHintNone: 'حدد عضواً واحداً لمهمة عادية. حدد عضوين أو أكثر لمهمة فريق. أو استخدم قائمة مسؤول المهمة أعلاه لشخص واحد.',
   pdtSumOne: 'مهمة عادية لـ {0}.',
-  pdtSumManyChoose: 'تم تحديد {0} أعضاء. ينشئ النظام مهمة رئيسية واحدة و{0} مهام فرعية، واحدة لكل عضو. أنت تحدد تاريخ انتهاء المهمة الرئيسية. ويختار كل عضو تاريخ انتهائه، في تاريخ المهمة الرئيسية أو قبله.',
+  pdtSumManyChoose: 'تم تحديد {0} أعضاء. ينشئ النظام مهمة رئيسية واحدة و{0} مهام فرعية، واحدة لكل عضو. تاريخ انتهاء المهمة الرئيسية اختياري. اتركه فارغاً ليختار كل عضو تاريخ انتهائه بنفسه. وإذا أدخلت تاريخاً رئيسياً فيجب أن يختار كل عضو تاريخاً في ذلك التاريخ أو قبله.',
   pdtSumManyFixed: 'تم تحديد {0} أعضاء. ينشئ النظام مهمة رئيسية واحدة و{0} مهام فرعية، واحدة لكل عضو. تحصل كل مهمة فرعية على تاريخ انتهاء المهمة الرئيسية.',
-  pdtMainEnd: 'تاريخ انتهاء المهمة الرئيسية', pdtSetByAdmin: 'يحدده المسؤول',
+  pdtMainEnd: 'تاريخ انتهاء المهمة الرئيسية', pdtSetByAdmin: 'يحدده المسؤول', pdtOptionalTag: 'اختياري', pdtNeedOwnerOrDate: 'اختر مسؤولاً للمهمة من فريق الشريك واترك تاريخ الانتهاء فارغاً. أو أدخل تاريخ انتهاء.',
   pdtWholeTeam: 'الفريق كاملاً ({0})', pdtTeamOf: 'فريق من {0}',
   pdtParentClosed: 'اكتملت كل المهام الفرعية. تم إكمال المهمة الرئيسية.',
   pdtAddedTag: 'أضافها الشريك', pdtProposedByPartner: 'أضافها الشريك',
@@ -11426,7 +11427,8 @@ function pdtRefreshDate() {
   const team = pdtSelectedIds().length >= 2;
   if (team) {
     if (!label.dataset.pdaOrig) label.dataset.pdaOrig = label.innerHTML;
-    label.innerHTML = t('pdtMainEnd') + ' <span class="pda-tag pda-set">' + t('pdtSetByAdmin') + '</span>';
+    let _opt = false; try { const p0 = getPartnerForMemberId(pdtSelectedIds()[0]); _opt = !!p0 && pdaEffective(p0, getProject(document.getElementById('f-project')?.value)).chooseDates; } catch (e) {}
+    label.innerHTML = t('pdtMainEnd') + ' <span class="pda-tag ' + (_opt ? 'pda-wait' : 'pda-set') + '">' + t(_opt ? 'pdtOptionalTag' : 'pdtSetByAdmin') + '</span>';
     const h = document.getElementById('pda-date-hint'); if (h) h.remove();
   }
 }
@@ -11448,12 +11450,23 @@ function pdtRefreshDate() {
   };
 })();
 
+/* A team main task is a container. It never has an owner, so it must never trigger the "needs your end date" email. */
+(function() {
+  const orig = window.pdaNotifyEndDateNeeded;
+  if (typeof orig !== 'function') return;
+  window.pdaNotifyEndDateNeeded = function(task) {
+    if (task && (task.teamTask || (!task.ownerId && !task.parentId))) return;
+    return orig.apply(this, arguments);
+  };
+})();
+
 /* ---- Saving a team task: the normal save runs first for the main task, then the subtasks are created ---- */
 async function pdtBuildSubtasks(parent, ids) {
   parent.teamTask = true; parent.teamMemberIds = ids.slice();
   const g = pdtGroups(parent.projectId).find(x => x.members.some(m => m.id === ids[0]));
   parent.teamAll = !!g && g.members.every(m => ids.indexOf(m.id) !== -1);
   parent.ownerKind = ''; parent.ownerId = '';
+  if (parent.dateConfirmationStatus === 'needs_partner_date') parent.dateConfirmationStatus = undefined;
   markRowDirty('actions', parent.id);
   const proj = getProject(parent.projectId);
   const subs = ids.map(mid => {
@@ -11479,6 +11492,12 @@ async function pdtBuildSubtasks(parent, ids) {
   if (typeof orig !== 'function') return;
   window.saveAction = function(id) {
     const ids = !id ? pdtSelectedIds() : [];
+    try {
+      if (!id && document.getElementById('f-type')?.value === 'task' && !document.getElementById('f-due')?.value && !window._pendingParentId
+          && !ids.length && !(document.getElementById('f-owner')?.value || '') && pdaAnyAuthorityOn(document.getElementById('f-project')?.value)) {
+        formError(t('pdtNeedOwnerOrDate')); return;
+      }
+    } catch (e) {}
     const teamMode = ids.length >= 2 && !window._pendingParentId && document.getElementById('f-type')?.value === 'task';
     if (!teamMode) return orig.apply(this, arguments);
     const before = new Set(state.actions.map(a => a.id));
