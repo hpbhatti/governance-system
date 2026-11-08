@@ -5206,7 +5206,7 @@ function renderTaskNode(a, expanded) {
     '<div class="task-node-meta">' +
     '<span>📁 ' + escapeHtml(project ? project.name : '—') + '</span>' +
     (responsibleTag(a) ? '<span>' + responsibleTag(a) + '</span>' : '') +
-    '<span>' + (meeting ? t('meetingDateLabel') : t('dueLabel')) + ': ' + dateDisplay + '</span>' +
+    (pdaDateTagsHtml(a) && !a.dueDate ? '<span>' + pdaDateTagsHtml(a) + '</span>' : '<span>' + (meeting ? t('meetingDateLabel') : t('dueLabel')) + ': ' + dateDisplay + '</span>' + (pdaDateTagsHtml(a) ? '<span>' + pdaDateTagsHtml(a) + '</span>' : '')) +
     (completedDisplay ? '<span>' + completedDisplay + '</span>' : '') +
     (ownDelayed ? '<span style="color:var(--red)">⏰ ' + delay + ' ' + t('days') + '</span>' : '') +
     '</div>' +
@@ -7516,7 +7516,7 @@ views.pendingApprovals = () => {
         ${proj ? `<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">📁 ${escapeHtml(proj.name)}</div>` : ''}
         <div class="pv-for-row">
           <div class="pv-avatar">${escapeHtml(initial)}</div>
-          <div><span class="pv-for-label">${t('confirmedByLabel')}</span> <span class="pv-for-name">${escapeHtml(partner ? partner.name : (row.proposed_by_name || ''))}</span></div>
+          <div><span class="pv-for-label">${t('confirmedByLabel')}</span> <span class="pv-for-name">${escapeHtml(partner ? partner.name : (row.proposed_by_name || ''))}</span>${pdaChosenByHtml(row)}</div>
         </div>
         <div class="pv-meta-row">
           <div class="pv-meta-item"><span class="pv-meta-lbl">${t('assignDueLabel')}</span><span>${escapeHtml(fmtDate(row.proposed_due_date))}</span></div>
@@ -7790,6 +7790,13 @@ async function approveDateConfirmation(id) {
   if (task) {
     task.dueDate = row.proposed_due_date;
     task.dateConfirmationStatus = undefined;
+    if (typeof row.note_text === 'string' && row.note_text.indexOf('partner_chosen|') === 0) {
+      // The partner chose this date (not a change to an existing date): record who and when.
+      if (!task.originalDueDate) task.originalDueDate = task.dueDate;
+      task.datePartnerSet = todayDate();
+      task.dateSetBy = row.note_text.slice(15) || null;
+      task.proposedDueDate = null; task.lastDateRejectionReason = null;
+    }
     markRowDirty('actions', task.id);
     saveState();
     notifyPartnerDateDecision(task, true);
@@ -7814,7 +7821,8 @@ async function rejectDateConfirmation(id) {
     // The task goes back to awaiting confirmation, not back to a silent
     // open state — the partner still needs to actually provide a date
     // that works, same as before, just with the reason attached.
-    task.dateConfirmationStatus = 'pending';
+    // A rejected FIRST date (the task still has no date) goes back to waiting for the partner's choice.
+    task.dateConfirmationStatus = (row && typeof row.note_text === 'string' && row.note_text.indexOf('partner_chosen|') === 0 && !task.dueDate) ? 'needs_partner_date' : 'pending';
     // Kept on the task itself, not only inside pending_changes, so the
     // partner sees exactly why on their own page, not only if they happen
     // to open the email. Cleared automatically the moment they submit
@@ -8459,6 +8467,7 @@ views.projectDetail = (projectId) => {
         <div class="section-title">${t('sectionOpenActions')} (${openMainTasks.length})<span class="accent-line"></span></div>
         <button class="btn sm" onclick="showActionForm(null,'${p.id}')">${t('addAction')}</button>
       </div>
+      ${pdaWaitingBarHtml(p.id)}
       ${openMainTasks.length === 0 ? `<div class="table-wrap"><div class="empty">${t('noOpenActionsShort')}</div></div>` :
         openMainTasks.sort(compareByDelayThenDueDate).map(a => renderTaskNode(a, false)).join('')}
     </div>
@@ -10317,6 +10326,8 @@ function showPartnerForm(partnerId) {
 
     <div style="border-top:1px solid var(--line);margin:18px 0 14px;padding-top:14px"></div>
 
+    ${pdaPartnerSectionHtml(editing)}
+
     <div class="form-row" style="margin-top:18px">
       <label>${t('fieldNotes')}</label>
       <textarea id="f-notes">${escapeHtml(editing?.notes || '')}</textarea>
@@ -10391,7 +10402,8 @@ function savePartner(id) {
     phone: document.getElementById('f-phone').value.trim(),
     email: document.getElementById('f-email').value.trim(),
     notes: document.getElementById('f-notes').value.trim(),
-    team
+    team,
+    ...(pdaReadPartnerAuthority() ? { authority: pdaReadPartnerAuthority() } : {})
   };
   if (id) {
     const p = getPartner(id);
@@ -10713,6 +10725,7 @@ function showProjectForm(projectId, defaultPartnerId) {
       </select>
       <div style="font-size:11px;color:var(--ink-faint);margin-top:4px">${t('pmoInChargeHint')}</div>
     </div>
+    ${pdaProjectSectionHtml(editing)}
       <textarea id="f-desc">${escapeHtml(editing ? (editing['description' + (currentLang==='ar'?'Ar':'En')] || '') : '')}</textarea>
     </div>
     <div class="form-row row-2">
@@ -10848,6 +10861,7 @@ function saveProject(id) {
     partnershipValue: derivedValue,
     partnershipCustomType: '',
     pmoInChargeId: document.getElementById('f-pmo-incharge')?.value || null,
+    partnerAuthority: pdaReadProjectAuthority(partnerIds),
   };
   if (id) {
     const p = getProject(id);
@@ -10895,6 +10909,363 @@ function saveProject(id) {
   toast(t('toastSaved'));
   closeModal();
   render(state.detailParam);
+}
+
+/* ========== PARTNER DATE AUTHORITY (new feature, self-contained) ==========
+   Four switches per partner, an optional per-project override, tasks that wait for
+   the partner to choose the end date, and an Admin "Remind members" control.
+   Nothing here replaces existing code. Existing functions only call into the
+   helpers below at a few marked places. */
+Object.assign(T.en, {
+  pdaSecTitle: 'Partner date authority', pdaSecSub: 'Default for all projects of this partner. Everything is off until you turn it on. A project can override this.',
+  pdaS1: 'Partner chooses the end date of tasks', pdaS1d: 'Admin creates the task and sets the start date. The partner chooses the end date.',
+  pdaS2: 'Approve the chosen date automatically', pdaS2d: 'The first date the partner chooses is applied at once. Later changes still need approval.', pdaS2off: 'Turn on "Partner chooses the end date" first.',
+  pdaS3: 'Partner can add tasks', pdaS3d: 'The partner adds a task from the partner page.',
+  pdaS4: 'Approve new tasks automatically', pdaS4d: 'New tasks become active without approval.', pdaS4off: 'Turn on "Partner can add tasks" first.',
+  pdaProjTitle: 'Date authority for this project', pdaProjSub: 'Set per partner. A project can follow the partner settings or use its own.',
+  pdaFollow: 'Follow partner settings', pdaCustom: 'Custom for this project', pdaCustomD: 'Use different switches only for this project.',
+  pdaSumDates: 'Chooses end dates', pdaSumAuto: 'Auto-approve dates', pdaSumAdd: 'Can add tasks', pdaSumAutoTasks: 'Auto-approve new tasks', pdaSumNone: 'No partner authority (all off)',
+  pdaEndDateLabel: 'End Date', pdaPartnerChooses: 'Partner chooses',
+  pdaEndDateHint: 'This partner chooses the end date. Leave this empty. The task shows "Waiting for partner date". When you save, the task owner receives an email asking for the end date. You can still type a date yourself if you want to fix it.',
+  pdaWaitTag: '⏳ Waiting for partner date', pdaWaitApprovalTag: '⏳ Partner date waits for your approval',
+  pdaSetByTag: 'Date set by partner', pdaBarOne: '1 task is waiting for a date from the partner.', pdaBarMany: '{0} tasks are waiting for a date from the partner.',
+  pdaRemindBtn: '✉ Remind members', pdaRemindTitle: 'Remind members', pdaRemindSub: 'Only members who still have tasks without an end date can be selected.',
+  pdaRemindNoTasks: 'No tasks waiting for a date', pdaRemindTasks: '{0} task(s) need an end date: {1}',
+  pdaRemindWhat: 'What should the email contain?', pdaRemindOnly: 'Only tasks that need a date', pdaRemindOnlyD: 'A short reminder with a list of the tasks and one button.',
+  pdaRemindFull: 'Full status update', pdaRemindFullD: 'The usual status email, with a "Needs your end date" block at the top.',
+  pdaRemindNote: 'The reminder is sent only when you press the button. The system never repeats it by itself.',
+  pdaRemindSend: 'Send reminder ({0})', pdaRemindSent: 'Reminder sent to {0} member(s).', pdaRemindFail: 'Some reminders could not be sent. Please try again.',
+  pdaNoLink: 'This partner has no active link yet. Create the link so the partner can choose the date.', pdaNoEmail: 'This member has no email on file.',
+  pdaNeedsDateNoOwner: 'Choose a task owner from the partner team. The partner can choose the end date only for a partner team member.',
+  pdaChosenBy: 'chosen by {0}'
+});
+Object.assign(T.ar, {
+  pdaSecTitle: 'صلاحية الشريك في التواريخ', pdaSecSub: 'الإعداد الافتراضي لكل مشاريع هذا الشريك. كل شيء معطل حتى تفعّله. ويمكن للمشروع تجاوز هذا الإعداد.',
+  pdaS1: 'الشريك يختار تاريخ انتهاء المهام', pdaS1d: 'ينشئ المسؤول المهمة ويحدد تاريخ البدء. ويختار الشريك تاريخ الانتهاء.',
+  pdaS2: 'اعتماد التاريخ المختار تلقائياً', pdaS2d: 'يتم تطبيق أول تاريخ يختاره الشريك فوراً. أما التعديلات اللاحقة فتحتاج إلى موافقة.', pdaS2off: 'فعّل أولاً "الشريك يختار تاريخ الانتهاء".',
+  pdaS3: 'يمكن للشريك إضافة مهام', pdaS3d: 'يضيف الشريك مهمة من صفحة الشريك.',
+  pdaS4: 'اعتماد المهام الجديدة تلقائياً', pdaS4d: 'تصبح المهام الجديدة نشطة بدون موافقة.', pdaS4off: 'فعّل أولاً "يمكن للشريك إضافة مهام".',
+  pdaProjTitle: 'صلاحية التواريخ لهذا المشروع', pdaProjSub: 'تُحدد لكل شريك. يمكن للمشروع اتباع إعدادات الشريك أو استخدام إعدادات خاصة به.',
+  pdaFollow: 'اتباع إعدادات الشريك', pdaCustom: 'إعدادات خاصة بهذا المشروع', pdaCustomD: 'استخدم مفاتيح مختلفة لهذا المشروع فقط.',
+  pdaSumDates: 'يختار تواريخ الانتهاء', pdaSumAuto: 'اعتماد التواريخ تلقائياً', pdaSumAdd: 'يمكنه إضافة مهام', pdaSumAutoTasks: 'اعتماد المهام الجديدة تلقائياً', pdaSumNone: 'لا صلاحيات للشريك (الكل معطل)',
+  pdaEndDateLabel: 'تاريخ الانتهاء', pdaPartnerChooses: 'الشريك يختار',
+  pdaEndDateHint: 'هذا الشريك يختار تاريخ الانتهاء. اترك الحقل فارغاً. ستظهر المهمة بحالة "بانتظار تاريخ من الشريك". عند الحفظ يصل إلى مسؤول المهمة بريد يطلب منه تاريخ الانتهاء. ويمكنك كتابة التاريخ بنفسك إذا أردت تثبيته.',
+  pdaWaitTag: '⏳ بانتظار تاريخ من الشريك', pdaWaitApprovalTag: '⏳ تاريخ الشريك بانتظار موافقتك',
+  pdaSetByTag: 'التاريخ حدده الشريك', pdaBarOne: 'مهمة واحدة بانتظار تاريخ من الشريك.', pdaBarMany: '{0} مهام بانتظار تاريخ من الشريك.',
+  pdaRemindBtn: '✉ تذكير الأعضاء', pdaRemindTitle: 'تذكير الأعضاء', pdaRemindSub: 'يمكن اختيار الأعضاء الذين ما زالت لديهم مهام بدون تاريخ انتهاء فقط.',
+  pdaRemindNoTasks: 'لا مهام بانتظار تاريخ', pdaRemindTasks: '{0} مهمة تحتاج تاريخ انتهاء: {1}',
+  pdaRemindWhat: 'ماذا يحتوي البريد؟', pdaRemindOnly: 'المهام التي تحتاج تاريخاً فقط', pdaRemindOnlyD: 'تذكير قصير بقائمة المهام وزر واحد.',
+  pdaRemindFull: 'تحديث كامل للحالة', pdaRemindFullD: 'بريد الحالة المعتاد، مع قسم "بحاجة لتاريخ الانتهاء منك" في الأعلى.',
+  pdaRemindNote: 'يُرسل التذكير فقط عند الضغط على الزر. ولا يكرره النظام تلقائياً.',
+  pdaRemindSend: 'إرسال التذكير ({0})', pdaRemindSent: 'تم إرسال التذكير إلى {0} عضو.', pdaRemindFail: 'تعذر إرسال بعض التذكيرات. يرجى المحاولة مرة أخرى.',
+  pdaNoLink: 'لا يوجد رابط نشط لهذا الشريك بعد. أنشئ الرابط ليتمكن الشريك من اختيار التاريخ.', pdaNoEmail: 'لا يوجد بريد إلكتروني لهذا العضو.',
+  pdaNeedsDateNoOwner: 'اختر مسؤول المهمة من فريق الشريك. يمكن للشريك اختيار تاريخ الانتهاء لعضو في فريق الشريك فقط.',
+  pdaChosenBy: 'اختاره {0}'
+});
+
+(function pdaInjectCss() {
+  const s = document.createElement('style');
+  s.textContent = `
+  .pda-sec{margin-top:18px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--bg-card,#fcfbf7)}
+  .pda-sec h4{margin:0 0 2px;font-size:14px;color:var(--accent)}
+  .pda-sub{font-size:12px;color:var(--ink-faint);margin:0 0 10px;line-height:1.5}
+  .pda-sw{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+  .pda-sw:first-of-type{border-top:0}
+  .pda-sw.dis{opacity:.5;cursor:default}
+  .pda-sw input{position:absolute;opacity:0;pointer-events:none}
+  .pda-tg{flex:0 0 auto;width:38px;height:22px;border-radius:12px;background:#cfd3da;position:relative;margin-top:2px;transition:background .15s}
+  .pda-tg::after{content:'';position:absolute;top:2px;inset-inline-start:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:inset-inline-start .15s}
+  .pda-sw input:checked + .pda-tg{background:var(--accent,#1a3a52)}
+  .pda-sw input:checked + .pda-tg::after{inset-inline-start:18px}
+  .pda-t{font-size:13px;font-weight:600}.pda-d{font-size:12px;color:var(--ink-faint);margin-top:2px;line-height:1.5}
+  .pda-ind{margin-inline-start:30px;border-inline-start:2px solid var(--line);padding-inline-start:12px}
+  .pda-rad{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0;font-size:13px;cursor:pointer}
+  .pda-rad.sel{border-color:var(--accent,#1a3a52);background:rgba(26,58,82,.06)}
+  .pda-tag{display:inline-block;font-size:11px;font-weight:600;border-radius:7px;padding:2px 8px}
+  .pda-wait{background:#fdf0d5;color:#8a5a10;border:1px solid #e8cf94}
+  .pda-set{background:#e1ebf2;color:#1a3a52}
+  .pda-bar{display:flex;align-items:center;gap:12px;background:#fdf5e8;border:1px solid #e8cf94;border-inline-start:4px solid #c9a84c;border-radius:10px;padding:11px 14px;margin:0 0 12px;font-size:13px;color:#6b4a10}
+  .pda-bar b{color:#1a3a52}.pda-bar .btn{margin-inline-start:auto}
+  .pda-call{background:#fdf5e8;border:1px solid #e8cf94;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#6b4a10;margin-top:8px;line-height:1.55}
+  .pda-mem{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+  .pda-mem.dis{opacity:.55}`;
+  document.head.appendChild(s);
+})();
+
+/* ---- Authority model (mirrors the partner-view edge function) ---- */
+function pdaNormalize(src) {
+  src = src || {};
+  const chooseDates = src.chooseDates === true, addTasks = src.addTasks === true;
+  return { chooseDates, autoApproveDates: chooseDates && src.autoApproveDates === true, addTasks, autoApproveTasks: addTasks && src.autoApproveTasks === true };
+}
+function pdaEffective(partner, project) {
+  const ov = project && project.partnerAuthority && partner && project.partnerAuthority[partner.id];
+  return pdaNormalize(ov && ov.mode === 'custom' ? ov : (partner && partner.authority));
+}
+function pdaSwitchesHtml(prefix, v, onchange) {
+  const row = (key, on, dis, title, desc, indent) => `${indent ? '<div class="pda-ind">' : ''}
+    <label class="pda-sw ${dis ? 'dis' : ''}"><input type="checkbox" id="${prefix}-${key}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} onchange="${onchange}">
+    <span class="pda-tg"></span><span><span class="pda-t">${title}</span><div class="pda-d">${desc}</div></span></label>${indent ? '</div>' : ''}`;
+  return row('s1', v.chooseDates, false, t('pdaS1'), t('pdaS1d')) +
+    row('s2', v.autoApproveDates, !v.chooseDates, t('pdaS2'), v.chooseDates ? t('pdaS2d') : t('pdaS2off'), true) +
+    row('s3', v.addTasks, false, t('pdaS3'), t('pdaS3d')) +
+    row('s4', v.autoApproveTasks, !v.addTasks, t('pdaS4'), v.addTasks ? t('pdaS4d') : t('pdaS4off'), true);
+}
+function pdaReadSwitches(prefix) {
+  const g = k => !!(document.getElementById(prefix + '-' + k) || {}).checked;
+  return pdaNormalize({ chooseDates: g('s1'), autoApproveDates: g('s2'), addTasks: g('s3'), autoApproveTasks: g('s4') });
+}
+
+/* ---- Partner form ---- */
+function pdaPartnerSectionHtml(editing) {
+  const v = pdaNormalize(editing && editing.authority);
+  return `<div class="pda-sec" id="pda-partner-sec"><h4>${t('pdaSecTitle')}</h4><p class="pda-sub">${t('pdaSecSub')}</p>
+    <div id="pda-partner-switches">${pdaSwitchesHtml('pda-p', v, 'pdaPartnerChanged()')}</div></div>`;
+}
+function pdaPartnerChanged() {
+  const v = pdaReadSwitches('pda-p');
+  const box = document.getElementById('pda-partner-switches');
+  if (box) box.innerHTML = pdaSwitchesHtml('pda-p', v, 'pdaPartnerChanged()');
+}
+function pdaReadPartnerAuthority() {
+  return document.getElementById('pda-p-s1') ? pdaReadSwitches('pda-p') : undefined;
+}
+
+/* ---- Project form: one block per selected partner ---- */
+function pdaSummary(partner) {
+  const v = pdaNormalize(partner && partner.authority), parts = [];
+  if (v.chooseDates) parts.push(t('pdaSumDates')); if (v.autoApproveDates) parts.push(t('pdaSumAuto'));
+  if (v.addTasks) parts.push(t('pdaSumAdd')); if (v.autoApproveTasks) parts.push(t('pdaSumAutoTasks'));
+  return parts.length ? parts.join(' · ') : t('pdaSumNone');
+}
+function pdaRenderProjectBox() {
+  const box = document.getElementById('pda-proj-box');
+  if (!box) return;
+  const internal = !!document.getElementById('f-internal-project')?.checked;
+  const ids = internal ? [] : Array.from(document.querySelectorAll('#f-partners-container .partner-cb:checked')).map(cb => cb.value);
+  window._pdaProj = window._pdaProj || {};
+  const html = ids.map(pid => {
+    const p = getPartner(pid); if (!p) return '';
+    const st = window._pdaProj[pid]; const custom = !!(st && st.mode === 'custom');
+    return `<div style="font-size:13px;font-weight:700;margin:10px 0 4px">${escapeHtml(p.name)}</div>
+      <label class="pda-rad ${custom ? '' : 'sel'}"><input type="radio" name="pda-mode-${pid}" ${custom ? '' : 'checked'} onchange="pdaSetMode('${pid}','follow')"><span><b>${t('pdaFollow')}</b><div class="pda-d">${escapeHtml(pdaSummary(p))}</div></span></label>
+      <label class="pda-rad ${custom ? 'sel' : ''}"><input type="radio" name="pda-mode-${pid}" ${custom ? 'checked' : ''} onchange="pdaSetMode('${pid}','custom')"><span><b>${t('pdaCustom')}</b><div class="pda-d">${t('pdaCustomD')}</div></span></label>
+      ${custom ? `<div id="pda-j-${pid}">${pdaSwitchesHtml('pda-j-' + pid, pdaNormalize(st), "pdaProjChanged('" + pid + "')")}</div>` : ''}`;
+  }).join('');
+  box.innerHTML = html || '';
+  const sec = document.getElementById('pda-proj-sec');
+  if (sec) sec.style.display = html ? '' : 'none';
+}
+function pdaSetMode(pid, mode) {
+  window._pdaProj = window._pdaProj || {};
+  if (mode === 'follow') delete window._pdaProj[pid];
+  else window._pdaProj[pid] = Object.assign({ mode: 'custom' }, pdaNormalize(window._pdaProj[pid] || getPartner(pid)?.authority));
+  pdaRenderProjectBox();
+}
+function pdaProjChanged(pid) {
+  const v = pdaReadSwitches('pda-j-' + pid);
+  window._pdaProj[pid] = Object.assign({ mode: 'custom' }, v);
+  pdaRenderProjectBox();
+}
+function pdaProjectSectionHtml(editing) {
+  window._pdaProj = {};
+  const pa = (editing && editing.partnerAuthority) || {};
+  Object.keys(pa).forEach(pid => { if (pa[pid] && pa[pid].mode === 'custom') window._pdaProj[pid] = Object.assign({ mode: 'custom' }, pdaNormalize(pa[pid])); });
+  return `<div class="pda-sec" id="pda-proj-sec"><h4>${t('pdaProjTitle')}</h4><p class="pda-sub">${t('pdaProjSub')}</p><div id="pda-proj-box"></div></div>`;
+}
+function pdaReadProjectAuthority(partnerIds) {
+  const out = {};
+  (partnerIds || []).forEach(pid => { const st = (window._pdaProj || {})[pid]; if (st && st.mode === 'custom') out[pid] = Object.assign({ mode: 'custom' }, pdaNormalize(st)); });
+  return out;
+}
+// Re-render the per-partner blocks whenever the project's partner selection changes
+// (the existing checkbox handler is refreshContributions — it is wrapped, not replaced).
+(function() {
+  const orig = window.refreshContributions;
+  if (typeof orig === 'function') {
+    window.refreshContributions = function() { const r = orig.apply(this, arguments); try { pdaRenderProjectBox(); } catch (e) {} return r; };
+  }
+})();
+
+/* ---- Task form: allow an empty end date when the partner chooses it ---- */
+function pdaAnyAuthorityOn(projectId) {
+  const proj = getProject(projectId);
+  const pids = Array.isArray(proj && proj.partnerIds) && proj.partnerIds.length ? proj.partnerIds : (proj && proj.partnerId ? [proj.partnerId] : []);
+  return pids.some(pid => { const p = getPartner(pid); return p && pdaEffective(p, proj).chooseDates; });
+}
+function pdaOwnerPartnerOf(ownerRaw) {
+  if (!ownerRaw || !ownerRaw.startsWith('p:')) return null;
+  return getPartnerForMemberId(ownerRaw.slice(2)) || null;
+}
+function pdaEmptyDateAllowed(actionId) {
+  const type = document.getElementById('f-type')?.value;
+  if (type !== 'task') return false;
+  const partner = pdaOwnerPartnerOf(document.getElementById('f-owner')?.value || '');
+  if (!partner) return false;
+  if (actionId) {
+    const a = state.actions.find(x => x.id === actionId);
+    if (a && a.dateConfirmationStatus === 'needs_partner_date') return true;
+    return false; // an existing task with a date can never lose it
+  }
+  const proj = getProject(document.getElementById('f-project')?.value);
+  return pdaEffective(partner, proj).chooseDates;
+}
+function pdaRefreshTaskDateHint() {
+  const due = document.getElementById('f-due'); const label = document.getElementById('due-label');
+  if (!due || !label) return;
+  const editingId = window._pdaEditingActionId || '';
+  let ok = false;
+  try { ok = pdaEmptyDateAllowed(editingId); } catch (e) {}
+  let hint = document.getElementById('pda-date-hint');
+  if (!label.dataset.pdaOrig) label.dataset.pdaOrig = label.innerHTML;
+  if (ok) {
+    label.innerHTML = t('pdaEndDateLabel') + ' <span class="pda-tag pda-wait">' + t('pdaPartnerChooses') + '</span>';
+    if (!hint) {
+      hint = document.createElement('div'); hint.id = 'pda-date-hint'; hint.className = 'pda-call';
+      const row = due.closest('.form-row') || due.parentElement;
+      row.parentElement.insertBefore(hint, row.nextSibling);
+    }
+    hint.textContent = t('pdaEndDateHint');
+  } else {
+    if (label.dataset.pdaOrig && label.innerHTML.indexOf('pda-tag') !== -1) label.innerHTML = label.dataset.pdaOrig;
+    if (hint) hint.remove();
+  }
+}
+(function() {
+  const orig = window.showActionForm;
+  if (typeof orig === 'function') {
+    window.showActionForm = function(actionId) {
+      window._pdaEditingActionId = actionId || '';
+      const r = orig.apply(this, arguments);
+      try {
+        ['f-owner', 'f-project', 'f-type'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', pdaRefreshTaskDateHint); });
+        pdaRefreshTaskDateHint();
+      } catch (e) {}
+      return r;
+    };
+  }
+})();
+
+/* ---- Task list tags ---- */
+function pdaDateTagsHtml(a) {
+  if (!a || a.type === 'meeting') return '';
+  if (!a.dueDate && a.dateConfirmationStatus === 'needs_partner_date') return '<span class="pda-tag pda-wait">' + t('pdaWaitTag') + '</span>';
+  if (!a.dueDate && a.dateConfirmationStatus === 'awaiting_approval') return '<span class="pda-tag pda-wait">' + t('pdaWaitApprovalTag') + '</span>';
+  if (a.datePartnerSet) return '<span class="pda-tag pda-set">📅 ' + t('pdaSetByTag') + (a.dateSetBy ? ' · ' + escapeHtml(a.dateSetBy) : '') + ' · ' + fmtDate(a.datePartnerSet) + '</span>';
+  return '';
+}
+
+/* ---- Waiting bar + Remind members ---- */
+function pdaWaitingTasks(projectId) {
+  return state.actions.filter(a => a.projectId === projectId && a.type !== 'meeting' && !a.dueDate && a.dateConfirmationStatus === 'needs_partner_date' && a.ownerKind === 'partner' && !isCompleted(a) && !isMissed(a));
+}
+function pdaWaitingBarHtml(projectId) {
+  const n = pdaWaitingTasks(projectId).length;
+  if (!n) return '';
+  return `<div class="pda-bar" id="pda-bar-${projectId}">⏳ <span>${n === 1 ? t('pdaBarOne') : t('pdaBarMany', n)}</span><button class="btn sm" onclick="pdaOpenRemind('${projectId}')">${t('pdaRemindBtn')}</button></div>`;
+}
+function pdaMembersOfProject(projectId) {
+  const proj = getProject(projectId); const out = [];
+  const pids = Array.isArray(proj && proj.partnerIds) && proj.partnerIds.length ? proj.partnerIds : (proj && proj.partnerId ? [proj.partnerId] : []);
+  pids.forEach(pid => {
+    const p = getPartner(pid); if (!p) return;
+    (p.team || []).forEach(m => {
+      const tasks = pdaWaitingTasks(projectId).filter(a => a.ownerId === m.id);
+      out.push({ partner: p, member: m, tasks });
+    });
+  });
+  return out;
+}
+function pdaOpenRemind(projectId) {
+  const list = pdaMembersOfProject(projectId).filter(x => x.tasks.length || true);
+  window._pdaRemind = { projectId, list, mode: 'only', selected: {} };
+  list.forEach((x, i) => { window._pdaRemind.selected[i] = x.tasks.length > 0; });
+  pdaRenderRemind();
+}
+function pdaRenderRemind() {
+  const R = window._pdaRemind; if (!R) return;
+  const count = Object.keys(R.selected).filter(i => R.selected[i] && R.list[i].tasks.length).length;
+  const html = `<p class="pda-sub">${t('pdaRemindSub')}</p>` + R.list.map((x, i) => {
+    const has = x.tasks.length > 0;
+    return `<label class="pda-mem ${has ? '' : 'dis'}"><input type="checkbox" ${R.selected[i] && has ? 'checked' : ''} ${has ? '' : 'disabled'} onchange="pdaRemindToggle(${i}, this.checked)">
+      <span style="flex:1"><b>${escapeHtml(x.member.name)}</b> <span style="color:var(--ink-faint)">${escapeHtml(x.member.email || '')}</span>
+      <div class="pda-d">${has ? t('pdaRemindTasks', x.tasks.length, escapeHtml(x.tasks.map(a => a.title).join(', '))) : t('pdaRemindNoTasks')}</div></span></label>`;
+  }).join('') +
+  `<div style="margin-top:12px;font-size:13px;font-weight:700">${t('pdaRemindWhat')}</div>
+   <label class="pda-rad ${R.mode === 'only' ? 'sel' : ''}"><input type="radio" name="pda-rm" ${R.mode === 'only' ? 'checked' : ''} onchange="pdaRemindMode('only')"><span><b>${t('pdaRemindOnly')}</b><div class="pda-d">${t('pdaRemindOnlyD')}</div></span></label>
+   <label class="pda-rad ${R.mode === 'full' ? 'sel' : ''}"><input type="radio" name="pda-rm" ${R.mode === 'full' ? 'checked' : ''} onchange="pdaRemindMode('full')"><span><b>${t('pdaRemindFull')}</b><div class="pda-d">${t('pdaRemindFullD')}</div></span></label>
+   <div class="pda-call">${t('pdaRemindNote')}</div>`;
+  const foot = `<button class="btn" id="pda-remind-send" ${count ? '' : 'disabled'} onclick="pdaSendRemind()">${t('pdaRemindSend', count)}</button> <button class="btn ghost" onclick="closeModal()">${t('cancel')}</button>`;
+  openModal(t('pdaRemindTitle'), html, foot);
+}
+function pdaRemindToggle(i, on) { window._pdaRemind.selected[i] = on; pdaRenderRemind(); }
+function pdaRemindMode(m) { window._pdaRemind.mode = m; pdaRenderRemind(); }
+async function pdaGetPartnerLinkUrl(partnerId) {
+  const { data: rows, error } = await supabaseClient.from('partner_links').select('token').eq('partner_id', partnerId).eq('revoked', false).order('created_at', { ascending: false }).limit(1);
+  if (error || !rows || !rows.length) return null;
+  return PARTNER_VIEW_BASE_URL + '?token=' + rows[0].token;
+}
+function pdaPick(o, base) {
+  return currentLang === 'ar' ? (o[base + 'Ar'] || o[base] || o[base + 'En'] || '') : (o[base + 'En'] || o[base] || o[base + 'Ar'] || '');
+}
+async function pdaSendRemind() {
+  const R = window._pdaRemind; if (!R) return;
+  if (!supabaseClient) { alert(t('alertOfflineFeature')); return; }
+  const picked = R.list.filter((x, i) => R.selected[i] && x.tasks.length);
+  if (!picked.length) return;
+  const btn = document.getElementById('pda-remind-send'); if (btn) btn.disabled = true;
+  let sent = 0, failed = 0;
+  const linkCache = {};
+  for (const x of picked) {
+    try {
+      if (!x.member.email) { failed++; continue; }
+      if (!(x.partner.id in linkCache)) linkCache[x.partner.id] = await pdaGetPartnerLinkUrl(x.partner.id);
+      const linkUrl = linkCache[x.partner.id];
+      if (!linkUrl) { failed++; alert(t('pdaNoLink')); continue; }
+      const proj = getProject(R.projectId);
+      let body;
+      if (R.mode === 'only') {
+        body = { recipients: [x.member.email], recipientName: pdaPick(x.member, 'name') || x.member.name, recipientType: 'partner_date_reminder',
+          items: x.tasks.map(a => ({ title: pdaPick(a, 'title') || a.title, projectName: proj ? pdaPick(proj, 'name') : '', startDate: a.startDate ? fmtDate(a.startDate) : '', isSubtask: !!a.parentId })),
+          linkUrl, lang: currentLang };
+      } else {
+        const breakdown = computeProjectBreakdownForPartner(x.partner.id).map(b => Object.assign({}, b, { needsDateTasks: (b.needsDateTasks || []).filter(n => n.ownerId === x.member.id) }));
+        body = { recipients: [x.member.email], recipientName: x.member.name, recipientType: 'team_member', projectBreakdown: breakdown, linkUrl, lang: currentLang };
+      }
+      const res = await fetch(SEND_EMAIL_FUNCTION_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) sent++; else failed++;
+    } catch (e) { failed++; }
+  }
+  closeModal();
+  if (sent) toast(t('pdaRemindSent', sent));
+  if (failed && !sent) alert(t('pdaRemindFail'));
+}
+
+/* ---- Email A: a new task with no end date asks the owner to choose one ---- */
+async function pdaNotifyEndDateNeeded(task) {
+  const skip = why => console.info('End-date request skipped: ' + why);
+  try {
+    if (!supabaseClient || !task) return skip('no supabaseClient or no task');
+    const partner = getPartnerForMemberId(task.ownerId);
+    if (!partner) return skip('owner is not in a partner team');
+    const linkUrl = await pdaGetPartnerLinkUrl(partner.id);
+    if (!linkUrl) { toast(t('pdaNoLink')); return skip('no active link for ' + (partner.name || partner.id)); }
+    const recipients = Array.isArray(partner.lastEmailRecipients) ? partner.lastEmailRecipients : [];
+    if (recipients.length === 0) return skip('no recipients selected for ' + (partner.name || partner.id) + ' via Send Email');
+    const member = (partner.team || []).find(m => m.id === task.ownerId);
+    if (!member || !member.email) return skip('owner has no email on file');
+    const proj = getProject(task.projectId);
+    const res = await fetch(SEND_EMAIL_FUNCTION_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipients: [member.email], recipientName: pdaPick(member, 'name') || member.name, recipientType: 'partner_date_needed',
+        taskTitle: pdaPick(task, 'title') || task.title, projectName: proj ? pdaPick(proj, 'name') : '', startDate: task.startDate ? fmtDate(task.startDate) : '', linkUrl, lang: currentLang }) });
+    if (!res.ok) console.warn('End-date request email answered ' + res.status);
+  } catch (e) { console.warn('pdaNotifyEndDateNeeded failed: ' + (e && e.message ? e.message : e)); }
+}
+
+/* ---- Approval card helper: who chose the date ---- */
+function pdaChosenByHtml(row) {
+  const n = row && typeof row.note_text === 'string' && row.note_text.indexOf('partner_chosen|') === 0 ? row.note_text.slice(15) : null;
+  return n ? ' <span style="color:var(--ink-faint);font-size:11.5px">(' + t('pdaChosenBy', escapeHtml(n)) + ')</span>' : '';
 }
 
 async function deleteProject(id) {
@@ -11478,7 +11849,11 @@ function saveAction(id) {
   const type = rawType === 'milestone' ? 'task' : rawType;
   const isMilestoneSel = rawType === 'milestone';
   const dueDate = document.getElementById('f-due').value;
-  if (!dueDate) { formError(t('alertDateRequired')); return; }
+  // Partner date authority: an empty end date is allowed only when the partner will choose it.
+  const _pdaEmpty = !dueDate && pdaEmptyDateAllowed(id);
+  if (!dueDate && !_pdaEmpty) {
+    formError(t('alertDateRequired')); return;
+  }
   const data = {
     title,
     type,
@@ -11495,6 +11870,7 @@ function saveAction(id) {
     reason: '', // legacy field kept blank — content lives in `tracking` now
     tracking: (window._editingTracking || []).map(e => ({...e}))
   };
+  if (_pdaEmpty) data.dueDate = null;
   // Meeting-only fields (participants / notes / link / linked deliverable)
   if (type === 'meeting') {
     data.participants = (document.getElementById('f-participants')?.value || '').trim();
@@ -11562,6 +11938,8 @@ function saveAction(id) {
     // Track extension if due date changed
     const oldDue = a.dueDate;
     Object.assign(a, data);
+    // Admin typed the date himself for a task that was waiting for the partner: it is no longer waiting.
+    if (a.dateConfirmationStatus === 'needs_partner_date' && a.dueDate) { a.dateConfirmationStatus = undefined; if (!a.originalDueDate) a.originalDueDate = a.dueDate; }
     if (oldDue && data.dueDate && data.dueDate !== oldDue && !isMeeting(a)) {
       if (!a.originalDueDate) a.originalDueDate = oldDue;
       const driftDays = daysBetween(oldDue, data.dueDate);
@@ -11604,6 +11982,7 @@ function saveAction(id) {
     if (newA.ownerKind === 'partner' && newA.ownerId && newA.dueDate && newA.type !== 'meeting') {
       window._pendingDateConfirmTask = newA;
     }
+    if (_pdaEmpty) { newA.dateConfirmationStatus = 'needs_partner_date'; window._pdaPendingNeedsDate = newA; }
   }
   window._pendingParentId = null;
   if (typeof a !== 'undefined' && a && a.id) markRowDirty('actions', a.id);
@@ -11614,6 +11993,7 @@ function saveAction(id) {
   render(state.detailParam);
   if (managerNoticeTask) notifyManagerTaskCompleted(managerNoticeTask);
   if (window._pendingDateConfirmTask) { const _t = window._pendingDateConfirmTask; window._pendingDateConfirmTask = null; requestDateConfirmation(_t); }
+  if (window._pdaPendingNeedsDate) { const _n = window._pdaPendingNeedsDate; window._pdaPendingNeedsDate = null; pdaNotifyEndDateNeeded(_n); }
 }
 
 async function deleteAction(id) {
@@ -13244,7 +13624,7 @@ function computeProjectBreakdownForPartner(partnerId) {
     if (!belongsToThisPartner) return;
     const proj = getProject(a.projectId);
     if (!proj) return;
-    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, openCount: 0, overdueCount: 0, criticalTasks: [], dateConfirmTasks: [] };
+    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, projectId: proj.id, openCount: 0, overdueCount: 0, criticalTasks: [], dateConfirmTasks: [], needsDateTasks: [] };
     byProject[proj.id].openCount++;
     if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
     if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
@@ -13252,6 +13632,7 @@ function computeProjectBreakdownForPartner(partnerId) {
     // separate list, so the email can call them out ahead of the regular
     // pending list rather than burying them in the normal count.
     if (a.dateConfirmationStatus === 'pending') byProject[proj.id].dateConfirmTasks.push({ title: a.title, proposedDate: fmtDate(a.proposedDueDate || a.dueDate) });
+    if (a.dateConfirmationStatus === 'needs_partner_date' && !a.dueDate) byProject[proj.id].needsDateTasks.push({ title: a.title, startDate: a.startDate ? fmtDate(a.startDate) : '', ownerId: a.ownerId });
   });
   return Object.values(byProject);
 }
