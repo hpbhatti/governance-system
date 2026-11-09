@@ -361,6 +361,9 @@
   .pvn-col { display:flex; justify-content:space-between; align-items:center; width:100%; background:#fff; border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-top:12px; font-size:14px; font-family:inherit; color:var(--ink); cursor:pointer; text-align:start; }
   .pvn-col b { font-size:14.5px; } .pvn-col em { font-style:normal; color:var(--ink-muted); font-weight:500; }
   .pvn-col-r { display:flex; gap:8px; align-items:center; }
+  .pvn-calnote { font-size:12.5px; color:var(--ink-muted); margin:-2px 0 10px; }
+  .pvn-calneed { background:#fbf1dd; border:1px solid #e8c987; border-radius:12px; padding:10px 12px; margin:0 0 12px; font-size:13.5px; color:#5a4a1c; line-height:1.6; }
+  .pvn-calneed .pvn-btn { margin-top:6px; padding:6px 12px; font-size:13px; }
   .pvn-hint { font-size:12.5px; color:var(--ink-muted); margin:8px 2px 0; }
   .pvn-row { background:#fff; border:1px solid var(--line); border-inline-start:4px solid var(--line-strong); border-radius:12px; padding:10px 12px; margin-top:7px; font-size:13.5px; }
   .pvn-row.ovd { border-inline-start-color:var(--red); } .pvn-row.team { border-inline-start-color:var(--gold); } .pvn-row.done { opacity:.7; }
@@ -673,6 +676,8 @@ Object.assign(STR.en, {
   pvnDone: function(n){ return n + ' done'; }, pvnOpenUs: function(n){ return n + ' open with your team'; }, pvnOpenOthers: function(n){ return n + ' open with others'; }, pvnOpenN: function(n){ return n + ' open'; },
   pvnLateN: function(n){ return n + ' late'; }, pvnNeedDatesN: function(n){ return n === 1 ? '1 needs a date' : n + ' need dates'; },
   pvnNoMine: 'You have no tasks in this project.',
+  pvnCalNote: 'This calendar shows only your own tasks, to help you plan your time.',
+  pvnCalNeed: function(n){ return (n === 1 ? '1 task has' : n + ' tasks have') + ' no end date from you yet, so ' + (n === 1 ? 'it is' : 'they are') + ' not on the calendar.'; },
   pvnTeamTasks: 'Team tasks', pvnTeamTasksHint: 'Tasks of other team members. View only. Shared tasks that you are not part of are included.',
   pvnLateChip: function(n){ return n > 0 ? 'Late · ' + n + ' day' + (n === 1 ? '' : 's') : 'Late'; }, pvnDueChip: function(d){ return 'Due ' + d; },
   pvnWaitDate: 'Waiting for date', pvnDateChosen: function(d){ return 'Date chosen · ' + d; }, pvnDoneChip: '✓ Done', pvnOpenChip: 'Open',
@@ -696,6 +701,8 @@ Object.assign(STR.ar, {
   pvnDone: function(n){ return n + ' منجزة'; }, pvnOpenUs: function(n){ return n + ' مفتوحة لدى فريقك'; }, pvnOpenOthers: function(n){ return n + ' مفتوحة لدى آخرين'; }, pvnOpenN: function(n){ return n + ' مفتوحة'; },
   pvnLateN: function(n){ return n + ' متأخرة'; }, pvnNeedDatesN: function(n){ return n === 1 ? 'تاريخ واحد مطلوب' : n + ' تواريخ مطلوبة'; },
   pvnNoMine: 'ليس لديك مهام في هذا المشروع.',
+  pvnCalNote: 'يعرض هذا التقويم مهامك أنت فقط، لمساعدتك على تخطيط وقتك.',
+  pvnCalNeed: function(n){ return (n === 1 ? 'مهمة واحدة بلا تاريخ انتهاء منك' : n + ' مهام بلا تاريخ انتهاء منك') + '، لذلك لا تظهر في التقويم.'; },
   pvnTeamTasks: 'مهام الفريق', pvnTeamTasksHint: 'مهام أعضاء الفريق الآخرين للاطلاع فقط. تشمل المهام المشتركة التي لست طرفاً فيها.',
   pvnLateChip: function(n){ return n > 0 ? 'متأخرة · ' + n + ' ' + (n === 1 ? 'يوم' : 'أيام') : 'متأخرة'; }, pvnDueChip: function(d){ return 'الموعد ' + d; },
   pvnWaitDate: 'بانتظار التاريخ', pvnDateChosen: function(d){ return 'تم اختيار التاريخ · ' + d; }, pvnDoneChip: '✓ منجزة', pvnOpenChip: 'مفتوحة',
@@ -1350,14 +1357,33 @@ function pvgSwitchHtml(pid) {
     '<button data-pvg="mode" data-pid="' + p + '" data-mode="month" class="' + (mm ? 'on' : '') + '" aria-pressed="' + (mm ? 'true' : 'false') + '">' + escapeHtml(t('pvgMonth')) + '</button></span>';
 }
 function pvgHeat(n) { return 'pvg-h' + (n >= 4 ? 4 : n); }
+// Calendar view: show my own dates. A team task is placed by MY part (my date and status), and tasks finished by other people are left out.
+function pvnCalItems(items) {
+  var me = pvtMeId(), out = [];
+  items.forEach(function(tk) {
+    if (tk.teamTask && me) {
+      var mine = pvtSubsOf(tk).filter(function(st) { return st.ownerId === me; })[0];
+      if (!mine) return;
+      out.push(Object.assign({}, tk, { dueDate: mine.dueDate || null, status: mine.status, completedDate: mine.completedDate || null }));
+    } else if (tk.status === 'completed' && me && !pvnIsMine(tk, me)) {
+      return;
+    } else out.push(tk);
+  });
+  return out;
+}
 function pvgGridHtml(items, pid, today, selDay) {
+  var _meC = pvtMeId();
+  var _needN = items.filter(function(tk){ return pvnIsMine(tk, _meC) && pvnNeedsDate(tk); }).length;
+  var _calNote = '<div class="pvn-calnote">' + escapeHtml(t('pvnCalNote')) + '</div>' +
+    (_needN ? '<div class="pvn-calneed"><b>⏰ ' + escapeHtml(t('pvnCalNeed', _needN)) + '</b><br><button class="pvn-btn" onclick="pvnJumpToAction()">' + escapeHtml(t('pvnBanBtn')) + '</button></div>' : '');
+  items = pvnCalItems(items);
   var key = pvgMonthKey(pid, today), y = +key.slice(0, 4), m = +key.slice(5, 7) - 1, loc = pvgLocale(), p = escapeHtml(pid);
   var first = new Date(y, m, 1).getDay(), nd = new Date(y, m + 1, 0).getDate();
   var doneMonth = items.filter(function(tk){ return tk.status === 'completed' && pvgDateOnly(tk.completedDate).slice(0, 7) === key; }).length;
   var h = '<div class="pvg-cal"><div class="pvg-cal-head"><span class="pvg-cal-title">' + escapeHtml(new Date(y, m, 1).toLocaleDateString(loc, { month: 'long', year: 'numeric' })) + '</span>' +
     (doneMonth ? '<span class="pvg-cal-done">' + escapeHtml(t('pvgDoneMonth', doneMonth)) + '</span>' : '') +
     '<span class="pvg-switch"><button data-pvg="month" data-pid="' + p + '" data-dir="-1">' + escapeHtml(t('pvgPrev')) + '</button>' +
-    '<button data-pvg="month" data-pid="' + p + '" data-dir="1">' + escapeHtml(t('pvgNext')) + '</button></span></div><div class="pvg-cal-grid">';
+    '<button data-pvg="month" data-pid="' + p + '" data-dir="1">' + escapeHtml(t('pvgNext')) + '</button></span></div>' + _calNote + '<div class="pvg-cal-grid">';
   for (var i = 0; i < 7; i++) h += '<div class="pvg-cal-dow">' + escapeHtml(new Date(2023, 0, 1 + i).toLocaleDateString(loc, { weekday: 'short' })) + '</div>';
   for (var e = 0; e < first; e++) h += '<div></div>';
   for (var d = 1; d <= nd; d++) {
@@ -1402,8 +1428,9 @@ function pvgRenderGroups(items, tasks, pid, beforeDoneHtml) {
   ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k].sort(function(a, b){ return (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); }); });
   by.done.sort(function(a, b){ return (b.completedDate || '').localeCompare(a.completedDate || ''); });
   if (selDay) {
-    ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k] = by[k].filter(function(tk){ return pvgIsActiveOn(tk, selDay, today); }); });
-    by.done = by.done.filter(function(tk){ return pvgDateOnly(tk.completedDate) === selDay; });
+    var _calIds = {}; pvnCalItems(items).forEach(function(tk){ _calIds[tk.id] = tk; });
+    ['ovd', 'wk', 'nxt', 'later'].forEach(function(k){ by[k] = by[k].filter(function(tk){ return _calIds[tk.id] && pvgIsActiveOn(_calIds[tk.id], selDay, today); }); });
+    by.done = by.done.filter(function(tk){ return _calIds[tk.id] && pvgDateOnly(_calIds[tk.id].completedDate) === selDay; });
   }
   var openCount = by.ovd.length + by.wk.length + by.nxt.length + by.later.length;
 
