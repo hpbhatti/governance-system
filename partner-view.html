@@ -325,6 +325,59 @@
   .pvd-as a { color:#1a3a52; font-weight:600; cursor:pointer; text-decoration:underline; }
   .pvd-who { display:block; width:100%; text-align:start; padding:11px 13px; border:1px solid var(--line); border-radius:10px; background:#fff; font-size:14px; font-family:inherit; margin-bottom:8px; cursor:pointer; }
   .pvd-who:hover { border-color:#1a3a52; background:#eef3f7; }
+
+  /* ── v3: who-are-you gate, action banner, project at a glance, team tasks (pvn-) ── */
+  .pvn-gate { background:#e8f0fb; border:1px solid #b9cfee; border-radius:14px; padding:14px; margin:12px 0; }
+  .pvn-gate-t { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .pvn-gate-s { font-size:13px; color:var(--ink-muted); line-height:1.5; margin-bottom:10px; }
+  .pvn-names { display:flex; flex-wrap:wrap; gap:8px; }
+  .pvn-name { border:1px solid var(--ink); background:#fff; color:var(--ink); border-radius:10px; padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .pvn-chip { display:inline-flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:13px; margin:12px 0 0; }
+  .pvn-chip a { color:#1a3a52; font-weight:600; text-decoration:underline; cursor:pointer; font-size:12px; }
+  .pvn-ban { border-radius:14px; padding:13px 14px; margin:10px 0; }
+  .pvn-ban.need { background:#fbf1dd; border:1px solid #e8c987; }
+  .pvn-ban.late { background:var(--red-bg); border:1px solid #e8bcb9; }
+  .pvn-ban.ok { background:var(--green-bg); border:1px solid #b9d9c1; }
+  .pvn-ban-t { font-size:15.5px; font-weight:700; margin-bottom:3px; }
+  .pvn-ban.ok .pvn-ban-t { color:var(--green); }
+  .pvn-ban-s { font-size:13px; color:var(--ink-muted); line-height:1.5; }
+  .pvn-btn { display:inline-block; margin-top:9px; border:none; background:var(--accent); color:#fff; border-radius:10px; padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .pvn-gl { background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; margin:10px 0; }
+  .pvn-gl-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; gap:8px; }
+  .pvn-gl-top b { font-size:15px; }
+  .pvn-gl-top small { color:var(--ink-faint); font-size:11.5px; }
+  .pvn-lv { margin-bottom:12px; }
+  .pvn-lv:last-child { margin-bottom:0; }
+  .pvn-lv-h { display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:5px; gap:8px; }
+  .pvn-lv-l { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pvn-lv-h > span:last-child { color:var(--ink-muted); white-space:nowrap; }
+  .pvn-bar { display:flex; height:12px; border-radius:8px; overflow:hidden; background:#ece7da; }
+  .pvn-bar i { display:block; height:100%; }
+  .pvn-lg { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--ink-muted); margin-top:6px; }
+  .pvn-lg s { display:inline-block; width:9px; height:9px; border-radius:3px; margin-inline-end:5px; text-decoration:none; }
+  .pvn-sep { border-top:1px dashed #ddd6c4; margin:10px 0; }
+  .pvn-pill { font-size:11.5px; font-weight:700; border-radius:999px; padding:3px 10px; white-space:nowrap; }
+  .pvn-pill.g { background:#e3f1e6; color:#2d6a3f; } .pvn-pill.a { background:#fff0cf; color:#8a5a0b; } .pvn-pill.r { background:#f8e2de; color:#b4402f; }
+  .pvn-col { display:flex; justify-content:space-between; align-items:center; width:100%; background:#fff; border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-top:12px; font-size:14px; font-family:inherit; color:var(--ink); cursor:pointer; text-align:start; }
+  .pvn-col b { font-size:14.5px; } .pvn-col em { font-style:normal; color:var(--ink-muted); font-weight:500; }
+  .pvn-col-r { display:flex; gap:8px; align-items:center; }
+  .pvn-hint { font-size:12.5px; color:var(--ink-muted); margin:8px 2px 0; }
+  .pvn-row { background:#fff; border:1px solid var(--line); border-inline-start:4px solid var(--line-strong); border-radius:12px; padding:10px 12px; margin-top:7px; font-size:13.5px; }
+  .pvn-row.ovd { border-inline-start-color:var(--red); } .pvn-row.team { border-inline-start-color:var(--gold); } .pvn-row.done { opacity:.7; }
+  .pvn-row-t { display:flex; justify-content:space-between; gap:8px; align-items:center; font-weight:700; }
+  .pvn-row-m { font-size:12px; color:var(--ink-muted); margin-top:3px; }
+  .pvn-av { display:inline-block; width:20px; height:20px; border-radius:50%; background:#d9e2f1; color:#26406b; font-size:10px; font-weight:700; text-align:center; line-height:20px; margin-inline-end:6px; }
+  .pvn-subs { margin-top:8px; padding-inline-start:10px; border-inline-start:2px solid var(--line); font-size:12.5px; color:var(--ink-muted); line-height:1.9; }
+  .pvn-chipx { font-size:11.5px; border-radius:999px; padding:3px 9px; white-space:nowrap; background:#eee9dc; color:#6b6552; font-weight:600; }
+  .pvn-chipx.ok { background:#e3f1e6; color:#2d6a3f; } .pvn-chipx.red { background:#f8e2de; color:#b4402f; } .pvn-chipx.you { background:#fff0cf; color:#8a5a0b; } .pvn-chipx.blue { background:#e8eef8; color:#26558f; }
+  .pvn-prog { height:7px; border-radius:9px; background:#ece7da; margin:8px 0 4px; overflow:hidden; }
+  .pvn-prog i { display:block; height:100%; background:var(--green); }
+  .pvn-prow { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--line); font-size:13.5px; opacity:.85; }
+  .pvn-me { background:#fff8e8; border:1.5px solid var(--gold); border-radius:12px; padding:12px; margin:8px 0; }
+  .pvn-me-h { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:14px; }
+  .pvn-help { font-size:12.5px; color:var(--ink-muted); margin:6px 0 8px; }
+  .pvn-me .pvd-date { width:100%; margin-top:8px; }
+  .pvn-me .propose-btn { width:100%; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -603,6 +656,54 @@ function normalizeTaskTitles(task) {
     else task.titleEn = task.titleRaw;
   }
 }
+
+
+Object.assign(STR.en, {
+  pvnGateTitle: 'Who are you?', pvnGateSub: 'This page is shared by your team. Choose your name to see the project and your tasks.',
+  pvnYouAre: 'You are', pvnChange: 'Change',
+  pvnBanNeedDate: function(n){ return n === 1 ? '1 task needs your end date' : n + ' tasks need your end date'; },
+  pvnBanNeedAct: function(n){ return n === 1 ? '1 task needs your action' : n + ' tasks need your action'; },
+  pvnBanNeedSub: 'Open the highlighted tasks below. Each date must respect the limit shown on the task.', pvnBanBtn: 'Choose my dates ↓',
+  pvnBanLate: function(n){ return n === 1 ? '1 task is overdue' : n + ' tasks are overdue'; }, pvnBanLateSub: 'Please review the overdue tasks below.',
+  pvnBanOk: 'No end dates needed from you',
+  pvnBanOkSub: function(n, next){ return 'You have ' + n + ' open task' + (n === 1 ? '' : 's') + '.' + (next ? ' The next one is due ' + next + '.' : ''); },
+  pvnGlance: function(p){ return p + ' · at a glance'; }, pvnMainOnly: 'main tasks only', pvnWhole: 'Whole project',
+  pvnYou: function(n){ return n ? 'You · ' + n : 'You'; },
+  pvnNTasks: function(n){ return n + ' task' + (n === 1 ? '' : 's'); },
+  pvnDone: function(n){ return n + ' done'; }, pvnOpenUs: function(n){ return n + ' open with your team'; }, pvnOpenOthers: function(n){ return n + ' open with others'; }, pvnOpenN: function(n){ return n + ' open'; },
+  pvnLateN: function(n){ return n + ' late'; }, pvnNeedDatesN: function(n){ return n === 1 ? '1 needs a date' : n + ' need dates'; },
+  pvnNoMine: 'You have no tasks in this project.',
+  pvnTeamTasks: 'Team tasks', pvnTeamTasksHint: 'Tasks of other team members. View only. Shared tasks that you are not part of are included.',
+  pvnLateChip: function(n){ return n > 0 ? 'Late · ' + n + ' day' + (n === 1 ? '' : 's') : 'Late'; }, pvnDueChip: function(d){ return 'Due ' + d; },
+  pvnWaitDate: 'Waiting for date', pvnDateChosen: function(d){ return 'Date chosen · ' + d; }, pvnDoneChip: '✓ Done', pvnOpenChip: 'Open',
+  pvnDatesChosen: function(a, b){ return a + ' of ' + b + ' end dates chosen'; },
+  pvnTeamTask: 'Team task', pvnSharedBy: function(n){ return 'shared by ' + n + ' people'; }, pvnSharedByNames: function(x){ return 'shared by ' + x; }, pvnNotYou: 'not you',
+  pvnYourPart: 'Your part', pvnNeedsYourDate: 'Needs your date', pvnLatestDate: 'Latest date',
+  pvnPickRange: function(a, b){ return 'Choose a date between ' + a + ' and ' + b + '.'; }, pvnPickFrom: function(a){ return 'Choose a date on or after ' + a + '.'; }
+});
+Object.assign(STR.ar, {
+  pvnGateTitle: 'من أنت؟', pvnGateSub: 'هذه الصفحة مشتركة بين فريقك. اختر اسمك لتعرض المشروع ومهامك.',
+  pvnYouAre: 'أنت', pvnChange: 'تغيير',
+  pvnBanNeedDate: function(n){ return n === 1 ? 'مهمة واحدة تحتاج تاريخ انتهاء منك' : n + ' مهام تحتاج تاريخ انتهاء منك'; },
+  pvnBanNeedAct: function(n){ return n === 1 ? 'مهمة واحدة تحتاج إجراءً منك' : n + ' مهام تحتاج إجراءً منك'; },
+  pvnBanNeedSub: 'افتح المهام المميزة أدناه. يجب أن يلتزم كل تاريخ بالحد الظاهر على المهمة.', pvnBanBtn: 'اختيار تواريخي ↓',
+  pvnBanLate: function(n){ return n === 1 ? 'مهمة واحدة متأخرة' : n + ' مهام متأخرة'; }, pvnBanLateSub: 'يرجى مراجعة المهام المتأخرة أدناه.',
+  pvnBanOk: 'لا نحتاج منك أي تاريخ انتهاء',
+  pvnBanOkSub: function(n, next){ return 'لديك ' + n + ' ' + (n === 1 ? 'مهمة مفتوحة' : 'مهام مفتوحة') + '.' + (next ? ' موعد المهمة التالية ' + next + '.' : ''); },
+  pvnGlance: function(p){ return p + ' · نظرة عامة'; }, pvnMainOnly: 'المهام الرئيسية فقط', pvnWhole: 'المشروع كاملاً',
+  pvnYou: function(n){ return n ? 'أنت · ' + n : 'أنت'; },
+  pvnNTasks: function(n){ return n + ' ' + (n === 1 ? 'مهمة' : 'مهام'); },
+  pvnDone: function(n){ return n + ' منجزة'; }, pvnOpenUs: function(n){ return n + ' مفتوحة لدى فريقك'; }, pvnOpenOthers: function(n){ return n + ' مفتوحة لدى آخرين'; }, pvnOpenN: function(n){ return n + ' مفتوحة'; },
+  pvnLateN: function(n){ return n + ' متأخرة'; }, pvnNeedDatesN: function(n){ return n === 1 ? 'تاريخ واحد مطلوب' : n + ' تواريخ مطلوبة'; },
+  pvnNoMine: 'ليس لديك مهام في هذا المشروع.',
+  pvnTeamTasks: 'مهام الفريق', pvnTeamTasksHint: 'مهام أعضاء الفريق الآخرين للاطلاع فقط. تشمل المهام المشتركة التي لست طرفاً فيها.',
+  pvnLateChip: function(n){ return n > 0 ? 'متأخرة · ' + n + ' ' + (n === 1 ? 'يوم' : 'أيام') : 'متأخرة'; }, pvnDueChip: function(d){ return 'الموعد ' + d; },
+  pvnWaitDate: 'بانتظار التاريخ', pvnDateChosen: function(d){ return 'تم اختيار التاريخ · ' + d; }, pvnDoneChip: '✓ منجزة', pvnOpenChip: 'مفتوحة',
+  pvnDatesChosen: function(a, b){ return 'تم اختيار ' + a + ' من ' + b + ' تواريخ انتهاء'; },
+  pvnTeamTask: 'مهمة فريق', pvnSharedBy: function(n){ return 'مشتركة بين ' + n + ' أشخاص'; }, pvnSharedByNames: function(x){ return 'مشتركة بين ' + x; }, pvnNotYou: 'لا تشملك',
+  pvnYourPart: 'حصتك', pvnNeedsYourDate: 'تحتاج تاريخك', pvnLatestDate: 'آخر موعد',
+  pvnPickRange: function(a, b){ return 'اختر تاريخاً بين ' + a + ' و' + b + '.'; }, pvnPickFrom: function(a){ return 'اختر تاريخاً في ' + a + ' أو بعده.'; }
+});
 
 var currentLang = localStorage.getItem('partnerViewLang') || 'en';
 var lastData = null;
@@ -995,13 +1096,13 @@ function renderTaskCard(task, subtasks) {
     (task.feedsIntoMilestone ? '<div class="task-milestone-line">🚩 ' + t('neededFor') + ': ' + escapeHtml(milestoneTitle(task.feedsIntoMilestone)) + ' (' + fmtDate(task.feedsIntoMilestone.dueDate) + ')</div>' : '') +
     '<div class="task-title">' + escapeHtml(taskTitle(task)) + (untranslated ? ' <span class="untranslated-note">' + t('originalLanguageNote') + '</span>' : '') + '</div>' +
     (task.stakeholder ? '<div class="stakeholder-line">👤 ' + t('assignedTo') + ': <strong>' + escapeHtml(stakeholderDisplayName(task.stakeholder)) + '</strong></div>' : '') +
-    (task.teamTask ? '<div class="stakeholder-line">👥 <strong>' + escapeHtml(t('pvtWholeTeam', subtasks.length)) + '</strong> · ' + escapeHtml(t('pvtTeamTask')) + '</div>' : '') +
+    (task.teamTask ? '<div class="stakeholder-line">👥 <strong>' + escapeHtml(t('pvnTeamTask')) + '</strong> · ' + escapeHtml(t('pvnSharedBy', subtasks.length)) + '</div>' + pvnTeamProgressHtml(subtasks) : '') +
     (task.addedByPartner ? '<div class="stakeholder-line"><span class="pvd-tag">🤝 ' + escapeHtml(t('pvtAddedBy', '')) + '</span></div>' : '') +
     '<div class="task-meta">' +
       statusBadge(task) +
       priorityBadge(task.priority) +
       (task.startDate ? '<span>🚀 ' + t('startDate') + ': ' + fmtDate(task.startDate) + '</span>' : '') +
-      (task.dueDate ? '<span>📅 ' + t('due') + ': ' + fmtDate(task.dueDate) + '</span>' : '<span>📅 ' + t('pvdEndDateYouChoose') + '</span>') +
+      (task.dueDate ? '<span>📅 ' + (task.teamTask ? t('pvnLatestDate') : t('due')) + ': ' + fmtDate(task.dueDate) + '</span>' : (task.teamTask ? '' : '<span>📅 ' + t('pvdEndDateYouChoose') + '</span>')) +
       (task.datePartnerSet ? '<span class="pvd-tag">📅 ' + escapeHtml(task.dateSetBy ? t('pvdSetByName', task.dateSetBy, fmtDate(task.datePartnerSet)) : t('pvdSetByYou', fmtDate(task.datePartnerSet))) + '</span>' : '') +
       (cls === 'overdue' && pvgWorkDays(task.dueDate, todayStr()) > 0 ? '<span style="color:var(--red);font-weight:600">' + t('pvgOverdueWorkDays', pvgWorkDays(task.dueDate, todayStr())) + '</span>' : '') +
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
@@ -1275,7 +1376,7 @@ function pvgGridHtml(items, pid, today, selDay) {
     '<span><i style="background:var(--gold);height:4px"></i>' + escapeHtml(t('pvgLegendToday')) + '</span></div></div>';
 }
 
-function pvgRenderGroups(items, tasks, pid) {
+function pvgRenderGroups(items, tasks, pid, beforeDoneHtml) {
   var today = todayStr(), wkEnd = pvgWeekEnd(today), nxtEnd = pvgAddDays(wkEnd, 7);
   // Team chips only when 2 or more named people have tasks in this project
   var keys = [], seen = {};
@@ -1349,6 +1450,7 @@ function pvgRenderGroups(items, tasks, pid) {
     return h;
   }
   var showDone = !!pvgState.done[pid];
+  h += (beforeDoneHtml || '');
   h += '<div class="pvg-group-head done">' + escapeHtml(t('pvgGroupCompleted')) +
     ' <span class="pvg-count">' + escapeHtml(t('pvgTaskCount', by.done.length)) + '</span>' +
     (by.done.length ? '<button class="pvg-toggle" data-pvg="done" data-pid="' + escapeHtml(pid) + '">' + escapeHtml(showDone ? t('pvgHide') : t('pvgShow')) + '</button>' : '') + '</div>';
@@ -1379,6 +1481,152 @@ document.addEventListener('click', function(e) {
     pvgState.day[pid] = '';
   } else { return; }
   if (lastData) render(lastData);
+});
+
+// ── v3: who-are-you gate, action banner, project at a glance, team tasks (view only) ──
+function pvnNeedsGate() { return pvdTeam().length >= 2 && !pvdStoredMemberId(); }
+function pvnOwnerIsMember(id) { return !!id && pvdTeam().some(function(m) { return m.id === id; }); }
+// A task belongs to the viewer when it is theirs, shared with them, or not assigned to a named partner member.
+function pvnIsMine(tk, me) {
+  if (!me) return true;
+  if (tk.teamTask) return pvtSubsOf(tk).some(function(st) { return st.ownerId === me; });
+  if (tk.ownerId && pvnOwnerIsMember(tk.ownerId)) return tk.ownerId === me;
+  return true;
+}
+function pvnNeedsDate(tk) {
+  if (tk.status === 'completed' || tk.status === 'missed') return false;
+  if (tk.teamTask) return pvtActionSubs(tk).length > 0;
+  return tk.dateConfirmationStatus === 'needs_partner_date' || tk.dateConfirmationStatus === 'pending';
+}
+function pvnIsChoice(tk) {
+  if (tk.teamTask) return pvtActionSubs(tk).some(function(st) { return st.dateConfirmationStatus === 'needs_partner_date'; });
+  return tk.dateConfirmationStatus === 'needs_partner_date';
+}
+function pvnJumpToAction() {
+  var el = document.querySelector('.pvg-action-box');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function pvnTopHtml(mainTasks) {
+  var team = pvdTeam();
+  if (pvnNeedsGate()) {
+    return '<div class="pvn-gate"><div class="pvn-gate-t">👋 ' + escapeHtml(t('pvnGateTitle')) + '</div><div class="pvn-gate-s">' + escapeHtml(t('pvnGateSub')) + '</div><div class="pvn-names">' +
+      team.map(function(m) { return '<button class="pvn-name" onclick="pvtThisIsMe(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(pvdMemberName(m.id)) + '</button>'; }).join('') + '</div></div>';
+  }
+  var me = pvtMeId();
+  var chip = (team.length >= 2 && me) ? '<div class="pvn-chip">' + escapeHtml(t('pvnYouAre')) + ' <b>' + escapeHtml(pvdMemberName(me)) + '</b> <a onclick="pvdChangeMember()">' + escapeHtml(t('pvnChange')) + '</a></div>' : '';
+  var mine = mainTasks.filter(function(tk) { return pvnIsMine(tk, me); });
+  var needs = mine.filter(pvnNeedsDate);
+  var today = todayStr();
+  var late = mine.filter(function(tk) { return taskStatusClass(tk) === 'overdue' && !pvnNeedsDate(tk); });
+  var open = mine.filter(function(tk) { return tk.status !== 'completed' && tk.status !== 'missed'; });
+  var banner;
+  if (needs.length) {
+    var allChoice = needs.every(pvnIsChoice);
+    banner = '<div class="pvn-ban need"><div class="pvn-ban-t">⏰ ' + escapeHtml(allChoice ? t('pvnBanNeedDate', needs.length) : t('pvnBanNeedAct', needs.length)) + '</div>' +
+      '<div class="pvn-ban-s">' + escapeHtml(t('pvnBanNeedSub')) + '</div><button class="pvn-btn" onclick="pvnJumpToAction()">' + escapeHtml(t('pvnBanBtn')) + '</button></div>';
+  } else if (late.length) {
+    banner = '<div class="pvn-ban late"><div class="pvn-ban-t">⚠️ ' + escapeHtml(t('pvnBanLate', late.length)) + '</div><div class="pvn-ban-s">' + escapeHtml(t('pvnBanLateSub')) + '</div></div>';
+  } else if (mainTasks.length) {
+    var nextDue = open.filter(function(tk) { return tk.dueDate && tk.dueDate >= today; }).map(function(tk) { return tk.dueDate; }).sort()[0];
+    banner = '<div class="pvn-ban ok"><div class="pvn-ban-t">✓ ' + escapeHtml(t('pvnBanOk')) + '</div><div class="pvn-ban-s">' + escapeHtml(t('pvnBanOkSub', open.length, nextDue ? fmtDate(nextDue) : '')) + '</div></div>';
+  } else { banner = ''; }
+  return chip + banner;
+}
+function pvnYouStatus(mine) {
+  var late = mine.filter(function(tk) { return taskStatusClass(tk) === 'overdue'; }).length;
+  var needs = mine.filter(pvnNeedsDate).length;
+  if (late > 0) return { cls: 'r', label: '● ' + t('pvnLateN', late) };
+  if (needs > 0) return { cls: 'a', label: '● ' + t('pvnNeedDatesN', needs) };
+  return { cls: 'g', label: '● ' + t('statusOnTrack') };
+}
+function pvnGlanceHtml(p, st, mine, me) {
+  var bp = p.bigPicture, rows = '';
+  if (bp && bp.totalTasks) {
+    var total = bp.totalTasks;
+    var done = st.completedTotal || 0, openUs = st.yourOpenCount || 0, openOth = st.openByOthers || 0;
+    var pd = Math.round(done / total * 100), pu = Math.round(openUs / total * 100), po = Math.max(0, 100 - pd - pu);
+    var pc = { onTrack: 'g', atRisk: 'a', delayed: 'r' }[bp.statusLight || 'onTrack'] || 'g';
+    var pl = { onTrack: t('statusOnTrack'), atRisk: t('statusAtRisk'), delayed: t('statusDelayed') }[bp.statusLight || 'onTrack'];
+    rows += '<div class="pvn-lv"><div class="pvn-lv-h"><div class="pvn-lv-l"><b>' + escapeHtml(t('pvnWhole')) + '</b><span class="pvn-pill ' + pc + '">● ' + escapeHtml(pl) + '</span></div><span>' + escapeHtml(t('pvnNTasks', total)) + '</span></div>' +
+      '<div class="pvn-bar"><i style="width:' + pd + '%;background:#2d6a3f"></i><i style="width:' + pu + '%;background:#16233a"></i><i style="width:' + po + '%;background:#b9b2a0"></i></div>' +
+      '<div class="pvn-lg"><span><s style="background:#2d6a3f"></s>' + escapeHtml(t('pvnDone', done)) + '</span><span><s style="background:#16233a"></s>' + escapeHtml(t('pvnOpenUs', openUs)) + '</span><span><s style="background:#b9b2a0"></s>' + escapeHtml(t('pvnOpenOthers', openOth)) + '</span></div></div>';
+  }
+  if (me !== null && pvdTeam().length >= 1) {
+    var yDone = mine.filter(function(tk) { return tk.status === 'completed'; }).length;
+    var yOpen = mine.filter(function(tk) { return tk.status !== 'completed' && tk.status !== 'missed'; }).length;
+    var yn = mine.length || 1, ys = pvnYouStatus(mine);
+    if (rows) rows += '<div class="pvn-sep"></div>';
+    rows += '<div class="pvn-lv"><div class="pvn-lv-h"><div class="pvn-lv-l"><b>' + escapeHtml(t('pvnYou', me ? pvdMemberName(me) : '')) + '</b><span class="pvn-pill ' + ys.cls + '">' + escapeHtml(ys.label) + '</span></div><span>' + escapeHtml(t('pvnNTasks', mine.length)) + '</span></div>' +
+      '<div class="pvn-bar"><i style="width:' + Math.round(yDone / yn * 100) + '%;background:#2d6a3f"></i><i style="width:' + Math.round((mine.length - yDone) / yn * 100) + '%;background:#c98a2b"></i></div>' +
+      '<div class="pvn-lg"><span><s style="background:#2d6a3f"></s>' + escapeHtml(t('pvnDone', yDone)) + '</span><span><s style="background:#c98a2b"></s>' + escapeHtml(t('pvnOpenN', yOpen)) + '</span></div></div>';
+  }
+  if (!rows) return '';
+  return '<div class="pvn-gl"><div class="pvn-gl-top"><b>📁 ' + escapeHtml(t('pvnGlance', projectName(p))) + '</b><small>' + escapeHtml(t('pvnMainOnly')) + '</small></div>' + rows + '</div>';
+}
+function pvnTeamProgressHtml(subs) {
+  if (!subs.length) return '';
+  var chosen = subs.filter(function(st) { return !!st.dueDate; }).length;
+  return '<div class="pvn-prog"><i style="width:' + Math.round(chosen / subs.length * 100) + '%"></i></div><div class="pvn-row-m" style="margin:0 0 4px">' + escapeHtml(t('pvnDatesChosen', chosen, subs.length)) + '</div>';
+}
+function pvnSubChip(st) {
+  if (st.status === 'completed') return '<span class="pvn-chipx ok">' + escapeHtml(t('pvnDoneChip')) + '</span>';
+  if (st.status === 'missed') return '<span class="pvn-chipx red">' + escapeHtml(t('stMissed')) + '</span>';
+  if (st.dateConfirmationStatus === 'needs_partner_date' || !st.dueDate) return '<span class="pvn-chipx">' + escapeHtml(t('pvnWaitDate')) + '</span>';
+  if (taskStatusClass(st) === 'overdue') return '<span class="pvn-chipx red">' + escapeHtml(t('pvnLateChip', pvgWorkDays(st.dueDate, todayStr()))) + '</span>';
+  return '<span class="pvn-chipx ' + (st.datePartnerSet ? 'ok' : 'blue') + '">' + escapeHtml(st.datePartnerSet ? t('pvnDateChosen', fmtDate(st.dueDate)) : t('pvnDueChip', fmtDate(st.dueDate))) + '</span>';
+}
+function pvnOtherRowHtml(tk) {
+  var cls = taskStatusClass(tk);
+  var chip, meta, subsHtml = '';
+  if (tk.teamTask) {
+    var subs = pvtSubsOf(tk);
+    var names = subs.map(function(st) { return st.stakeholder ? stakeholderDisplayName(st.stakeholder) : ''; }).filter(Boolean);
+    var chosen = subs.filter(function(st) { return !!st.dueDate; }).length;
+    chip = tk.status === 'completed' ? '<span class="pvn-chipx ok">' + escapeHtml(t('pvnDoneChip')) + '</span>' : '<span class="pvn-chipx you">' + escapeHtml(t('pvnDatesChosen', chosen, subs.length)) + '</span>';
+    meta = '👥 ' + escapeHtml(t('pvnTeamTask')) + ' · ' + escapeHtml(t('pvnSharedByNames', names.join(currentLang === 'ar' ? '، ' : ', '))) + ' · ' + escapeHtml(t('pvnNotYou'));
+    subsHtml = '<div class="pvn-subs">' + subs.map(function(st) {
+      var nm = st.stakeholder ? stakeholderDisplayName(st.stakeholder) : '';
+      return '<div><span class="pvn-av">' + escapeHtml(pvgInitials(nm)) + '</span>' + escapeHtml(nm) + ' · ' + pvnSubChip(st) + '</div>';
+    }).join('') + '</div>';
+  } else {
+    var nm2 = tk.stakeholder ? stakeholderDisplayName(tk.stakeholder) : '';
+    if (cls === 'completed') chip = '<span class="pvn-chipx ok">' + escapeHtml(t('pvnDoneChip')) + '</span>';
+    else if (cls === 'overdue') chip = '<span class="pvn-chipx red">' + escapeHtml(t('pvnLateChip', pvgWorkDays(tk.dueDate, todayStr()))) + '</span>';
+    else if (!tk.dueDate) chip = '<span class="pvn-chipx">' + escapeHtml(t('pvnWaitDate')) + '</span>';
+    else chip = '<span class="pvn-chipx blue">' + escapeHtml(t('pvnDueChip', fmtDate(tk.dueDate))) + '</span>';
+    meta = '<span class="pvn-av">' + escapeHtml(pvgInitials(nm2)) + '</span>' + escapeHtml(nm2);
+  }
+  return '<div class="pvn-row ' + (cls === 'overdue' ? 'ovd ' : '') + (tk.teamTask ? 'team ' : '') + (cls === 'completed' ? 'done' : '') + '"><div class="pvn-row-t"><span>' + escapeHtml(taskTitle(tk)) + '</span>' + chip + '</div><div class="pvn-row-m">' + meta + '</div>' + subsHtml + '</div>';
+}
+function pvnOthersHtml(others, pid) {
+  if (!others.length) return '';
+  pvgState.oth = pvgState.oth || {};
+  var openL = others.filter(function(tk) { return tk.status !== 'completed' && tk.status !== 'missed'; });
+  var doneL = others.filter(function(tk) { return tk.status === 'completed' || tk.status === 'missed'; });
+  var rank = function(tk) { return taskStatusClass(tk) === 'overdue' ? 0 : (pvnNeedsAny(tk) ? 1 : 2); };
+  openL.sort(function(a, b) { return rank(a) - rank(b) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'); });
+  var late = openL.filter(function(tk) { return taskStatusClass(tk) === 'overdue'; }).length;
+  var isOpen = !!pvgState.oth[pid];
+  var arrow = isOpen ? '▾' : (currentLang === 'ar' ? '◂' : '▸');
+  var h = '<button class="pvn-col" data-pvn="oth" data-pid="' + escapeHtml(pid) + '" aria-expanded="' + (isOpen ? 'true' : 'false') + '"><b>' + escapeHtml(t('pvnTeamTasks')) + ' <em>· ' + escapeHtml(t('pvnOpenN', openL.length)) + '</em></b><span class="pvn-col-r">' +
+    (late ? '<span class="pvn-pill r">' + escapeHtml(t('pvnLateN', late)) + '</span>' : '') + '<span>' + arrow + '</span></span></button>';
+  if (isOpen) h += '<div class="pvn-hint">' + escapeHtml(t('pvnTeamTasksHint')) + '</div>' + openL.concat(doneL).map(pvnOtherRowHtml).join('');
+  return h;
+}
+function pvnNeedsAny(tk) {
+  if (tk.status === 'completed' || tk.status === 'missed') return false;
+  if (tk.teamTask) return pvtSubsOf(tk).some(function(st) { return st.dateConfirmationStatus === 'needs_partner_date'; });
+  return tk.dateConfirmationStatus === 'needs_partner_date';
+}
+document.addEventListener('click', function(e) {
+  var el = e.target.closest ? e.target.closest('[data-pvn]') : null;
+  if (!el) return;
+  if (el.getAttribute('data-pvn') === 'oth') {
+    var pid = el.getAttribute('data-pid');
+    pvgState.oth = pvgState.oth || {};
+    pvgState.oth[pid] = !pvgState.oth[pid];
+    if (lastData) render(lastData);
+  }
 });
 
 function render(data) {
@@ -1460,15 +1708,20 @@ function render(data) {
         delayBox = '<div class="delay-impact-box"><span class="icon">⚠️</span><span>' + delayMsg + '</span></div>';
       }
 
+      var _gate = pvnNeedsGate();
+      var _me = pvtMeId();
+      var _mine = _gate ? [] : items.filter(function(tk){ return pvnIsMine(tk, _me); });
+      var _others = _gate ? [] : items.filter(function(tk){ return !pvnIsMine(tk, _me); });
+      var _othersHtml = pvnOthersHtml(_others, p.id);
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
-        renderProgressZone(p, personStats) +
+        pvnGlanceHtml(p, personStats, _mine, _gate ? null : _me) +
         renderMilestonesZone(p, milestoneYourTasksMap) +
-        renderForwardLookingLine(p, personStats) +
         delayBox +
-        pvtAddBarHtml(p) + pvtPendingAddsHtml(p.id) +
-        (cardsHtml ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' : '') +
-        (cardsHtml ? pvgRenderGroups(items, tasks, p.id) : '') +
+        (_gate ? '' : pvtAddBarHtml(p) + pvtPendingAddsHtml(p.id)) +
+        (_gate ? '' : (_mine.length
+          ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' + pvgRenderGroups(_mine, tasks, p.id, _othersHtml)
+          : '<div class="pvg-empty">' + escapeHtml(t('pvnNoMine')) + '</div>' + _othersHtml)) +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
           : '') +
@@ -1485,11 +1738,7 @@ function render(data) {
       '<div class="header-partner">' + escapeHtml(partnerDisplayName(data.partner)) + '</div>' +
       '<div class="header-meta">' + t('lastUpdated') + ': ' + fmtDateTime(data.generatedAt) + '</div>' +
     '</div>' +
-    '<div class="kpi-strip">' +
-      '<div class="kpi k-total"><div class="kpi-label">' + t('totalTasks') + '</div><div class="kpi-value">' + mainTasks.length + '</div></div>' +
-      '<div class="kpi k-done"><div class="kpi-label">' + t('completed') + '</div><div class="kpi-value">' + completed + '</div></div>' +
-      '<div class="kpi k-open"><div class="kpi-label">' + t('open') + '</div><div class="kpi-value">' + open + '</div></div>' +
-    '</div>' +
+    pvnTopHtml(mainTasks) +
     ((mainTasks.length === 0 && !projectSections) ? '<div class="state-box"><div class="icon">✅</div><div class="msg">' + t('noTasks') + '</div></div>' : projectSections) +
     '<div class="footer-note">' + t('footer') + '</div>';
 }
@@ -1610,35 +1859,31 @@ function pvtTeamSubtasksHtml(parent, subs) {
     var mine = !!me && st.ownerId === me;
     var done = st.status === 'completed';
     var who = st.stakeholder ? stakeholderDisplayName(st.stakeholder) : '';
-    var dateTxt = st.dueDate ? '<span class="subtask-due">📅 ' + fmtDate(st.dueDate) + '</span>'
-      : '<span class="subtask-due">' + escapeHtml(t('pvdEndDateYouChoose')) + '</span>';
-    var tag = st.datePartnerSet ? ' <span class="pvd-tag">📅 ' + escapeHtml(st.dateSetBy ? t('pvdSetByName', st.dateSetBy, fmtDate(st.datePartnerSet)) : t('pvdSetByYou', fmtDate(st.datePartnerSet))) + '</span>' : '';
-    var act = '';
-    if (!done && st.status !== 'missed') {
-      if (!me && pvdTeam().length > 1) {
-        act = '<a class="pvt-link" onclick="pvtThisIsMe(\'' + escapeHtml(st.ownerId || '') + '\')">' + escapeHtml(t('pvtThisIsMe')) + '</a>';
-      } else if (mine) {
-        if (st.dateConfirmationStatus === 'needs_partner_date') {
-          act = '<input type="date" class="pvd-date" id="pvd-date-' + escapeHtml(st.id) + '"' + (st.startDate ? ' min="' + escapeHtml(st.startDate) + '"' : '') + (parent.dueDate ? ' max="' + escapeHtml(parent.dueDate) + '"' : '') + '>' +
-            '<button class="propose-btn" style="flex:0 0 auto" onclick="pvdChooseEndDate(\'' + st.id + '\')">✓ ' + t('pvdConfirmBtn') + '</button>' +
-            (parent.dueDate ? '<div class="date-confirm-hint" style="flex-basis:100%;margin:0">' + escapeHtml(t('pvdAfterParent', fmtDate(parent.dueDate))) + '</div>' : '');
-        } else if (st.dateConfirmationStatus === 'pending') {
-          act = '<button class="propose-btn" onclick="openDateConfirm(\'' + st.id + '\', false)">✓ ' + t('confirmDateBtn') + '</button>' +
-            '<button class="propose-btn secondary" onclick="openDateConfirm(\'' + st.id + '\', true)">📅 ' + t('chooseOtherDateBtn') + '</button>';
-        } else if (st.dateConfirmationStatus === 'awaiting_approval') {
-          act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('awaitingDateApprovalMsg')) + '</span>';
-        } else if (_pendingTaskIds[st.id] === 'pending') {
-          act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('submittedPendingLabel')) + '</span>';
-        } else {
-          act = '<button class="propose-btn" onclick="openProposeComplete(\'' + st.id + '\')">✓ ' + t('pvtMarkDone') + '</button>';
-        }
-      }
+    var chip = pvnSubChip(st);
+    if (!mine || done || st.status === 'missed') {
+      return '<div class="pvn-prow"><span>' + escapeHtml(who) + (mine ? ' <em style="color:var(--ink-faint)">(' + escapeHtml(t('pvnYourPart')) + ')</em>' : '') + '</span>' + chip + '</div>';
     }
-    return '<div class="pvt-sub"><div class="pvt-sub-top">' +
-      '<span class="subtask-title">◦ <span class="pvt-who">' + escapeHtml(who) + '</span>' + (mine ? ' <em style="color:var(--ink-faint)">(' + escapeHtml(t('pvtYourSub')) + ')</em>' : '') + '</span>' +
-      '<span class="subtask-tags">' + statusBadge(st) + dateTxt + '</span></div>' +
-      (tag ? '<div style="margin-top:4px">' + tag + '</div>' : '') +
-      (act ? '<div class="pvt-sub-act">' + act + '</div>' : '') + '</div>';
+    var act = '';
+    if (st.dateConfirmationStatus === 'needs_partner_date') {
+      var help = parent.dueDate
+        ? t('pvnPickRange', fmtDate(st.startDate || todayStr()), fmtDate(parent.dueDate))
+        : t('pvnPickFrom', fmtDate(st.startDate || todayStr()));
+      act = '<input type="date" class="pvd-date" id="pvd-date-' + escapeHtml(st.id) + '"' + (st.startDate ? ' min="' + escapeHtml(st.startDate) + '"' : '') + (parent.dueDate ? ' max="' + escapeHtml(parent.dueDate) + '"' : '') + '>' +
+        '<div class="pvn-help">' + escapeHtml(help) + '</div>' +
+        '<button class="propose-btn" onclick="pvdChooseEndDate(\'' + st.id + '\')">✓ ' + t('pvdConfirmBtn') + '</button>';
+    } else if (st.dateConfirmationStatus === 'pending') {
+      act = '<button class="propose-btn" onclick="openDateConfirm(\'' + st.id + '\', false)">✓ ' + t('confirmDateBtn') + '</button>' +
+        '<button class="propose-btn secondary" onclick="openDateConfirm(\'' + st.id + '\', true)">📅 ' + t('chooseOtherDateBtn') + '</button>';
+    } else if (st.dateConfirmationStatus === 'awaiting_approval') {
+      act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('awaitingDateApprovalMsg')) + '</span>';
+    } else if (_pendingTaskIds[st.id] === 'pending') {
+      act = '<span class="date-confirm-waiting">⏳ ' + escapeHtml(t('submittedPendingLabel')) + '</span>';
+    } else {
+      act = '<button class="propose-btn" onclick="openProposeComplete(\'' + st.id + '\')">✓ ' + t('pvtMarkDone') + '</button>';
+    }
+    var needs = st.dateConfirmationStatus === 'needs_partner_date' || st.dateConfirmationStatus === 'pending';
+    return '<div class="pvn-me"><div class="pvn-me-h"><b>' + escapeHtml(t('pvnYourPart')) + ' · ' + escapeHtml(who) + '</b>' +
+      (needs ? '<span class="pvn-chipx you">' + escapeHtml(t('pvnNeedsYourDate')) + '</span>' : chip) + '</div>' + act + '</div>';
   }).join('') + '</div>';
 }
 
