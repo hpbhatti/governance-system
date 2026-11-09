@@ -4780,7 +4780,8 @@ function getPartnerCommitment(partnerId) {
   //     was edited in the system. Backdating a completion to its true date is
   //     always respected exactly as entered.
   const relevant = state.actions.filter(a =>
-    a.partnerId === partnerId && isTask(a) && !isInternalOwned(a) && !a.teamTask);
+    a.partnerId === partnerId && isTask(a) && !isInternalOwned(a) && !a.teamTask && !pdtSubOfCountedParent(a, partnerId))
+    .concat(pdtTeamRepresentatives(partnerId));
 
   const completed = relevant.filter(isCompleted);
   const open = relevant.filter(isOpen);
@@ -8266,7 +8267,7 @@ views.projects = () => {
         <tbody>
           ${list.map(p => {
             const allPartnerIds = Array.isArray(p.partnerIds) ? p.partnerIds : [p.partnerId];
-            const acts = getProjectActions(p.id);
+            const acts = getProjectActions(p.id).filter(a => !pdtIsAnySub(a.id));
             const completedActs = acts.filter(isCompleted).length;
             const attachCount = (p.attachments || []).length;
             return `
@@ -8312,7 +8313,7 @@ views.projectDetail = (projectId) => {
   const partner = getPartner(p.partnerId);
   const actions = getProjectActions(projectId);
   // Tasks, milestones and meetings are kept strictly separate
-  const tasks = actions.filter(a => isTask(a) && !a.isMilestone);
+  const tasks = actions.filter(a => isTask(a) && !a.isMilestone && !pdtIsAnySub(a.id));
   const milestones = actions.filter(isMilestone);
   const projectMeetings = actions.filter(isMeeting);
   const open = tasks.filter(isOpen);
@@ -9052,7 +9053,7 @@ views.partnerDetail = (partnerId) => {
               <thead><tr><th>${t('colProject')}</th><th>${t('cardAgreement')}</th><th>${t('colDate')}</th><th>${t('colActions')}</th></tr></thead>
               <tbody>
                 ${projects.map(pr => {
-                  const acts = getProjectActions(pr.id);
+                  const acts = getProjectActions(pr.id).filter(a => !pdtIsAnySub(a.id));
                   const c = acts.filter(isCompleted).length;
                   return `<tr style="cursor:pointer" onclick="viewProject('${pr.id}')">
                     <td><div class="name">${escapeHtml(pr.name)}</div><div class="sub">${escapeHtml(pr.description || '')}</div></td>
@@ -11446,6 +11447,28 @@ function pdtEditSettingOn(a) {
     else if (a.teamTask) partner = getPartnerForMemberId((a.teamMemberIds || [])[0]) || getPartner(a.partnerId);
     return !!partner && pdaEffective(partner, getProject(pid)).chooseDates;
   } catch (e) { return false; }
+}
+
+/* A team task counts as ONE item in totals and in the commitment score.
+   It is judged by its worst part: a missed part, then the most overdue open part, then any open part.
+   Only when every part is complete is the team task complete, judged by its most delayed part. */
+function pdtTeamRepresentatives(partnerId) {
+  const out = [];
+  state.actions.forEach(m => {
+    if (!m.teamTask || m.partnerId !== partnerId || m.type === 'meeting') return;
+    const subs = state.actions.filter(x => x.parentId === m.id && x.type !== 'meeting');
+    if (!subs.length) return;
+    const missed = subs.filter(isMissed);
+    if (missed.length) { out.push(missed[0]); return; }
+    const open = subs.filter(isOpen);
+    if (open.length) {
+      const late = open.filter(x => getDelayDays(x) > 0).sort((a, b) => getDelayDays(b) - getDelayDays(a));
+      out.push(late.length ? late[0] : open[0]); return;
+    }
+    const done = subs.filter(isCompleted).sort((a, b) => getDelayDays(b) - getDelayDays(a));
+    if (done.length) out.push(done[0]);
+  });
+  return out;
 }
 
 /* Team subtasks never appear in the Depends On list or the Linked Deliverable list. Only the main task does. */
@@ -14077,13 +14100,28 @@ function computeProjectBreakdownForTeamMember(memberId) {
   return Object.values(byProject);
 }
 
+/* Any subtask (automatic team part or hand-added) is a part of its parent. Totals count the parent only. */
+function pdtIsAnySub(id) {
+  const a = state.actions.find(x => x.id === id);
+  return !!(a && a.parentId && state.actions.some(x => x.id === a.parentId));
+}
+/* For one partner: a subtask is a part of a counted parent when its parent is a team task, or the parent also belongs to this partner. */
+function pdtSubOfCountedParent(a, partnerId) {
+  if (!a || !a.parentId) return false;
+  const par = state.actions.find(x => x.id === a.parentId);
+  if (!par) return false;
+  if (par.teamTask) return true;
+  return par.partnerId === partnerId && isTask(par) && !isInternalOwned(par);
+}
 function computeProjectBreakdownForPartner(partnerId, onlyMemberId) {
   const p = getPartner(partnerId);
   const teamIds = new Set((p && p.team || []).map(m => m.id));
   const byProject = {};
   state.actions.forEach(a => {
     if (a.type === 'meeting' || isCompleted(a) || isMissed(a)) return;
-    if (a.teamTask) return; // container of a team task: its subtasks are counted instead
+    if (a.teamTask && onlyMemberId) return; // person view: the team task is shown through the person's own part
+    const _pdtSub = pdtIsTeamSub(a.id);
+    const _pdtCount = onlyMemberId ? true : !(_pdtSub || pdtSubOfCountedParent(a, partnerId)); // partner view: a team task counts once, through its main task
     if (onlyMemberId && !(a.ownerKind === 'partner' && a.ownerId === onlyMemberId)) return;
     const belongsToThisPartner = a.ownerKind === 'partner'
       ? teamIds.has(a.ownerId)
@@ -14091,15 +14129,23 @@ function computeProjectBreakdownForPartner(partnerId, onlyMemberId) {
     if (!belongsToThisPartner) return;
     const proj = getProject(a.projectId);
     if (!proj) return;
-    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, projectId: proj.id, openCount: 0, overdueCount: 0, criticalTasks: [], dateConfirmTasks: [], needsDateTasks: [] };
-    byProject[proj.id].openCount++;
-    if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
-    if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
+    if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, projectId: proj.id, openCount: 0, overdueCount: 0, teamOpenCount: 0, criticalTasks: [], dateConfirmTasks: [], needsDateTasks: [] };
+    if (_pdtCount) {
+      byProject[proj.id].openCount++;
+      if (_pdtSub) byProject[proj.id].teamOpenCount++;
+      if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
+      if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
+    }
     // Tasks still awaiting this partner's date confirmation get their own
     // separate list, so the email can call them out ahead of the regular
     // pending list rather than burying them in the normal count.
     if (a.dateConfirmationStatus === 'pending') byProject[proj.id].dateConfirmTasks.push({ title: a.title, proposedDate: fmtDate(a.proposedDueDate || a.dueDate) });
-    if (a.dateConfirmationStatus === 'needs_partner_date' && !a.dueDate) byProject[proj.id].needsDateTasks.push({ title: a.title, startDate: a.startDate ? fmtDate(a.startDate) : '', ownerId: a.ownerId });
+    if (a.dateConfirmationStatus === 'needs_partner_date' && !a.dueDate) byProject[proj.id].needsDateTasks.push({ title: a.title, startDate: a.startDate ? fmtDate(a.startDate) : '', ownerId: a.ownerId, maxDate: (() => { const _pa = a.parentId && state.actions.find(x => x.id === a.parentId); return _pa && _pa.teamTask && _pa.dueDate ? fmtDate(_pa.dueDate) : ''; })() });
+  });
+  Object.values(byProject).forEach(b => {
+    const _all = state.actions.filter(a => a.projectId === b.projectId && isTask(a) && !a.isMilestone && !pdtIsAnySub(a.id));
+    b.projectTotal = _all.length;
+    b.projectDone = _all.filter(isCompleted).length;
   });
   return Object.values(byProject);
 }
@@ -14257,7 +14303,7 @@ function printPartnerReport(partnerId, existingEntry) {
         <thead><tr><th>${t('colProject')}</th><th>${t('cardAgreement')}</th><th>${t('statStartDate')}</th><th>${t('statTargetDate')}</th><th>${t('colCompletedTotal')}</th></tr></thead>
         <tbody>
           ${projects.map(pr => {
-            const a = getProjectTasks(pr.id); // tasks only — meetings excluded from counts
+            const a = getProjectTasks(pr.id).filter(x => !pdtIsAnySub(x.id)); // tasks only — meetings excluded from counts; a team task counts once
             const c = a.filter(isCompleted).length;
             return `<tr>
               <td><strong>${escapeHtml(pr.name)}</strong><div style="font-size:11px;color:var(--ink-faint)">${escapeHtml(pr.description || '')}</div></td>
