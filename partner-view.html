@@ -1712,15 +1712,18 @@ function render(data) {
       var _me = pvtMeId();
       var _mine = _gate ? [] : items.filter(function(tk){ return pvnIsMine(tk, _me); });
       var _others = _gate ? [] : items.filter(function(tk){ return !pvnIsMine(tk, _me); });
-      var _othersHtml = pvnOthersHtml(_others, p.id);
+      var _othersDone = _others.filter(function(tk){ return tk.status === 'completed'; });
+      var _othersOpen = _others.filter(function(tk){ return tk.status !== 'completed'; });
+      var _othersHtml = pvnOthersHtml(_othersOpen, p.id);
+      var _groupItems = _mine.concat(_othersDone);
       return '<div class="project-section">' +
         '<div class="project-head"><div><div class="project-eyebrow">' + t('projectLabel') + '</div><div class="project-name">📁 ' + escapeHtml(projectName(p)) + '</div></div></div>' +
         pvnGlanceHtml(p, personStats, _mine, _gate ? null : _me) +
         renderMilestonesZone(p, milestoneYourTasksMap) +
         delayBox +
         (_gate ? '' : pvtAddBarHtml(p) + pvtPendingAddsHtml(p.id)) +
-        (_gate ? '' : (_mine.length
-          ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' + pvgRenderGroups(_mine, tasks, p.id, _othersHtml)
+        (_gate ? '' : (_groupItems.length
+          ? '<div class="pv-task-rule"><span class="pv-task-rule-label">' + t('yourTasks') + '</span>' + pvgSwitchHtml(p.id) + '</div>' + pvgRenderGroups(_groupItems, tasks, p.id, _othersHtml)
           : '<div class="pvg-empty">' + escapeHtml(t('pvnNoMine')) + '</div>' + _othersHtml)) +
         (p.attachments && p.attachments.length
           ? '<div class="pv-files-rule"><span class="pv-files-rule-label">' + t('projectFilesZone') + '</span></div>'
