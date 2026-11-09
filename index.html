@@ -11248,7 +11248,7 @@ async function pdaSendRemind() {
           items: x.tasks.map(a => ({ title: pdaPickL(a, 'title', _pl) || a.title, projectName: proj ? pdaPickL(proj, 'name', _pl) : '', startDate: a.startDate ? fmtDate(a.startDate) : '', isSubtask: !!a.parentId })),
           linkUrl, lang: _pl };
       } else {
-        const breakdown = computeProjectBreakdownForPartner(x.partner.id).map(b => Object.assign({}, b, { needsDateTasks: (b.needsDateTasks || []).filter(n => n.ownerId === x.member.id) }));
+        const breakdown = computeProjectBreakdownForPartner(x.partner.id, x.member.id); // this person's own tasks and parts only
         body = { recipients: [x.member.email], recipientName: x.member.name, recipientType: 'team_member', projectBreakdown: breakdown, linkUrl, lang: pdaPartnerLang(x.partner) };
       }
       const res = await fetch(SEND_EMAIL_FUNCTION_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -14132,7 +14132,7 @@ function computeProjectBreakdownForPartner(partnerId, onlyMemberId) {
     if (!byProject[proj.id]) byProject[proj.id] = { projectName: proj.name, projectId: proj.id, openCount: 0, overdueCount: 0, teamOpenCount: 0, criticalTasks: [], dateConfirmTasks: [], needsDateTasks: [] };
     if (_pdtCount) {
       byProject[proj.id].openCount++;
-      if (_pdtSub) byProject[proj.id].teamOpenCount++;
+      if (_pdtSub || (a.teamTask && !onlyMemberId)) byProject[proj.id].teamOpenCount++;
       if (a.dueDate && a.dueDate < todayDate()) byProject[proj.id].overdueCount++;
       if (a.criticalNote) byProject[proj.id].criticalTasks.push({ title: a.title, note: a.criticalNote });
     }
