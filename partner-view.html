@@ -1108,7 +1108,7 @@ function renderTaskCard(task, subtasks) {
       (cls === 'completed' && task.completedDate ? '<span style="color:var(--green)">✓ ' + t('completedOn') + ' ' + fmtDate(task.completedDate) + '</span>' : '') +
     '</div>' +
     (task.teamTask ? pvtTeamSubtasksHtml(task, subtasks) : renderSubtasks(subtasks)) +
-    (task.dateConfirmationStatus === 'needs_partner_date' ?
+    ((cls === 'completed' || cls === 'missed') ? '' : task.dateConfirmationStatus === 'needs_partner_date' ?
       (task.lastDateRejectionReason ?
         '<div class="date-reject-note">' +
           '<div class="date-reject-lbl">' + t('dateNotApprovedLabel') + '</div>' +
