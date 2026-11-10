@@ -11167,6 +11167,7 @@ function pdaRefreshTaskDateHint() {
 /* ---- Task list tags ---- */
 function pdaDateTagsHtml(a) {
   if (!a || a.type === 'meeting') return '';
+  if (isCompleted(a)) return a.datePartnerSet ? '<span class="pda-tag pda-set">📅 ' + t('pdaSetByTag') + (a.dateSetBy ? ' · ' + escapeHtml(a.dateSetBy) : '') + ' · ' + fmtDate(a.datePartnerSet) + '</span>' : '';
   if (!a.dueDate && a.dateConfirmationStatus === 'needs_partner_date') return '<span class="pda-tag pda-wait">' + t('pdaWaitTag') + '</span>';
   if (!a.dueDate && a.dateConfirmationStatus === 'awaiting_approval') return '<span class="pda-tag pda-wait">' + t('pdaWaitApprovalTag') + '</span>';
   if (a.datePartnerSet) return '<span class="pda-tag pda-set">📅 ' + t('pdaSetByTag') + (a.dateSetBy ? ' · ' + escapeHtml(a.dateSetBy) : '') + ' · ' + fmtDate(a.datePartnerSet) + '</span>';
@@ -12570,6 +12571,8 @@ function completeAction(id) {
   const wasAlreadyCompleted = isCompleted(a);
   a.status = 'completed';
   a.completedDate = todayDate();
+  // A finished task no longer waits for a date from the partner.
+  if (['needs_partner_date', 'awaiting_approval', 'pending'].indexOf(a.dateConfirmationStatus) !== -1) a.dateConfirmationStatus = undefined;
   markRowDirty('actions', a.id);
   saveState();
   // Tell the team member's manager, if he has one. This covers the Complete
@@ -14140,7 +14143,7 @@ function computeProjectBreakdownForPartner(partnerId, onlyMemberId) {
     // separate list, so the email can call them out ahead of the regular
     // pending list rather than burying them in the normal count.
     if (a.dateConfirmationStatus === 'pending') byProject[proj.id].dateConfirmTasks.push({ title: a.title, proposedDate: fmtDate(a.proposedDueDate || a.dueDate) });
-    if (a.dateConfirmationStatus === 'needs_partner_date' && !a.dueDate) byProject[proj.id].needsDateTasks.push({ title: a.title, startDate: a.startDate ? fmtDate(a.startDate) : '', ownerId: a.ownerId, maxDate: (() => { const _pa = a.parentId && state.actions.find(x => x.id === a.parentId); return _pa && _pa.teamTask && _pa.dueDate ? fmtDate(_pa.dueDate) : ''; })() });
+    if (a.dateConfirmationStatus === 'needs_partner_date' && !a.dueDate && !isCompleted(a)) byProject[proj.id].needsDateTasks.push({ title: a.title, startDate: a.startDate ? fmtDate(a.startDate) : '', ownerId: a.ownerId, maxDate: (() => { const _pa = a.parentId && state.actions.find(x => x.id === a.parentId); return _pa && _pa.teamTask && _pa.dueDate ? fmtDate(_pa.dueDate) : ''; })() });
   });
   Object.values(byProject).forEach(b => {
     const _all = state.actions.filter(a => a.projectId === b.projectId && isTask(a) && !a.isMilestone && !pdtIsAnySub(a.id));
